@@ -2,6 +2,9 @@
 .godot/
 .import/
 
+# Python virtual environment
+venv/
+
 # Imported translations (automatically generated from CSV files)
 *.translation
 
@@ -34,3 +37,6 @@ exports/
 
 # OS generated files
 Thumbs.db
+
+# Screenshots (development only, not for repo)
+screenshots/
