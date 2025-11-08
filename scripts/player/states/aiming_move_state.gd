@@ -18,6 +18,7 @@ func enter() -> void:
 		last_direction = InputManager.get_aim_direction_grid()
 	if player:
 		player.movement_target = last_direction
+		player.update_move_indicator()
 
 func exit() -> void:
 	super.exit()
