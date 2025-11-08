@@ -47,5 +47,6 @@ layout_mode = 2
 
 [node name="Status" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Press START to begin development testing"
+text = "Press START to begin development testing
+Press SELECT or ESC to quit"
 horizontal_alignment = 1

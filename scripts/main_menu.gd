@@ -1,41 +1,42 @@
 extends Control
-## Main Menu
-## Temporary placeholder during initial development
+## Main Menu - Entry point for the game
+##
+## Simple menu with controller/keyboard support
+## Uses clean input handling (no need for state machine here)
 
 @onready var status_label: Label = $CenterContainer/VBoxContainer/Status
 
 func _ready() -> void:
-	print("Backrooms Power Crawl - Main Menu loaded")
-	print("Project initialized successfully!")
-	print("Waiting for input... (Controller START or keyboard SPACE)")
+	print("[MainMenu] Loaded")
+	print("[MainMenu] Waiting for input...")
 
-	# List connected joypads for debugging
-	var joypads = Input.get_connected_joypads()
-	if joypads.size() > 0:
-		print("Connected controllers: ", joypads)
-		for joypad in joypads:
-			print("  - ", Input.get_joy_name(joypad))
-	else:
-		print("WARNING: No controllers detected!")
+	# InputManager will show connected controllers automatically
+	if InputManager:
+		print("[MainMenu] InputManager active")
 
 func _input(event: InputEvent) -> void:
-	# Debug: Print ALL input events to help debug controller
-	if event is InputEventJoypadButton:
-		print("Joypad button pressed: ", event.button_index, " (", event.as_text(), ")")
+	# Start game with pause action (START button or ESCAPE)
+	if event.is_action_pressed("pause"):
+		_start_game()
 
-	# Check for START button (pause action)
-	if Input.is_action_just_pressed("pause"):
-		_on_start_pressed()
+	# Quit with inventory action (SELECT button or I key)
+	if event.is_action_pressed("inventory"):
+		_quit_game()
 
-	# Keyboard fallback for testing
+	# Keyboard fallback: SPACE also starts
 	if event is InputEventKey and event.pressed and event.keycode == KEY_SPACE:
-		_on_start_pressed()
+		_start_game()
 
-func _on_start_pressed() -> void:
-	print("========================================")
-	print("START PRESSED - No game scene yet!")
-	print("========================================")
-	status_label.text = "Button detected! No game scene to load yet."
+	# Keyboard fallback: ESC also quits
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_quit_game()
+
+func _start_game() -> void:
+	print("[MainMenu] Starting game...")
+	status_label.text = "Loading game..."
 	status_label.modulate = Color.GREEN
-	# TODO: Load game scene when ready
-	# get_tree().change_scene_to_file("res://scenes/game.tscn")
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+func _quit_game() -> void:
+	print("[MainMenu] Quitting...")
+	get_tree().quit()

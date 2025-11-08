@@ -1,0 +1,80 @@
+[gd_scene load_steps=8 format=3 uid="uid://ckj3vwx8qn1yf"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/grid.gd" id="2_grid"]
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="3_player"]
+[ext_resource type="Script" path="res://scripts/player/input_state_machine.gd" id="4_state_machine"]
+[ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="5_idle"]
+[ext_resource type="Script" path="res://scripts/player/states/aiming_move_state.gd" id="6_aiming"]
+[ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="7_executing"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="Grid" type="Node2D" parent="."]
+script = ExtResource("2_grid")
+
+[node name="TileContainer" type="Node2D" parent="Grid"]
+
+[node name="Player" type="Node2D" parent="."]
+script = ExtResource("3_player")
+
+[node name="InputStateMachine" type="Node" parent="Player"]
+script = ExtResource("4_state_machine")
+
+[node name="IdleState" type="Node" parent="Player/InputStateMachine"]
+script = ExtResource("5_idle")
+
+[node name="AimingMoveState" type="Node" parent="Player/InputStateMachine"]
+script = ExtResource("6_aiming")
+
+[node name="ExecutingTurnState" type="Node" parent="Player/InputStateMachine"]
+script = ExtResource("7_executing")
+
+[node name="Sprite" type="Label" parent="Player"]
+offset_right = 32.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 24
+text = "🚶"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MoveIndicator" type="Label" parent="Player"]
+visible = false
+offset_right = 32.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 24
+text = "→"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+zoom = Vector2(1.5, 1.5)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TurnCounter" type="Label" parent="UI"]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 500.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "Turn: 0 | Pos: (0, 0) | State: None"
+
+[node name="Instructions" type="Label" parent="UI"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -100.0
+offset_right = 600.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "LEFT STICK / WASD: Aim movement
+RIGHT TRIGGER / SPACE: Confirm move
+START / ESC: Return to menu
+
+ARCHITECTURE: InputManager + State Machine + Actions"

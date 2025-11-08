@@ -4,6 +4,163 @@
 
 This document outlines the technical architecture for Backrooms Power Crawl, focusing on systems design, data structures, and implementation patterns.
 
+## ✅ Implemented Architecture (Current)
+
+### Three-Layer Input & Turn System
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   RAW INPUT LAYER                           │
+│  Controller / Keyboard → Godot Input Actions                │
+└──────────────────┬──────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────┐
+│              INPUTMANAGER (Autoload)                        │
+│  - Device abstraction (controller + keyboard identical)     │
+│  - Deadzone handling (radial, 0.2 default)                  │
+│  - Analog → 8-direction grid conversion (angle-based)       │
+│  - Action tracking for frame-based queries                  │
+└──────────────────┬──────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────┐
+│              STATE MACHINE LAYER                            │
+│  Player → InputStateMachine → Current State                 │
+│    States: IdleState, AimingMoveState, ExecutingTurnState   │
+│  - State-specific input handling                            │
+│  - Turn boundaries explicit                                 │
+│  - Queries InputManager for normalized input                │
+└──────────────────┬──────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────┐
+│              ACTION LAYER (Command Pattern)                 │
+│  States create Actions → Actions validate & execute         │
+│    Actions: MovementAction, WaitAction, (future: others)    │
+│  - Decouples input from execution                           │
+│  - Enables replays, AI, undo (future)                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### File Structure
+
+```
+scripts/
+├── autoload/
+│   └── input_manager.gd           # InputManager singleton (autoload)
+├── actions/
+│   ├── action.gd                  # Base Action class
+│   ├── movement_action.gd         # Move in direction
+│   └── wait_action.gd             # Pass turn
+├── player/
+│   ├── player.gd                  # Player controller
+│   ├── input_state_machine.gd    # State machine manager
+│   └── states/
+│       ├── player_input_state.gd  # Base state class
+│       ├── idle_state.gd          # Waiting for input
+│       ├── aiming_move_state.gd   # Aiming movement
+│       └── executing_turn_state.gd # Processing turn
+├── grid.gd                        # Grid/map management
+└── game.gd                        # Main game scene
+```
+
+### InputManager (Autoload)
+
+**Purpose**: Normalize input from different devices, provide unified API
+
+**Features**:
+- `get_aim_direction() -> Vector2` - Normalized analog input
+- `get_aim_direction_grid() -> Vector2i` - 8-way grid-snapped direction
+- `is_action_just_pressed(action: String) -> bool` - Frame-based action query
+- Radial deadzone (0.2 default, configurable)
+- Angle-based 8-direction conversion for clean diagonals
+- Debug mode with console logging
+
+**Usage**:
+```gdscript
+# From any script
+var aim = InputManager.get_aim_direction_grid()
+if InputManager.is_action_just_pressed("move_confirm"):
+    execute_action()
+```
+
+### State Machine Pattern
+
+**Purpose**: Manage player input modes and turn boundaries
+
+**States**:
+1. **IdleState**: Waiting for player input
+   - Transitions to AimingMoveState when stick/WASD pressed
+2. **AimingMoveState**: Player aiming movement direction
+   - Shows preview indicator (green if valid, red if blocked)
+   - Confirms with move_confirm action
+   - Returns to IdleState if stick released
+   - Transitions to ExecutingTurnState on confirm
+3. **ExecutingTurnState**: Processing turn
+   - Input blocked during turn execution
+   - Executes pending action
+   - Processes enemy turns (future)
+   - Returns to IdleState when complete
+
+**State Lifecycle**:
+```
+IdleState
+  ├─ stick_moved → AimingMoveState
+  └─ (waiting)
+
+AimingMoveState
+  ├─ stick_released → IdleState
+  ├─ move_confirm + valid → ExecutingTurnState
+  └─ move_confirm + invalid → (stay, show error)
+
+ExecutingTurnState
+  ├─ execute_action()
+  ├─ process_enemies() [future]
+  └─ turn_complete → IdleState
+```
+
+### Action Pattern (Command)
+
+**Purpose**: Decouple input from execution, enable replays/AI
+
+**Base Class**:
+```gdscript
+class_name Action
+  func can_execute(player) -> bool
+  func execute(player) -> void
+```
+
+**Implemented Actions**:
+- **MovementAction**: Move player in direction, validate bounds/walls
+- **WaitAction**: Pass turn without moving
+
+**Future Actions**:
+- AbilityAction, ExamineAction, InteractAction, etc.
+
+### Grid System
+
+**Purpose**: Manage map data, tile rendering, viewport culling
+
+**Features**:
+- 2D array grid data (0 = floor, 1 = wall)
+- Viewport culling: Only render ~400 tiles near player (not 16k!)
+- `is_walkable(pos)` - Query tile walkability
+- `render_around_position(pos)` - Update visible tiles
+- ASCII/emoji placeholder graphics
+
+### Input Configuration (project.godot)
+
+All actions support both controller and keyboard:
+- **move_confirm**: R2 / SPACE
+- **pause**: START / ESC
+- **inventory**: SELECT / I
+- **toggle_ability_1-4**: RB/LB/X/Y / 1/2/3/4
+- **examine_mode**: L1 / TAB
+
+Movement uses Godot's built-in ui_left/ui_right/ui_up/ui_down (stick + WASD)
+
+---
+
+## 🔮 Planned Architecture (Future)
+
 ## Engine: Godot 4.3+
 
 ### Why Godot
