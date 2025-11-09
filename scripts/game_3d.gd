@@ -11,8 +11,15 @@ extends Node3D
 func _ready() -> void:
 	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Initializing 3D viewport (640x480 with PSX shaders)")
 
-	# Initialize grid
-	grid.initialize(Grid3D.GRID_SIZE)
+	# Load and configure Level 0
+	var level_0 := LevelManager.load_level(0)
+	if level_0:
+		grid.configure_from_level(level_0)
+		LevelManager.transition_to_level(0)
+	else:
+		# Fallback to default grid if level config not found
+		push_warning("[Game3D] Level 0 config not found, using default grid")
+		grid.initialize(Grid3D.GRID_SIZE)
 
 	# Link player to grid and indicator
 	player.grid = grid

@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 
 InputManager="*res://scripts/autoload/input_manager.gd"
 Log="*res://scripts/autoload/logger.gd"
+LevelManager="*res://scripts/autoload/level_manager.gd"
 
 [display]
 

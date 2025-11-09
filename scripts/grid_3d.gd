@@ -4,6 +4,8 @@ extends Node3D
 ##
 ## Maintains same logical grid (Vector2i) as 2D version,
 ## but renders in 3D space using GridMap.
+##
+## Now supports LevelConfig for configurable generation parameters.
 
 # Grid configuration
 const GRID_SIZE := Vector2i(128, 128)
@@ -15,6 +17,9 @@ const CELL_SIZE := Vector3(2.0, 1.0, 2.0)  # X, Y (height), Z - doubled for visi
 # Grid data (same as 2D version)
 var grid_size: Vector2i = GRID_SIZE
 var walkable_cells: Array[Vector2i] = []
+
+# Current level configuration
+var current_level: LevelConfig = null
 
 # MeshLibrary item IDs
 enum TileType {
@@ -32,9 +37,57 @@ func _ready() -> void:
 	print("[Grid3D] Initialized: %d x %d" % [grid_size.x, grid_size.y])
 
 func initialize(size: Vector2i) -> void:
-	"""Initialize grid with given size"""
+	"""Initialize grid with given size (legacy method)"""
 	grid_size = size
 	_generate_grid()
+
+func configure_from_level(level_config: LevelConfig) -> void:
+	"""Configure grid from a LevelConfig resource"""
+	if not level_config:
+		push_error("[Grid3D] Cannot configure from null LevelConfig")
+		return
+
+	current_level = level_config
+	grid_size = level_config.grid_size
+
+	Log.system("Configuring grid for: %s" % level_config.display_name)
+	Log.system("Grid size: %d x %d" % [grid_size.x, grid_size.y])
+
+	# Apply visual settings
+	_apply_level_visuals(level_config)
+
+	# Generate grid with level parameters
+	_generate_grid()
+
+	# Lifecycle hook
+	level_config.on_generation_complete()
+
+func _apply_level_visuals(config: LevelConfig) -> void:
+	"""Apply visual settings from level config"""
+	# Apply materials if provided
+	if config.floor_material:
+		Log.system("Applying custom floor material")
+		# TODO: Apply to GridMap when material system is implemented
+
+	if config.wall_material:
+		Log.system("Applying custom wall material")
+		# TODO: Apply to GridMap when material system is implemented
+
+	# Apply fog settings
+	if has_node("/root/Game3D/WorldEnvironment"):
+		var env = get_node("/root/Game3D/WorldEnvironment").environment
+		if env:
+			# TODO: Configure fog when Environment is set up
+			pass
+
+	# Load custom MeshLibrary if specified
+	if not config.mesh_library_path.is_empty() and config.mesh_library_path != grid_map.mesh_library.resource_path:
+		var mesh_lib = load(config.mesh_library_path) as MeshLibrary
+		if mesh_lib:
+			grid_map.mesh_library = mesh_lib
+			Log.system("Loaded MeshLibrary: %s" % config.mesh_library_path)
+		else:
+			push_error("[Grid3D] Failed to load MeshLibrary: %s" % config.mesh_library_path)
 
 # ============================================================================
 # GRID GENERATION
