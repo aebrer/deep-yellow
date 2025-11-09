@@ -1,80 +1,161 @@
-[gd_scene load_steps=8 format=3 uid="uid://ckj3vwx8qn1yf"]
+[gd_scene load_steps=3 format=3 uid="uid://bqm3n2v8xk7yx"]
 
-[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
-[ext_resource type="Script" path="res://scripts/grid.gd" id="2_grid"]
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="3_player"]
-[ext_resource type="Script" path="res://scripts/player/input_state_machine.gd" id="4_state_machine"]
-[ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="5_idle"]
-[ext_resource type="Script" path="res://scripts/player/states/aiming_move_state.gd" id="6_aiming"]
-[ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="7_executing"]
+[ext_resource type="PackedScene" uid="uid://cy7w8qn1yf3d" path="res://scenes/game_3d.tscn" id="1_game3d"]
+[ext_resource type="Script" path="res://scripts/game.gd" id="2_game"]
 
-[node name="Game" type="Node2D"]
-script = ExtResource("1_game")
+[node name="Game" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_game")
 
-[node name="Grid" type="Node2D" parent="."]
-script = ExtResource("2_grid")
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
-[node name="TileContainer" type="Node2D" parent="Grid"]
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
 
-[node name="Player" type="Node2D" parent="."]
-script = ExtResource("3_player")
+[node name="LeftSide" type="VBoxContainer" parent="MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+theme_override_constants/separation = 10
 
-[node name="InputStateMachine" type="Node" parent="Player"]
-script = ExtResource("4_state_machine")
+[node name="ViewportPanel" type="PanelContainer" parent="MarginContainer/HBoxContainer/LeftSide"]
+layout_mode = 2
+size_flags_vertical = 3
 
-[node name="IdleState" type="Node" parent="Player/InputStateMachine"]
-script = ExtResource("5_idle")
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/LeftSide/ViewportPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 2
+theme_override_constants/margin_top = 2
+theme_override_constants/margin_right = 2
+theme_override_constants/margin_bottom = 2
 
-[node name="AimingMoveState" type="Node" parent="Player/InputStateMachine"]
-script = ExtResource("6_aiming")
+[node name="SubViewportContainer" type="SubViewportContainer" parent="MarginContainer/HBoxContainer/LeftSide/ViewportPanel/MarginContainer"]
+texture_filter = 1
+custom_minimum_size = Vector2(640, 480)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+mouse_filter = 0
+stretch = true
+stretch_shrink = 1
 
-[node name="ExecutingTurnState" type="Node" parent="Player/InputStateMachine"]
-script = ExtResource("7_executing")
+[node name="SubViewport" type="SubViewport" parent="MarginContainer/HBoxContainer/LeftSide/ViewportPanel/MarginContainer/SubViewportContainer"]
+handle_input_locally = false
+size = Vector2i(640, 480)
+render_target_update_mode = 4
 
-[node name="Sprite" type="Label" parent="Player"]
-offset_right = 32.0
-offset_bottom = 32.0
-theme_override_font_sizes/font_size = 24
-text = "🚶"
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="Game3D" parent="MarginContainer/HBoxContainer/LeftSide/ViewportPanel/MarginContainer/SubViewportContainer/SubViewport" instance=ExtResource("1_game3d")]
 
-[node name="MoveIndicator" type="Label" parent="Player"]
-visible = false
-offset_right = 32.0
-offset_bottom = 32.0
-theme_override_font_sizes/font_size = 24
-text = "→"
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="LogPanel" type="PanelContainer" parent="MarginContainer/HBoxContainer/LeftSide"]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
 
-[node name="Camera2D" type="Camera2D" parent="Player"]
-zoom = Vector2(1.5, 1.5)
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/LeftSide/LogPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer"]
+layout_mode = 2
 
-[node name="TurnCounter" type="Label" parent="UI"]
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 500.0
-offset_bottom = 40.0
+[node name="LogTitle" type="Label" parent="MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+text = "GAME LOG / EXAMINE"
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="LogText" type="RichTextLabel" parent="MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/normal_font_size = 12
+bbcode_enabled = true
+text = "[color=gray]Welcome to the Backrooms...[/color]
+[color=white]> You enter Level 0. The fluorescent lights buzz overhead.[/color]
+[color=#88ff88]> [REDACTED] watches from [REDACTED][/color]"
+scroll_following = true
+
+[node name="RightSide" type="PanelContainer" parent="MarginContainer/HBoxContainer"]
+custom_minimum_size = Vector2(350, 0)
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/RightSide"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="CharacterSheet" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Title" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet"]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 16
-text = "Turn: 0 | Pos: (0, 0) | State: None"
+text = "CHARACTER"
 
-[node name="Instructions" type="Label" parent="UI"]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = -100.0
-offset_right = 600.0
-offset_bottom = -10.0
-grow_vertical = 0
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet"]
+layout_mode = 2
+
+[node name="Stats" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet"]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 14
-text = "LEFT STICK / WASD: Aim movement
-RIGHT TRIGGER / SPACE: Confirm move
-START / ESC: Return to menu
+theme_override_font_sizes/font_size = 12
+text = "Health: 100 / 100
+Sanity: 80 / 100
+Stamina: 50 / 50
 
-ARCHITECTURE: InputManager + State Machine + Actions"
+Turn: 0
+Position: (0, 0)"
+
+[node name="HSeparator2" type="HSeparator" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="CoreInventory" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Title" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "CORE INVENTORY"
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory"]
+layout_mode = 2
+
+[node name="Items" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 12
+text = "[Empty Slot]
+[Empty Slot]
+[Empty Slot]
+[Empty Slot]"

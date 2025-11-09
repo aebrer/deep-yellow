@@ -108,36 +108,6 @@ fov = 70.0
 
 [node name="UI" type="CanvasLayer" parent="."]
 
-[node name="TurnCounter" type="Label" parent="UI"]
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 510.0
-offset_bottom = 40.0
-theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
-theme_override_font_sizes/font_size = 16
-text = "Turn: 0 | Pos: (0, 0) | State: None"
-
-[node name="Instructions" type="Label" parent="UI"]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = -100.0
-offset_right = 610.0
-offset_bottom = -10.0
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 14
-text = "EXPERIMENTAL: Forward Indicator Mode
-Green arrow = 1 cell ahead in camera direction
-
-RIGHT STICK / MOUSE: Rotate camera (Fortnite-style!)
-RT / SPACE / LEFT CLICK: Move forward (hold = rapid turns!)
-LB / RB / MOUSE WHEEL: Zoom camera
-ESC: Toggle mouse capture
-
-TURN-BASED: Each action = 1 discrete turn. Snap movement!"
-
 [node name="PostProcessDither" type="ColorRect" parent="UI"]
 material = ExtResource("9_dither")
 anchors_preset = 15
