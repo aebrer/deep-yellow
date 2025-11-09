@@ -35,7 +35,7 @@ item/1/navigation_layers = 1
 
 item/2/name = "Ceiling"
 item/2/mesh = SubResource("PlaneMesh_ceiling")
-item/2/mesh_transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 5.0, 0)
+item/2/mesh_transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 3.0, 0)
 item/2/mesh_cast_shadow = 0
 item/2/shapes = []
 item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
