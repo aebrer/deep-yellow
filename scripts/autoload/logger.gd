@@ -14,6 +14,13 @@ extends Node
 ##   Log.msg(Logger.Category.MOVEMENT, Logger.Level.ERROR, "Invalid grid position")
 
 # ============================================================================
+# SIGNALS
+# ============================================================================
+
+## Emitted when a message is logged (for UI display)
+signal message_logged(category: Category, level: Level, message: String)
+
+# ============================================================================
 # LOG LEVELS (Priority ordering)
 # ============================================================================
 
@@ -147,6 +154,9 @@ func msg(category: Category, level: Level, message: String) -> void:
 
 	if enable_file_logging and _log_file:
 		_log_file.store_line(formatted)
+
+	# Emit signal for UI display
+	message_logged.emit(category, level, message)
 
 ## Check if a category + level should be logged (performance optimization)
 func _should_log(category: Category, level: Level) -> bool:
