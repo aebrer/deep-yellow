@@ -78,8 +78,15 @@ A top-down roguelike combining Caves of Qud's deep simulation and character buil
   - Player can disable to manage resources, noise, or unwanted effects
 
 ### System Controls
-- **Start**: Pause/Menu
-- **Select/Back**: Inventory/Character sheet
+- **Start/ESC**: Pause game → Enter menu mode (UI panels become selectable)
+- **Select/Back**: Quick inventory/Character sheet toggle (planned)
+
+### Menu Mode Controls (Planned - Active when paused)
+- **D-Pad / Left Stick**: Navigate between UI panels
+- **A Button**: Select/expand item or entry
+- **B Button**: Back/close panel
+- **Right Stick**: Scroll content within selected panel
+- **Start/ESC**: Unpause → Return to gameplay
 
 ### Design Philosophy
 - Minimal button usage for accessibility
@@ -100,11 +107,55 @@ A top-down roguelike combining Caves of Qud's deep simulation and character buil
     - Current Backrooms level
 
 ### UI/UX
-- **SCP-style tooltips and panels**:
-  - Monospace font, clinical documentation style
-  - Redaction bars (████) for unknown information
-  - Clearance levels unlock full descriptions
-  - Document types: Entity files, incident reports, exploration logs
+
+**Layout** (Implemented):
+- **3D Viewport** (top-left): PSX-style 3D world at 640x480 with vertex wobble, affine textures, dithering
+- **Character Sheet** (right panel): Stats (hp, sanity, stamina), turn counter, position
+- **Core Inventory** (right panel): Build-defining items and abilities
+- **Game Log** (bottom panel): Real-time event stream with color-coded messages
+- **Terminal Aesthetic**: IBM Plex Mono font, minimal black panels, lowercase text
+
+**Log System** (Implemented):
+- Live game event feed in bottom panel
+- Color-coded by severity:
+  - ERROR: red - critical failures
+  - WARN: yellow - unexpected events
+  - INFO: white - important actions
+  - DEBUG: light gray - state changes
+  - TRACE: dark gray - verbose details
+- Abbreviated category tags: [sys], [state], [move], [action], [turn], etc.
+- Connected to centralized Logger autoload
+
+**Log Revelation Mechanics** (Planned):
+- **Items control log visibility**:
+  - Base state: Only INFO/WARN/ERROR logs visible
+  - "Diagnostic Scanner" item: Reveals DEBUG logs
+  - "System Analyzer" item: Reveals TRACE logs
+  - "Corrupted Terminal" item: Adds glitch/noise to logs
+  - "Clearance Badge" tiers: Unlock specific categories
+- **Progression through information**:
+  - Early game: Minimal logs, vague descriptions
+  - Late game: Full diagnostic access, complete information
+- **Tie-in to knowledge system**: Log detail correlates with entity/hazard knowledge
+
+**Menu Navigation** (Planned):
+- **Pause System**:
+  - Press START/ESC to pause game
+  - Pausing makes UI panels selectable/scrollable
+  - D-pad/left stick: Navigate between panels
+  - A button: Select/expand items
+  - B button: Back/close
+- **Controller-first design**:
+  - All UI elements accessible via gamepad
+  - Smooth scrolling with analog stick
+  - Face buttons for quick actions
+- **Seamless transition**: Unpause returns to gameplay controls
+
+**SCP-style tooltips and panels**:
+- Monospace font, clinical documentation style
+- Redaction bars (████) for unknown information
+- Clearance levels unlock full descriptions
+- Document types: Entity files, incident reports, exploration logs
 
 ### Information Progression
 - **Early game**: Heavy redaction, minimal info
