@@ -29,13 +29,6 @@ window/size/viewport_height=900
 window/size/mode=2
 window/stretch/mode="canvas_items"
 
-[shader_globals]
-
-precision_multiplier={
-"type": "float",
-"value": 0.5
-}
-
 [input]
 
 ui_left={
@@ -141,3 +134,10 @@ camera_rotate_right={
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[shader_globals]
+
+precision_multiplier={
+"type": "float",
+"value": 0.5
+}

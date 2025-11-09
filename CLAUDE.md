@@ -742,7 +742,12 @@ python3 _claude_scripts/strip_mesh_library_previews.py
      - ModernGL/PyOpenGL for shader-based generation
      - **Whatever generative art technique produces the best result**
    - **Runs in project venv**: `/home/andrew/projects/backrooms_power_crawl/venv/`
-   - **Only requirement**: Must output `output.png` meeting the specifications
+   - **CRITICAL REQUIREMENTS**:
+     - **MUST BE TILEABLE/SEAMLESS**: Texture must repeat seamlessly when tiled in a grid
+     - **Use modulo wrapping for ALL pixel operations**: `img_array[y % SIZE, x % SIZE] = value`
+     - Pattern dimensions should divide texture size evenly (e.g., 32px repeat on 128px texture)
+     - For circular effects, use normal distance but apply with modulo coordinates
+     - Must output `output.png` meeting the specifications
    - Agent can install any Python packages needed: `pip install package_name`
    - **AUTOMATION**:
      1. Agent creates `generate.py`
@@ -754,83 +759,140 @@ python3 _claude_scripts/strip_mesh_library_previews.py
 2. **Spawn Comparison Critic Agent**
    - Provide original description + path to generated PNG
    - Task: Load PNG and compare against original requirements
+   - **MUST verify tiling/seamlessness** - check that edges align properly
    - Agent reports: "Matches description" or "Issues: [list problems]"
 
 3. **Spawn Blind Critic Agent**
    - NO CONTEXT PROVIDED - don't say "focus on X" or give description
    - Task: Look at PNG and describe what you see objectively
+   - **Should comment on whether it looks tileable** (edges align?)
    - Agent reports raw observations without bias
    - This catches issues the creator might have missed
 
 4. **Generate Revision Instructions**
    - Synthesize feedback from both critics
    - Create specific, actionable tweaks for creator
-   - Example: "Reduce saturation by 20%", "Add subtle vertical lines"
+   - Example: "Reduce saturation by 20%", "Add subtle vertical lines", "Fix tiling - use modulo wrapping for all pixel access"
+   - **Tiling fix pattern**:
+     ```python
+     # For circular effects (water stains, etc.):
+     for dy in range(-radius, radius + 1):
+         for dx in range(-radius, radius + 1):
+             dist = sqrt(dx**2 + dy**2)
+             if dist <= radius:
+                 y_coord = (center_y + dy) % SIZE  # Modulo wrapping
+                 x_coord = (center_x + dx) % SIZE
+                 img_array[y_coord, x_coord] += effect_value
+     ```
 
 5. **Respawn Creator with Feedback**
    - Same creator agent type, new instance
    - Provide original description + critic feedback
-   - Agent modifies JavaScript to address issues
+   - Agent modifies Python script to address issues
    - Re-renders PNG
 
 6. **Repeat Cycle**
    - Spawn new critics for updated PNG
-   - Continue until all critics approve
+   - Continue until all critics approve (including tiling verification!)
    - Typical cycles: 2-4 iterations
 
-**Example Workflow**:
+**Real Example - Backrooms Level 0 Wallpaper (2025-01-09)**:
+
+This is the actual workflow used to generate the Level 0 wallpaper texture, documenting the real challenges and solutions.
 
 ```markdown
-**Texture Needed**: Backrooms yellow wallpaper (128×128)
+**Texture Needed**: Backrooms Level 0 yellow wallpaper (128×128, tileable)
+**Reference**: Backrooms wiki - greyish-yellow wallpaper with chevron patterns
 
-**Iteration 1**:
-- Creator: Generates solid #E8D998 color
-- Comparison Critic: "Too flat, needs subtle texture"
-- Blind Critic: "Uniform yellow square, no detail"
-- Revisions: "Add Perlin noise at 5% opacity, slight vertical lines"
+**Iteration 1 - Wrong shape**:
+- Creator: Generated filled triangular arrows
+- Comparison Critic: "Arrows are correct but should be chevrons (∧), not filled triangles"
+- Blind Critic: "Sees triangular shapes in grid"
+- User correction: "arrows are more like chevrons btw in the official docs"
+- Revisions: "Replace arrows with chevron shapes (two angled lines forming ∧)"
 
-**Iteration 2**:
-- Creator: Adds noise and lines
-- Comparison Critic: "Good, but lines too pronounced"
-- Blind Critic: "Yellow with visible stripes, looks like wallpaper"
-- Revisions: "Reduce line opacity from 15% to 8%"
-
-**Iteration 3**:
-- Creator: Final version
+**Iteration 2 - Pattern correct but no weathering**:
+- Creator: Chevrons correct, but too clean
 - Comparison Critic: "Matches description perfectly"
-- Blind Critic: "Subtle textured yellow, liminal aesthetic achieved"
-- Status: APPROVED
+- Blind Critic: "Too uniform, lacks surface texture variation"
+- Revisions: "Add more visible aging - increase grain, water stains, wear patterns"
+
+**Iteration 3 - Weathering added but tiling broken**:
+- Creator: Added prominent weathering effects
+- Comparison Critic: "Pattern doesn't tile - 36px doesn't divide 128 evenly"
+- Blind Critic: "Pattern has discontinuity at edges"
+- Revisions: "Change vertical repeat to 32px (128÷32=4 rows exactly)"
+
+**Iteration 4 - Tiling still broken**:
+- Creator: Fixed pattern dimensions but effects don't wrap
+- Comparison Critic: "Pattern dimensions correct, but water stains don't wrap at edges"
+- Blind Critic: "Has strange cutoffs near edges"
+- User: "ah but remember, the tiling"
+- Revisions: "Use modulo wrapping for ALL pixel operations: `img_array[y % SIZE, x % SIZE]`"
+
+**Iteration 5 - PIL clipping issue**:
+- Creator: Implemented modulo for effects, but chevrons still don't tile
+- Comparison Critic: "Right edge doesn't match left edge - chevrons clip at boundary"
+- User insight: "draw them differently. mirroring can be a good trick"
+- Revisions: "Replace PIL ImageDraw with pixel-level drawing using modulo wrapping"
+
+**Iteration 6 - Pattern broken by pixel drawing**:
+- Creator: Pixel-level drawing but chevrons became filled shapes
+- Comparison Critic: "Filled triangles, missing vertical lines, missing small chevrons"
+- Blind Critic: "Clean geometric but missing weathering"
+- Revisions: "Fix chevron drawing - TWO separate angled lines, keep weathering, draw vertical lines"
+
+**Iteration 7 - Chevrons too narrow**:
+- Creator: All elements present and tiling works
+- Comparison Critic: "All requirements met, tiles seamlessly"
+- User: "the 'chevrons' are too narrow, so their bases aren't touching"
+- Revisions: "Increase chevron width from 8/12px to 18/26px so bases connect"
+
+**Final Result**:
+- User: "tiling is working great though btw" and "it's 'tileable' enough btw haha. the tiny flaws are not an issue, it's quite serviceable!"
+- Status: APPROVED and ready for production
 ```
+
+**Key Lessons Learned**:
+1. **Tiling is hard to get perfect** - "serviceable" tiling is often good enough for game textures
+2. **PIL ImageDraw clips at boundaries** - use pixel-level drawing with modulo for guaranteed wrapping
+3. **Pattern dimensions must divide texture size evenly** - 32px repeat on 128px texture = perfect fit
+4. **User corrections are valuable** - "chevrons not arrows" saved iterations
+5. **Both critics are essential** - comparison catches spec violations, blind catches unexpected issues
+6. **Iterate boldly** - took 7 iterations, but got there in the end!
 
 **Filesystem Convention**:
 ```
 _claude_scripts/textures/
 ├── backrooms_wallpaper/
-│   ├── generate.js          # Canvas/WebGL rendering code
-│   ├── output.png           # Generated texture
+│   ├── generate.py          # Python texture generation script
+│   ├── output.png           # Generated texture (tileable!)
 │   └── iterations/          # Iteration history (optional)
 │       ├── v1.png
 │       ├── v2.png
 │       └── v3.png
 ├── brown_carpet/
-│   └── generate.js
+│   └── generate.py
 └── ceiling_tile/
-    └── generate.js
+    └── generate.py
 ```
 
 **Running the Generator**:
 ```bash
-# Example generate.js structure:
+# From project root, activate venv and run script:
+cd /home/andrew/projects/backrooms_power_crawl
+source venv/bin/activate
 cd _claude_scripts/textures/backrooms_wallpaper
-node generate.js  # Uses puppeteer/headless Chrome to render PNG
+python generate.py  # Outputs tileable PNG
 ```
 
 **Why This Works**:
 - **Iterative refinement**: Each cycle improves quality
-- **Blind critique**: Catches unintended artifacts
-- **Comparison critique**: Ensures requirements met
-- **Reproducible**: JS code can be re-run or tweaked
+- **Blind critique**: Catches unintended artifacts (including tiling issues!)
+- **Comparison critique**: Ensures requirements met (including seamless tiling)
+- **Reproducible**: Python code can be re-run or tweaked
 - **Self-contained**: No external tools or manual work needed
+- **Tileable by design**: Toroidal math and pattern alignment ensure seamless textures
 
 **When NOT to Use This**:
 - User provides specific texture files to use
