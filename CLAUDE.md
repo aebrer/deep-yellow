@@ -723,6 +723,109 @@ python3 _claude_scripts/strip_mesh_library_previews.py
 
 ---
 
+### Generating Textures with Sub-Agent Virtuous Cycle
+
+**When you need to create texture assets** (e.g., yellow wallpaper, concrete floors, ceiling tiles), use this iterative multi-agent workflow instead of manually creating assets or asking the user to find them.
+
+**The Virtuous Cycle**:
+
+1. **Spawn Creator Agent**
+   - Provide detailed description of texture needed
+   - Pull reference details from Backrooms wiki or design docs
+   - Agent creates JavaScript code in `_claude_scripts/textures/` that:
+     - Renders texture using Canvas 2D API or WebGL shaders
+     - Outputs PNG at required resolution (e.g., 128×128, 64×64)
+     - Uses headless Chromium for rendering
+   - Clear filesystem layout: `_claude_scripts/textures/texture_name/generate.js`
+
+2. **Spawn Comparison Critic Agent**
+   - Provide original description + path to generated PNG
+   - Task: Load PNG and compare against original requirements
+   - Agent reports: "Matches description" or "Issues: [list problems]"
+
+3. **Spawn Blind Critic Agent**
+   - NO CONTEXT PROVIDED - don't say "focus on X" or give description
+   - Task: Look at PNG and describe what you see objectively
+   - Agent reports raw observations without bias
+   - This catches issues the creator might have missed
+
+4. **Generate Revision Instructions**
+   - Synthesize feedback from both critics
+   - Create specific, actionable tweaks for creator
+   - Example: "Reduce saturation by 20%", "Add subtle vertical lines"
+
+5. **Respawn Creator with Feedback**
+   - Same creator agent type, new instance
+   - Provide original description + critic feedback
+   - Agent modifies JavaScript to address issues
+   - Re-renders PNG
+
+6. **Repeat Cycle**
+   - Spawn new critics for updated PNG
+   - Continue until all critics approve
+   - Typical cycles: 2-4 iterations
+
+**Example Workflow**:
+
+```markdown
+**Texture Needed**: Backrooms yellow wallpaper (128×128)
+
+**Iteration 1**:
+- Creator: Generates solid #E8D998 color
+- Comparison Critic: "Too flat, needs subtle texture"
+- Blind Critic: "Uniform yellow square, no detail"
+- Revisions: "Add Perlin noise at 5% opacity, slight vertical lines"
+
+**Iteration 2**:
+- Creator: Adds noise and lines
+- Comparison Critic: "Good, but lines too pronounced"
+- Blind Critic: "Yellow with visible stripes, looks like wallpaper"
+- Revisions: "Reduce line opacity from 15% to 8%"
+
+**Iteration 3**:
+- Creator: Final version
+- Comparison Critic: "Matches description perfectly"
+- Blind Critic: "Subtle textured yellow, liminal aesthetic achieved"
+- Status: APPROVED
+```
+
+**Filesystem Convention**:
+```
+_claude_scripts/textures/
+├── backrooms_wallpaper/
+│   ├── generate.js          # Canvas/WebGL rendering code
+│   ├── output.png           # Generated texture
+│   └── iterations/          # Iteration history (optional)
+│       ├── v1.png
+│       ├── v2.png
+│       └── v3.png
+├── brown_carpet/
+│   └── generate.js
+└── ceiling_tile/
+    └── generate.js
+```
+
+**Running the Generator**:
+```bash
+# Example generate.js structure:
+cd _claude_scripts/textures/backrooms_wallpaper
+node generate.js  # Uses puppeteer/headless Chrome to render PNG
+```
+
+**Why This Works**:
+- **Iterative refinement**: Each cycle improves quality
+- **Blind critique**: Catches unintended artifacts
+- **Comparison critique**: Ensures requirements met
+- **Reproducible**: JS code can be re-run or tweaked
+- **Self-contained**: No external tools or manual work needed
+
+**When NOT to Use This**:
+- User provides specific texture files to use
+- Texture requires photorealistic detail (use image sources instead)
+- Simple solid colors (just create PNG directly)
+
+---
+
 ### Strategy for Large Godot Resource Files
 
 **General Pattern for .tres/.tscn files that blow up Claude's context window**:
