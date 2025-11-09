@@ -733,30 +733,23 @@ python3 _claude_scripts/strip_mesh_library_previews.py
    - Provide detailed description of texture needed
    - Pull reference details from Backrooms wiki or design docs
    - Agent creates standalone Python script in `_claude_scripts/textures/texture_name/generate.py`
-   - **USE PYTHON + PIL/Pillow** for image generation
+   - **USE PYTHON** - agent has creative freedom to use whatever works:
+     - PIL/Pillow for direct pixel manipulation
+     - NumPy for array-based generation
+     - Noise libraries (perlin, simplex, opensimplex)
+     - Geometric primitives (PIL.ImageDraw)
+     - Cairo for vector graphics
+     - ModernGL/PyOpenGL for shader-based generation
+     - **Whatever generative art technique produces the best result**
    - **Runs in project venv**: `/home/andrew/projects/backrooms_power_crawl/venv/`
-   - **Pillow already available** in venv (standard image library)
-   - Code structure:
-     ```python
-     from PIL import Image
-     import numpy as np
-
-     # Generate texture as numpy array or pixel-by-pixel
-     img = Image.new('RGB', (128, 128))
-     pixels = img.load()
-
-     # Render texture
-     for y in range(128):
-         for x in range(128):
-             pixels[x, y] = (r, g, b)
-
-     # Save directly to PNG
-     img.save('output.png')
-     print(f'✓ Saved {img.size} texture to output.png')
-     ```
-   - **AUTOMATION**: Agent creates script, runs it with project venv, verifies output.png exists
-   - **Command**: `cd /home/andrew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
-   - **THIS IS SIMPLE**: Pure Python, no browser, no headless nonsense, just direct PNG generation
+   - **Only requirement**: Must output `output.png` meeting the specifications
+   - Agent can install any Python packages needed: `pip install package_name`
+   - **AUTOMATION**:
+     1. Agent creates `generate.py`
+     2. Installs any dependencies in venv
+     3. Runs script: `cd /home/andrew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
+     4. Verifies `output.png` exists and meets requirements
+   - **THIS IS SIMPLE**: Pure Python, direct PNG output, agent chooses the best technique
 
 2. **Spawn Comparison Critic Agent**
    - Provide original description + path to generated PNG
