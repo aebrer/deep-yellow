@@ -1,0 +1,26 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://shaders/psx_wall_obstruction.gdshader" id="1"]
+[ext_resource type="Texture2D" path="res://assets/levels/level_00/textures/ceiling_acoustic.png" id="2"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+shader_parameter/enable_obstruction_fade = true
+shader_parameter/player_world_position = Vector3(0, 0, 0)
+shader_parameter/obstructed_cell_count = 0
+shader_parameter/obstructed_cells = PackedVector3Array()
+shader_parameter/cell_size = 2.0
+shader_parameter/player_fade_inner_radius = 3.0
+shader_parameter/player_fade_outer_radius = 8.0
+shader_parameter/player_fade_power = 2.0
+shader_parameter/is_ceiling = true
+shader_parameter/wireframe_color = Color(0, 1, 0.8, 0.3)
+shader_parameter/wire_width = 1.0
+shader_parameter/wire_smoothness = 0.01
+shader_parameter/wireframe_threshold = 0.8
+shader_parameter/grid_scale = 1.0

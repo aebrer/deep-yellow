@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=9 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
@@ -33,6 +33,9 @@ emission_enabled = true
 emission = Color(0, 0.8, 0, 1)
 emission_energy_multiplier = 2.0
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_obstruction"]
+size = Vector3(3, 3, 1)
+
 [node name="Game" type="Node3D"]
 script = ExtResource("1_game3d")
 
@@ -50,6 +53,8 @@ script = ExtResource("2_grid3d")
 [node name="GridMap" type="GridMap" parent="Grid3D"]
 mesh_library = ExtResource("3_meshlibrary")
 cell_size = Vector3(2, 1, 2)
+collision_layer = 2
+collision_mask = 0
 
 [node name="MoveIndicator" type="Node3D" parent="."]
 visible = false
@@ -102,13 +107,16 @@ pitch_far = -60.0
 
 [node name="VerticalPivot" type="Node3D" parent="Player3D/CameraRig/HorizontalPivot"]
 
-[node name="SpringArm3D" type="SpringArm3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot"]
-shape = SubResource("SphereShape3D_springarm")
-spring_length = 15.0
-collision_mask = 2
-
-[node name="Camera3D" type="Camera3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot/SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 15)
 fov = 70.0
+
+[node name="ObstructionDetector" type="ShapeCast3D" parent="Player3D"]
+enabled = true
+shape = SubResource("BoxShape3D_obstruction")
+target_position = Vector3(0, 0, -15)
+max_results = 32
+collision_mask = 2
 
 [node name="UI" type="CanvasLayer" parent="."]
 

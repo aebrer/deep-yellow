@@ -23,6 +23,9 @@ var move_indicator: Node3D = null  # Set by Game node
 # ============================================================================
 
 func _ready() -> void:
+	# Add to player group for obstruction detection
+	add_to_group("player")
+
 	# Grid reference will be set by Game node
 	await get_tree().process_frame
 
