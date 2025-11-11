@@ -166,20 +166,63 @@ A top-down roguelike combining Caves of Qud's deep simulation and character buil
 - Clearance levels unlock full descriptions
 - Document types: Entity files, incident reports, exploration logs
 
-### Information Progression
-- **Early game**: Heavy redaction, minimal info
-  ```
-  Entity: ████████
-  Class: [REDACTED]
-  Threat Level: ██
-  ```
-- **Late game**: Full dossiers with behaviors, weaknesses, containment procedures
-  ```
-  Entity: Skin-Stealer
-  Class: Hostile Humanoid
-  Threat Level: 4
-  Behavior: Mimics human appearance, attracted to sound...
-  ```
+### Information Progression & Examination System
+
+**All Objects Have Descriptions:**
+- **Everything is examinable**: Items, entities, walls, ceiling, floor, environmental objects
+- **Source material**: Descriptions lifted directly from SCP Wiki or Backrooms Wiki
+- **Accessible to game code**: Stored as data for the "look" action (Right Stick examination)
+- **Lore integration**: Players learn about the Backrooms/SCP universe through examination
+- **Examples**:
+  - Wall: "Standard office wallpaper. Yellow with faint geometric patterns. Shows signs of moisture damage."
+  - Almond Water: "Clear liquid with a distinct almond scent. Properties: [REDACTED]. Effects: Hydration, mild regeneration."
+  - Exit door: "Rusted metal door. Lock mechanism appears functional. Destination: Level 1."
+
+**Progression Tiers:**
+1. **Early game**: Heavy redaction, minimal info
+   ```
+   Entity: ████████
+   Class: [REDACTED]
+   Threat Level: ██
+   ```
+
+2. **Mid game**: Partial information unlocked through clearance
+   ```
+   Entity: Skin-Stealer
+   Class: Hostile Humanoid
+   Threat Level: 4
+   Behavior: [PARTIAL DATA]
+   ```
+
+3. **Late game**: Full dossiers with behaviors, weaknesses, containment procedures
+   ```
+   Entity: Skin-Stealer
+   Class: Hostile Humanoid
+   Threat Level: 4
+   Behavior: Mimics human appearance, attracted to sound...
+   Weakness: Bright light exposure reveals true form...
+   ```
+
+4. **Meta-Knowledge (Special Mind Item)**: **Code Revelation**
+   - **"System Analyzer" Mind Item**: Reveals actual game code for examined objects
+   - **Purpose**: Enable game-breaking strategies through code understanding
+   - **Display**: Shows GDScript/data structures alongside lore description
+   - **Example**:
+     ```
+     Item: Almond Water
+     [Lore Description...]
+
+     --- SYSTEM DATA (REQUIRES CLEARANCE OMEGA) ---
+     class_name: AlmondWater
+     resource_type: Consumable
+     on_use():
+       player.hp += 20
+       player.sanity += 10
+       player.status_effects.append("Regeneration", duration=5)
+     ```
+   - **Design Intent**: Reward curious players who explore the meta-layer
+   - **Balancing**: Make it a rare/late-game Mind item so it doesn't trivialize early runs
+   - **Architecture Note**: All items must expose their logic in human-readable format for this feature
 
 ## Simulation Systems
 
@@ -475,6 +518,59 @@ Next Turn:
 - **Efficient pathfinding**: For horde AI
 - **Shader pipeline**: For corruption/glitch effects
 - **Data-driven design**: Easy to add/modify entities, abilities, levels
+
+### Data Architecture for Examination & Code Revelation
+
+**All Game Objects Must Support:**
+
+1. **Lore Description System:**
+   - Every object (item, entity, tile, environmental object) has a `description` field
+   - Descriptions sourced from SCP Wiki / Backrooms Wiki
+   - Stored as accessible data (Resource files, JSON, or embedded in classes)
+   - Multiple tiers: redacted → partial → full (based on clearance level)
+
+2. **Code Revelation System:**
+   - All items/objects expose their logic in human-readable format
+   - **Option A**: Store simplified pseudocode as strings alongside actual code
+   - **Option B**: Generate code descriptions from actual GDScript at runtime (via reflection)
+   - **Option C**: Export logic as data structures that can be displayed as code
+
+3. **Recommended Implementation:**
+   ```gdscript
+   class_name Item extends Resource
+
+   @export var item_name: String
+   @export_multiline var lore_description: String  # From wiki
+   @export_multiline var code_description: String  # For meta-knowledge reveal
+
+   # Actual implementation
+   func on_use(player: Player) -> void:
+       player.hp += 20
+       player.sanity += 10
+
+   # Human-readable code for System Analyzer item
+   func get_code_representation() -> String:
+       return code_description if code_description else """
+   class_name: %s
+   on_use():
+     player.hp += %d
+     player.sanity += %d
+   """ % [item_name, heal_amount, sanity_amount]
+   ```
+
+4. **Design Benefits:**
+   - Enables "System Analyzer" Mind item (reveals code)
+   - Players can discover game-breaking synergies through meta-knowledge
+   - Fits thematic goal: researchers analyzing anomalous objects
+   - Reward for curious players who explore the meta-layer
+   - All object logic remains accessible even after obfuscation/export
+
+5. **Technical Notes:**
+   - Don't rely on GDScript reflection (fragile, may break in exports)
+   - Store code descriptions as data (string fields, JSON, or resource metadata)
+   - Keep code descriptions synchronized with actual implementation
+   - Consider using comments in code that can be extracted during build
+   - For tiles (walls, floors, ceilings): Descriptions in MeshLibrary metadata or tilemap data
 
 ### Performance Targets
 - **Tile-based**: Manageable scope for simulation
