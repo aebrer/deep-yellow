@@ -21,6 +21,12 @@ var walkable_cells: Array[Vector2i] = []
 # Current level configuration
 var current_level: LevelConfig = null
 
+# Player reference (for line-of-sight proximity fade)
+var player_node: Node3D = null
+
+# Cached wall materials (for updating player_position uniform)
+var wall_materials: Array[ShaderMaterial] = []
+
 # MeshLibrary item IDs
 enum TileType {
 	FLOOR = 0,
@@ -113,6 +119,71 @@ func _generate_grid() -> void:
 
 			# Place ceiling everywhere (at y=1 in grid space, which is y=4 in world space due to mesh_transform)
 			grid_map.set_cell_item(Vector3i(x, 1, y), TileType.CEILING)
+
+	# Cache wall materials for line-of-sight proximity fade updates
+	_cache_wall_materials()
+
+func _cache_wall_materials() -> void:
+	"""Cache wall materials from MeshLibrary for player position updates"""
+	wall_materials.clear()
+
+	var mesh_library = grid_map.mesh_library
+	if not mesh_library:
+		push_warning("[Grid3D] No MeshLibrary found, cannot cache wall materials")
+		return
+
+	# Get wall material from MeshLibrary
+	var wall_mesh = mesh_library.get_item_mesh(TileType.WALL)
+	if not wall_mesh:
+		push_warning("[Grid3D] Wall mesh not found in MeshLibrary")
+		return
+
+	# Get material from the wall mesh
+	for i in range(wall_mesh.get_surface_count()):
+		var material = wall_mesh.surface_get_material(i)
+		if material and material is ShaderMaterial:
+			wall_materials.append(material)
+			var shader_path = material.shader.resource_path if material.shader else "no shader"
+			print("[Grid3D] Cached wall material %d: %s" % [i, shader_path])
+
+			# Try to get current player_position value to verify uniform exists
+			var test_value = material.get_shader_parameter("player_position")
+			if test_value != null:
+				print("[Grid3D] ✓ Material has player_position uniform (current: %s)" % test_value)
+			else:
+				push_warning("[Grid3D] ✗ Material missing player_position uniform!")
+
+	print("[Grid3D] Total wall materials cached: %d" % wall_materials.size())
+
+# Debug: Track frame count for periodic logging
+var _frame_count: int = 0
+
+func _process(_delta: float) -> void:
+	"""Update wall shader uniforms with player position for line-of-sight fade"""
+	_frame_count += 1
+
+	if not player_node or wall_materials.is_empty():
+		if _frame_count % 60 == 0:  # Log once per second
+			if not player_node:
+				print("[Grid3D] No player_node set for proximity fade")
+			if wall_materials.is_empty():
+				print("[Grid3D] No wall materials cached")
+		return
+
+	# Update all wall materials with current player position
+	var player_pos = player_node.global_position
+	for material in wall_materials:
+		material.set_shader_parameter("player_position", player_pos)
+
+	# Debug: Log occasionally
+	if _frame_count % 120 == 0:  # Every 2 seconds
+		print("[Grid3D] Updated %d wall materials with player pos: %s" % [wall_materials.size(), player_pos])
+
+func set_player(player: Node3D) -> void:
+	"""Set player reference for line-of-sight proximity fade"""
+	player_node = player
+	Log.msg(Log.Category.GRID, Log.Level.INFO,
+		"Player linked to Grid3D for proximity fade updates")
 
 # ============================================================================
 # COORDINATE CONVERSION

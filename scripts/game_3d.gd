@@ -25,4 +25,7 @@ func _ready() -> void:
 	player.grid = grid
 	player.move_indicator = move_indicator
 
+	# Link grid back to player (for line-of-sight proximity fade)
+	grid.set_player(player)
+
 	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "3D viewport ready - controls active")
