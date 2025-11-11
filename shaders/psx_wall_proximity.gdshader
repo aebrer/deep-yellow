@@ -99,19 +99,22 @@ void fragment() {
 		vec3 fragment_to_camera = fragment_world_pos - camera_pos;
 		float projection = dot(fragment_to_camera, line_direction);
 
-		// Clamp projection to line segment (don't extend beyond player or before camera)
-		projection = clamp(projection, 0.0, line_length);
+		// CRITICAL FIX: Only fade fragments BETWEEN camera and player
+		// Walls behind the player should NOT fade!
+		float fade = 1.0;  // Default: fully opaque
 
-		// Find closest point on line segment to this fragment
-		vec3 closest_point = camera_pos + line_direction * projection;
+		if (projection >= 0.0 && projection <= line_length) {
+			// Fragment is between camera and player - check distance to sightline
+			vec3 closest_point = camera_pos + line_direction * projection;
+			float dist_to_sightline = length(fragment_world_pos - closest_point);
 
-		// Calculate perpendicular distance from fragment to sightline
-		float dist_to_sightline = length(fragment_world_pos - closest_point);
-
-		// Fade based on distance to sightline
-		// fade = 0.0 when on sightline (fully transparent)
-		// fade = 1.0 when far from sightline (fully opaque)
-		float fade = smoothstep(0.0, sightline_fade_radius, dist_to_sightline);
+			// Fade based on distance to sightline
+			// fade = 0.0 when on sightline (fully transparent)
+			// fade = 1.0 when far from sightline (fully opaque)
+			fade = smoothstep(0.0, sightline_fade_radius, dist_to_sightline);
+		}
+		// else: Fragment is before camera (projection < 0) or behind player (projection > line_length)
+		//       Keep fade = 1.0 (fully opaque, no fading)
 
 		// DEBUG: Visualize fade by tinting fragments
 		// Red = close to sightline (should fade), White = far from sightline (opaque)

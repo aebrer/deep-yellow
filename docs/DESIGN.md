@@ -337,22 +337,50 @@ A top-down roguelike combining Caves of Qud's deep simulation and character buil
   - Hive mind → control entities, but lose identity
 
 ### Progression Systems
-- **Meta-progression is KNOWLEDGE ONLY**: No arbitrary unlocks or power creep
-  - Player learns entity patterns, weaknesses, map layouts
-  - Discovers optimal build synergies through experimentation
-  - Unlocks information (redacted text becomes readable)
-  - Knowledge database fills with research data
-  - All mechanical progression resets each run
-- **Researcher Classification**: Tracks your total research/knowledge gained
-  - Higher classification = less redacted information in tooltips
-  - Cosmetic/lore reward, not mechanical advantage
-- **Clearance Levels**: Increases DURING runs as you explore and document
-  - Unlock access to deeper/more dangerous Backrooms levels within the run
-  - Higher clearance = less redacted info + access to restricted areas
-  - Risk/reward: Push deeper for better rewards but greater danger
-  - **The Backrooms punish hubris**: Unprepared players WILL die
-    - Like Qud's baboons - new players learn through failure
-    - Proper preparation and caution are survival skills, not optional
+
+**Clearance Level (Primary Progression):**
+- **Replaces traditional EXP/Level system**: Clearance is your "level"
+- **EXP = EXploration Points**: Gained through active engagement with the world
+  - Kill entities → Gain EXP
+  - Examine new objects/entities → Gain EXP
+  - Discover new areas/secrets → Gain EXP
+  - Complete objectives → Gain EXP
+- **Level Up = Clearance Increase**: Each level grants a **Clearance Perk**
+- **Perks are meta-flavored build choices**:
+  - Example perks:
+    - "Security Override" - Access restricted areas
+    - "Data Analyst" - Examination reveals more info
+    - "Combat Authorization" - Increased damage with Body items
+    - "Psionic Training" - Bonus Sanity regeneration
+    - "Anomalous Exposure" - Unlock first Mana/NULL slot
+    - "System Access" - Reduced cooldown on item reordering
+    - "Clearance Omega" - Unlock code revelation in examination
+  - Players choose ONE perk per clearance level
+  - Perks provide mechanical benefits tied to clearance theme
+  - Creates build diversity through clearance progression paths
+
+**Within-Run Progression:**
+- Clearance levels gained DURING runs (not persistent)
+- Start each run at Clearance Level 0
+- Level up by exploring and engaging with the Backrooms
+- Higher clearance = less redacted info + access to restricted areas
+- Clearance unlocks:
+  - Information tiers (redacted → partial → full)
+  - Restricted level access (deeper Backrooms require higher clearance)
+  - Perk-based mechanical benefits
+- **The Backrooms punish hubris**: Unprepared players WILL die
+  - Like Qud's baboons - new players learn through failure
+  - Proper preparation and caution are survival skills, not optional
+
+**Meta-Progression (Knowledge Only):**
+- **Researcher Classification**: Tracks total research/knowledge across all runs
+  - Higher classification = cosmetic/lore recognition
+  - NO mechanical advantage (avoids power creep)
+- **Knowledge Database**: Fills with discovered information
+  - Entity patterns, weaknesses, map layouts
+  - Optimal build synergies learned through experimentation
+  - Unlocked information persists between runs (player memory)
+  - All mechanical progression (Clearance, items, stats) resets each run
 
 ## Hub Area & NPCs
 
