@@ -331,5 +331,8 @@ func is_in_bounds(pos: Vector2i) -> bool:
 func get_random_walkable_position() -> Vector2i:
 	"""Get random walkable position"""
 	if walkable_cells.is_empty():
-		return Vector2i(grid_size.x / 2, grid_size.y / 2)
+		# Fallback to grid center when no walkable cells
+		var center_x: int = grid_size.x / 2
+		var center_y: int = grid_size.y / 2
+		return Vector2i(center_x, center_y)
 	return walkable_cells.pick_random()
