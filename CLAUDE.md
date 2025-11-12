@@ -536,6 +536,83 @@ Should I implement this, or do you want to discuss the tooltip system first?"
 **How**: Calculate visible rect, only update those tiles
 **Why**: 128x128 grid = 16k tiles, but only ~400 visible
 
+### Logging System (Log Autoload)
+
+**What**: Centralized logging with category and level filtering
+**Where**: `scripts/autoload/logger.gd` (accessed as `Log`)
+**Purpose**: Debug output with zero overhead when disabled
+
+**Log Levels** (in priority order):
+- `TRACE` - Every frame events (most verbose)
+- `DEBUG` - State changes, calculations
+- `INFO` - Important events
+- `WARN` - Unexpected but recoverable
+- `ERROR` - Serious issues
+- `NONE` - Disable all logging
+
+**Log Categories**:
+- `INPUT` - InputManager events
+- `STATE` - State machine transitions
+- `MOVEMENT` - Movement actions
+- `ACTION` - Action system
+- `TURN` - Turn execution
+- `GRID` - Grid/tile operations
+- `CAMERA` - Camera movement
+- `ENTITY` - Entity spawning/AI
+- `ABILITY` - Ability system
+- `PHYSICS` - Physics simulation
+- `SYSTEM` - System-level events
+
+**How to Use**:
+
+```gdscript
+# Category-specific convenience methods (most common):
+Log.system("Game initialized")           # SYSTEM category, INFO level
+Log.state("Entering IdleState")          # STATE category, DEBUG level
+Log.movement("Moving to (5, 3)")         # MOVEMENT category, DEBUG level
+
+# Cross-category level methods:
+Log.trace(Log.Category.STATE, "Frame update")      # Any category, TRACE level
+Log.warn(Log.Category.GRID, "Invalid cell")        # Any category, WARN level
+Log.error(Log.Category.ACTION, "Action failed")    # Any category, ERROR level
+
+# Generic method (all others route through this):
+Log.msg(Log.Category.INPUT, Log.Level.DEBUG, "Stick moved")
+```
+
+**Common Mistakes to Avoid**:
+```gdscript
+# ❌ WRONG - Log.info() doesn't exist:
+Log.info(Log.Category.SYSTEM, "Message")
+
+# ✅ CORRECT - Use category method or msg():
+Log.system("Message")  # For SYSTEM + INFO
+Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Message")  # Explicit
+```
+
+**Available Category Methods**:
+- `Log.input(msg)` - INPUT/DEBUG
+- `Log.state(msg)` - STATE/DEBUG
+- `Log.movement(msg)` - MOVEMENT/DEBUG
+- `Log.action(msg)` - ACTION/DEBUG
+- `Log.turn(msg)` - TURN/INFO
+- `Log.grid(msg)` - GRID/DEBUG
+- `Log.camera(msg)` - CAMERA/DEBUG
+- `Log.system(msg)` - SYSTEM/INFO
+
+**Configuration**:
+- Categories can be toggled on/off in Project Settings → Autoload → Log
+- Global level filter (e.g., only show WARN and above)
+- Output formatting (timestamps, frame count, category prefix)
+- File logging (future feature)
+
+**Adding Custom Categories** (if needed in future):
+1. Add to `Category` enum in logger.gd
+2. Add to `CATEGORY_NAMES` dict
+3. Add `@export var log_[name]: bool` to configuration
+4. Add case to `_should_log()` match statement
+5. (Optional) Add convenience method like `func [name](message: String)`
+
 ### Standard Third-Person Camera
 
 **What**: Mouse/right-stick controlled camera with pivot hierarchy

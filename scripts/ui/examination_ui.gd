@@ -5,7 +5,7 @@ extends Control
 ## Shows crosshair and SCP-style examination panel
 
 # Node references (will be set manually since we're creating programmatically)
-var crosshair: ColorRect
+var crosshair: Control  # Container holding crosshair lines
 var panel: PanelContainer
 var entity_name_label: Label
 var object_class_label: Label
@@ -33,17 +33,38 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block input
 
-	# Create crosshair (center of screen)
-	crosshair = ColorRect.new()
-	crosshair.name = "Crosshair"
-	crosshair.size = Vector2(4, 4)  # Small dot
-	crosshair.color = Color.WHITE
-	crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(crosshair)
+	# Create crosshair container (center of screen)
+	var crosshair_container = Control.new()
+	crosshair_container.name = "CrosshairContainer"
+	crosshair_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(crosshair_container)
 
-	# Position crosshair at center (will update in _process)
-	var viewport_size = get_viewport_rect().size
-	crosshair.position = (viewport_size / 2.0) - (crosshair.size / 2.0)
+	# Create crosshair as a simple cross (vertical and horizontal lines)
+	# Vertical line
+	var vertical_line = ColorRect.new()
+	vertical_line.name = "VerticalLine"
+	vertical_line.size = Vector2(2, 20)  # 2px wide, 20px tall
+	vertical_line.color = Color.WHITE
+	vertical_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vertical_line.set_anchors_preset(Control.PRESET_CENTER)
+	vertical_line.position = Vector2(-1, -10)  # Offset from anchor center
+	crosshair_container.add_child(vertical_line)
+
+	# Horizontal line
+	var horizontal_line = ColorRect.new()
+	horizontal_line.name = "HorizontalLine"
+	horizontal_line.size = Vector2(20, 2)  # 20px wide, 2px tall
+	horizontal_line.color = Color.WHITE
+	horizontal_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	horizontal_line.set_anchors_preset(Control.PRESET_CENTER)
+	horizontal_line.position = Vector2(-10, -1)  # Offset from anchor center
+	crosshair_container.add_child(horizontal_line)
+
+	# Set container to fill screen so child anchors work
+	crosshair_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# Store reference to container (so we can show/hide it)
+	crosshair = crosshair_container
 
 	# Create examination panel (bottom-center)
 	panel = PanelContainer.new()

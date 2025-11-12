@@ -152,21 +152,15 @@ func get_current_target() -> Examinable:
 	if collider is Examinable:
 		return collider
 
-	# Check if collider has Examinable as child node
-	for child in collider.get_children():
-		if child is Examinable:
-			return child
+	# Check all descendants recursively for Examinable
+	var examinable = _find_examinable_in_descendants(collider)
+	if examinable:
+		return examinable
 
 	return null
 
 func get_current_target_or_grid() -> Variant:
-	"""Get Examinable OR grid tile information from raycast target
-
-	Returns:
-	  - Examinable if entity/item detected
-	  - Dictionary with grid tile info if GridMap hit
-	  - null if nothing
-	"""
+	"""Get Examinable OR grid tile info (entity, grid tile dict, or null)"""
 	var hit = get_look_raycast()
 	if hit.is_empty():
 		return null
@@ -179,9 +173,10 @@ func get_current_target_or_grid() -> Variant:
 	if collider is Examinable:
 		return collider
 
-	for child in collider.get_children():
-		if child is Examinable:
-			return child
+	# Check all descendants recursively for Examinable
+	var examinable = _find_examinable_in_descendants(collider)
+	if examinable:
+		return examinable
 
 	# Check if we hit a GridMap (walls/floors/ceilings)
 	if collider is GridMap:
@@ -199,4 +194,15 @@ func get_current_target_or_grid() -> Variant:
 				"position": hit_position
 			}
 
+	return null
+
+func _find_examinable_in_descendants(node: Node) -> Examinable:
+	"""Recursively search for Examinable component in node's descendants"""
+	for child in node.get_children():
+		if child is Examinable:
+			return child
+		# Recurse into child's children
+		var found = _find_examinable_in_descendants(child)
+		if found:
+			return found
 	return null

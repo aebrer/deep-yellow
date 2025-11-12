@@ -55,7 +55,7 @@ func examine_entity(entity_id: String) -> void:
 	if current_level < 3:
 		discovered_entities[entity_id] = current_level + 1
 		researcher_classification += 1
-		Log.info(Log.Category.SYSTEM, "Entity examined: %s (discovery level: %d -> %d)" % [
+		Log.system("Entity examined: %s (discovery level: %d -> %d)" % [
 			entity_id,
 			current_level,
 			current_level + 1
