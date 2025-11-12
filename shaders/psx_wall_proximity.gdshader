@@ -116,10 +116,7 @@ void fragment() {
 		// else: Fragment is before camera (projection < 0) or behind player (projection > line_length)
 		//       Keep fade = 1.0 (fully opaque, no fading)
 
-		// DEBUG: Visualize fade by tinting fragments
-		// Red = close to sightline (should fade), White = far from sightline (opaque)
-		ALBEDO = mix(vec3(1.0, 0.0, 0.0), ALBEDO, fade);
-
+		// Apply transparency based on fade value
 		if (use_dithered_fade) {
 			// PSX-style dithered transparency using binary alpha (no discard!)
 			// This avoids depth buffer holes that cause culling issues

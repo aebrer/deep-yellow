@@ -104,27 +104,22 @@ void fragment() {
 		if (camera_y > ceiling_y) {
 			// Camera is above ceiling (looking down) - apply proximity fade
 
-			// Calculate camera→player line segment
-			vec3 line_direction = player_position - camera_pos;
-			float line_length = length(line_direction);
-			line_direction = normalize(line_direction);
+			// Calculate camera→player line direction
+			vec3 line_direction = normalize(player_position - camera_pos);
 
 			// Project fragment onto camera→player line
 			vec3 fragment_to_camera = fragment_world_pos - camera_pos;
 			float projection = dot(fragment_to_camera, line_direction);
 
-			// Only fade fragments BETWEEN camera and player
-			if (projection >= 0.0 && projection <= line_length) {
-				// Fragment is between camera and player - check distance to sightline
-				vec3 closest_point = camera_pos + line_direction * projection;
-				float dist_to_sightline = length(fragment_world_pos - closest_point);
+			// For ceiling: Fade ALL fragments near the line, not just between camera and player
+			// This creates a full cylinder around the camera→player line
+			vec3 closest_point = camera_pos + line_direction * projection;
+			float dist_to_sightline = length(fragment_world_pos - closest_point);
 
-				// Fade based on distance to sightline
-				// fade = 0.0 when on sightline (fully transparent)
-				// fade = 1.0 when far from sightline (fully opaque)
-				fade = smoothstep(0.0, sightline_fade_radius, dist_to_sightline);
-			}
-			// else: Fragment is before camera or behind player - keep fade = 1.0
+			// Fade based on distance to sightline
+			// fade = 0.0 when on sightline (fully transparent)
+			// fade = 1.0 when far from sightline (fully opaque)
+			fade = smoothstep(0.0, sightline_fade_radius, dist_to_sightline);
 		}
 		// else: Camera is below ceiling (looking up) - keep fade = 1.0 (fully opaque)
 

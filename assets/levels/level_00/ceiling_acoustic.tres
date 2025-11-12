@@ -19,6 +19,6 @@ shader_parameter/uv_scale = Vector2(1, 1)
 shader_parameter/uv_offset = Vector2(0, 0)
 shader_parameter/uv_pan_velocity = Vector2(0, 0)
 shader_parameter/enable_proximity_fade = true
-shader_parameter/sightline_fade_radius = 2.0
+shader_parameter/sightline_fade_radius = 30.0
 shader_parameter/use_dithered_fade = true
 shader_parameter/player_position = Vector3(0, 0, 0)
