@@ -36,8 +36,12 @@ func enter() -> void:
 		rt_repeat_timer = 0.0
 
 func handle_input(event: InputEvent) -> void:
-	# Initial press is handled in process_frame for consistent timing
-	pass
+	# Check for look mode activation (LT/RMB press)
+	if event.is_action_pressed("look_mode"):
+		transition_to("LookModeState")
+		return
+
+	# Initial movement press handled in process_frame for consistent timing
 
 func _move_forward() -> void:
 	"""Move forward in camera direction"""

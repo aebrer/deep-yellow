@@ -19,7 +19,7 @@ func enter() -> void:
 	# Execute the turn immediately
 	_execute_turn()
 
-func handle_input(event: InputEvent) -> void:
+func handle_input(_event: InputEvent) -> void:
 	# Block all input during turn execution
 	pass
 

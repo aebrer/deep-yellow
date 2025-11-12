@@ -41,11 +41,11 @@ func exit() -> void:
 # ============================================================================
 
 ## Handle input events (called from player's _unhandled_input)
-func handle_input(event: InputEvent) -> void:
+func handle_input(_event: InputEvent) -> void:
 	pass  # Override in subclasses
 
 ## Called every frame (from player's _process)
-func process_frame(delta: float) -> void:
+func process_frame(_delta: float) -> void:
 	pass  # Override in subclasses
 
 # ============================================================================

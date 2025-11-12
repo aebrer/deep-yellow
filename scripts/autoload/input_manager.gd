@@ -140,7 +140,6 @@ func _analog_to_grid_8_direction(analog: Vector2) -> Vector2i:
 
 	# Use angle-based approach for cleaner diagonal snapping
 	var angle = analog.angle()
-	var angle_deg = rad_to_deg(angle)
 
 	# Convert angle to octant (8 directions)
 	# Each octant is PI/4 radians (45 degrees)
@@ -178,8 +177,8 @@ func _update_triggers() -> void:
 	"""Read trigger axes and synthesize button events for actions"""
 	# Read raw axis values from controller 0
 	# Note: Triggers return 0.0 to 1.0 (not -1.0 to 1.0 like sticks)
-	left_trigger_value = Input.get_joy_axis(0, TRIGGER_AXIS_LEFT)
-	right_trigger_value = Input.get_joy_axis(0, TRIGGER_AXIS_RIGHT)
+	left_trigger_value = Input.get_joy_axis(0, TRIGGER_AXIS_LEFT as JoyAxis)
+	right_trigger_value = Input.get_joy_axis(0, TRIGGER_AXIS_RIGHT as JoyAxis)
 
 	# Convert to digital state (above threshold = "pressed")
 	var left_now_pressed = left_trigger_value > TRIGGER_THRESHOLD

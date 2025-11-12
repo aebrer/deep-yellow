@@ -1,27 +1,29 @@
-[gd_scene load_steps=8 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=9 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
-[ext_resource type="MeshLibrary" uid="uid://c8vwx8qn1yf3d" path="res://assets/grid_mesh_library.tres" id="3_meshlibrary"]
+[ext_resource type="MeshLibrary" uid="uid://beijc8l4th7t4" path="res://assets/grid_mesh_library.tres" id="3_meshlibrary"]
 [ext_resource type="Script" path="res://scripts/player/player_3d.gd" id="4_player3d"]
 [ext_resource type="Script" path="res://scripts/player/input_state_machine.gd" id="5_statemachine"]
 [ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="6_idle"]
+[ext_resource type="Script" path="res://scripts/player/states/look_mode_state.gd" id="7_lookmode"]
 [ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="8_executing"]
 [ext_resource type="Script" path="res://scripts/player/tactical_camera.gd" id="10_camera"]
+[ext_resource type="Script" path="res://scripts/player/first_person_camera.gd" id="11_fpcamera"]
+[ext_resource type="Script" path="res://scripts/ui/examination_ui.gd" id="12_examui"]
+[ext_resource type="Script" path="res://scripts/components/examinable.gd" id="13_examinable"]
 [ext_resource type="Material" path="res://post_process/dither-banding_mat.tres" id="9_dither"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
-
-[sub_resource type="Sky" id="Sky_1"]
-sky_material = SubResource("ProceduralSkyMaterial_1")
-
 [sub_resource type="Environment" id="Environment_1"]
-background_mode = 2
-sky = SubResource("Sky_1")
+background_mode = 1
+background_color = Color(0.5, 0.5, 0.5, 1)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
 height = 1.8
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_springarm"]
+radius = 0.3
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_indicator"]
 transparency = 1
@@ -30,14 +32,24 @@ emission_enabled = true
 emission = Color(0, 0.8, 0, 1)
 emission_energy_multiplier = 2.0
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_examcube"]
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_examcube"]
+size = Vector3(2, 2, 2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_examcube"]
+albedo_color = Color(0.8, 0.4, 0.2, 1)
+
 [node name="Game" type="Node3D"]
 script = ExtResource("1_game3d")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
 
-[node name="SunLight" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 0, 0)
+[node name="OverheadLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.174, 0.985, 0, -0.985, 0.174, 0, 0, 0)
+light_color = Color(1, 1, 1, 1)
 light_energy = 0.8
 shadow_enabled = true
 
@@ -47,6 +59,8 @@ script = ExtResource("2_grid3d")
 [node name="GridMap" type="GridMap" parent="Grid3D"]
 mesh_library = ExtResource("3_meshlibrary")
 cell_size = Vector3(2, 1, 2)
+collision_layer = 2
+collision_mask = 0
 
 [node name="MoveIndicator" type="Node3D" parent="."]
 visible = false
@@ -56,6 +70,37 @@ transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0.1
 radius = 0.8
 height = 0.3
 material = SubResource("StandardMaterial3D_indicator")
+
+[node name="TestEntity" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 140, 1.0, 4)
+pixel_size = 0.01
+billboard = 2
+render_priority = 127
+outline_render_priority = 126
+text = "👻"
+font_size = 128
+
+[node name="ExaminableTestCube" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 4)
+collision_layer = 2
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ExaminableTestCube"]
+mesh = SubResource("BoxMesh_examcube")
+surface_material_override/0 = SubResource("StandardMaterial3D_examcube")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExaminableTestCube"]
+shape = SubResource("BoxShape3D_examcube")
+
+[node name="Examinable" type="Area3D" parent="ExaminableTestCube"]
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("13_examinable")
+entity_id = "test_cube"
+entity_type = 6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExaminableTestCube/Examinable"]
+shape = SubResource("BoxShape3D_examcube")
 
 [node name="Player3D" type="CharacterBody3D" parent="."]
 script = ExtResource("4_player3d")
@@ -67,6 +112,8 @@ shape = SubResource("CapsuleShape3D_1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 pixel_size = 0.01
 billboard = 2
+render_priority = 127
+outline_render_priority = 126
 text = "🚶"
 font_size = 128
 
@@ -75,6 +122,9 @@ script = ExtResource("5_statemachine")
 
 [node name="IdleState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("6_idle")
+
+[node name="LookModeState" type="Node" parent="Player3D/InputStateMachine"]
+script = ExtResource("7_lookmode")
 
 [node name="ExecutingTurnState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("8_executing")
@@ -99,14 +149,42 @@ pitch_far = -60.0
 
 [node name="VerticalPivot" type="Node3D" parent="Player3D/CameraRig/HorizontalPivot"]
 
-[node name="SpringArm3D" type="SpringArm3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot"]
-spring_length = 15.0
-collision_mask = 2
-
-[node name="Camera3D" type="Camera3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot/SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="Player3D/CameraRig/HorizontalPivot/VerticalPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 15)
 fov = 70.0
 
+[node name="FirstPersonCamera" type="Node3D" parent="Player3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+script = ExtResource("11_fpcamera")
+rotation_speed = 360.0
+mouse_sensitivity = 0.15
+rotation_deadzone = 0.3
+pitch_min = -89.0
+pitch_max = 89.0
+default_fov = 75.0
+fov_min = 60.0
+fov_max = 90.0
+fov_zoom_speed = 5.0
+
+[node name="HorizontalPivot" type="Node3D" parent="Player3D/FirstPersonCamera"]
+
+[node name="VerticalPivot" type="Node3D" parent="Player3D/FirstPersonCamera/HorizontalPivot"]
+
+[node name="Camera3D" type="Camera3D" parent="Player3D/FirstPersonCamera/HorizontalPivot/VerticalPivot"]
+current = false
+fov = 75.0
+
 [node name="UI" type="CanvasLayer" parent="."]
+
+[node name="ExaminationUI" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("12_examui")
 
 [node name="PostProcessDither" type="ColorRect" parent="UI"]
 material = ExtResource("9_dither")

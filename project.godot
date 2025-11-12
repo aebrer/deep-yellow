@@ -13,13 +13,16 @@ config_version=5
 config/name="Backrooms Power Crawl"
 config/description="A turn-based roguelike combining Caves of Qud's deep simulation with Vampire Survivors' automatic combat, set in the Backrooms."
 run/main_scene="res://scenes/game.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 InputManager="*res://scripts/autoload/input_manager.gd"
 Log="*res://scripts/autoload/logger.gd"
+LevelManager="*res://scripts/autoload/level_manager.gd"
+KnowledgeDB="*res://scripts/autoload/knowledge_db.gd"
+EntityRegistry="*res://scripts/autoload/entity_registry.gd"
 
 [display]
 
@@ -27,13 +30,6 @@ window/size/viewport_width=1600
 window/size/viewport_height=900
 window/size/mode=2
 window/stretch/mode="canvas_items"
-
-[shader_globals]
-
-precision_multiplier={
-"type": "float",
-"value": 0.5
-}
 
 [input]
 
@@ -134,9 +130,22 @@ camera_rotate_right={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":69,"key_label":0,"unicode":101,"location":0,"echo":false,"script":null)
 ]
 }
+look_mode={
+"deadzone": 0.5,
+"events": [Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":6,"pressure":0.0,"pressed":true,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":2,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":true,"double_click":false,"script":null)
+]
+}
 
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[shader_globals]
+
+precision_multiplier={
+"type": "float",
+"value": 0.5
+}

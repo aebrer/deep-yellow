@@ -536,6 +536,83 @@ Should I implement this, or do you want to discuss the tooltip system first?"
 **How**: Calculate visible rect, only update those tiles
 **Why**: 128x128 grid = 16k tiles, but only ~400 visible
 
+### Logging System (Log Autoload)
+
+**What**: Centralized logging with category and level filtering
+**Where**: `scripts/autoload/logger.gd` (accessed as `Log`)
+**Purpose**: Debug output with zero overhead when disabled
+
+**Log Levels** (in priority order):
+- `TRACE` - Every frame events (most verbose)
+- `DEBUG` - State changes, calculations
+- `INFO` - Important events
+- `WARN` - Unexpected but recoverable
+- `ERROR` - Serious issues
+- `NONE` - Disable all logging
+
+**Log Categories**:
+- `INPUT` - InputManager events
+- `STATE` - State machine transitions
+- `MOVEMENT` - Movement actions
+- `ACTION` - Action system
+- `TURN` - Turn execution
+- `GRID` - Grid/tile operations
+- `CAMERA` - Camera movement
+- `ENTITY` - Entity spawning/AI
+- `ABILITY` - Ability system
+- `PHYSICS` - Physics simulation
+- `SYSTEM` - System-level events
+
+**How to Use**:
+
+```gdscript
+# Category-specific convenience methods (most common):
+Log.system("Game initialized")           # SYSTEM category, INFO level
+Log.state("Entering IdleState")          # STATE category, DEBUG level
+Log.movement("Moving to (5, 3)")         # MOVEMENT category, DEBUG level
+
+# Cross-category level methods:
+Log.trace(Log.Category.STATE, "Frame update")      # Any category, TRACE level
+Log.warn(Log.Category.GRID, "Invalid cell")        # Any category, WARN level
+Log.error(Log.Category.ACTION, "Action failed")    # Any category, ERROR level
+
+# Generic method (all others route through this):
+Log.msg(Log.Category.INPUT, Log.Level.DEBUG, "Stick moved")
+```
+
+**Common Mistakes to Avoid**:
+```gdscript
+# ❌ WRONG - Log.info() doesn't exist:
+Log.info(Log.Category.SYSTEM, "Message")
+
+# ✅ CORRECT - Use category method or msg():
+Log.system("Message")  # For SYSTEM + INFO
+Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Message")  # Explicit
+```
+
+**Available Category Methods**:
+- `Log.input(msg)` - INPUT/DEBUG
+- `Log.state(msg)` - STATE/DEBUG
+- `Log.movement(msg)` - MOVEMENT/DEBUG
+- `Log.action(msg)` - ACTION/DEBUG
+- `Log.turn(msg)` - TURN/INFO
+- `Log.grid(msg)` - GRID/DEBUG
+- `Log.camera(msg)` - CAMERA/DEBUG
+- `Log.system(msg)` - SYSTEM/INFO
+
+**Configuration**:
+- Categories can be toggled on/off in Project Settings → Autoload → Log
+- Global level filter (e.g., only show WARN and above)
+- Output formatting (timestamps, frame count, category prefix)
+- File logging (future feature)
+
+**Adding Custom Categories** (if needed in future):
+1. Add to `Category` enum in logger.gd
+2. Add to `CATEGORY_NAMES` dict
+3. Add `@export var log_[name]: bool` to configuration
+4. Add case to `_should_log()` match statement
+5. (Optional) Add convenience method like `func [name](message: String)`
+
 ### Standard Third-Person Camera
 
 **What**: Mouse/right-stick controlled camera with pivot hierarchy
@@ -720,6 +797,184 @@ python3 _claude_scripts/strip_mesh_library_previews.py
 ```
 
 **Note**: Godot Editor will regenerate preview images the next time you open the MeshLibrary, so you'll need to re-run this script before each commit if you've edited the file in Godot.
+
+---
+
+### Generating Textures with Sub-Agent Virtuous Cycle
+
+**When you need to create texture assets** (e.g., yellow wallpaper, concrete floors, ceiling tiles), use this iterative multi-agent workflow instead of manually creating assets or asking the user to find them.
+
+**The Virtuous Cycle**:
+
+1. **Spawn Creator Agent**
+   - Provide detailed description of texture needed
+   - Pull reference details from Backrooms wiki or design docs
+   - Agent creates standalone Python script in `_claude_scripts/textures/texture_name/generate.py`
+   - **USE PYTHON** - agent has creative freedom to use whatever works:
+     - PIL/Pillow for direct pixel manipulation
+     - NumPy for array-based generation
+     - Noise libraries (perlin, simplex, opensimplex)
+     - Geometric primitives (PIL.ImageDraw)
+     - Cairo for vector graphics
+     - ModernGL/PyOpenGL for shader-based generation
+     - **Whatever generative art technique produces the best result**
+   - **Runs in project venv**: `/home/andrew/projects/backrooms_power_crawl/venv/`
+   - **CRITICAL REQUIREMENTS**:
+     - **MUST BE TILEABLE/SEAMLESS**: Texture must repeat seamlessly when tiled in a grid
+     - **Use modulo wrapping for ALL pixel operations**: `img_array[y % SIZE, x % SIZE] = value`
+     - Pattern dimensions should divide texture size evenly (e.g., 32px repeat on 128px texture)
+     - For circular effects, use normal distance but apply with modulo coordinates
+     - Must output `output.png` meeting the specifications
+   - Agent can install any Python packages needed: `pip install package_name`
+   - **AUTOMATION**:
+     1. Agent creates `generate.py`
+     2. Installs any dependencies in venv
+     3. Runs script: `cd /home/andrew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
+     4. Verifies `output.png` exists and meets requirements
+   - **THIS IS SIMPLE**: Pure Python, direct PNG output, agent chooses the best technique
+
+2. **Spawn Comparison Critic Agent**
+   - Provide original description + path to generated PNG
+   - Task: Load PNG and compare against original requirements
+   - **MUST verify tiling/seamlessness** - check that edges align properly
+   - Agent reports: "Matches description" or "Issues: [list problems]"
+
+3. **Spawn Blind Critic Agent**
+   - NO CONTEXT PROVIDED - don't say "focus on X" or give description
+   - Task: Look at PNG and describe what you see objectively
+   - **Should comment on whether it looks tileable** (edges align?)
+   - Agent reports raw observations without bias
+   - This catches issues the creator might have missed
+
+4. **Generate Revision Instructions**
+   - Synthesize feedback from both critics
+   - Create specific, actionable tweaks for creator
+   - Example: "Reduce saturation by 20%", "Add subtle vertical lines", "Fix tiling - use modulo wrapping for all pixel access"
+   - **Tiling fix pattern**:
+     ```python
+     # For circular effects (water stains, etc.):
+     for dy in range(-radius, radius + 1):
+         for dx in range(-radius, radius + 1):
+             dist = sqrt(dx**2 + dy**2)
+             if dist <= radius:
+                 y_coord = (center_y + dy) % SIZE  # Modulo wrapping
+                 x_coord = (center_x + dx) % SIZE
+                 img_array[y_coord, x_coord] += effect_value
+     ```
+
+5. **Respawn Creator with Feedback**
+   - Same creator agent type, new instance
+   - Provide original description + critic feedback
+   - Agent modifies Python script to address issues
+   - Re-renders PNG
+
+6. **Repeat Cycle**
+   - Spawn new critics for updated PNG
+   - Continue until all critics approve (including tiling verification!)
+   - Typical cycles: 2-4 iterations
+
+**Real Example - Backrooms Level 0 Wallpaper (2025-01-09)**:
+
+This is the actual workflow used to generate the Level 0 wallpaper texture, documenting the real challenges and solutions.
+
+```markdown
+**Texture Needed**: Backrooms Level 0 yellow wallpaper (128×128, tileable)
+**Reference**: Backrooms wiki - greyish-yellow wallpaper with chevron patterns
+
+**Iteration 1 - Wrong shape**:
+- Creator: Generated filled triangular arrows
+- Comparison Critic: "Arrows are correct but should be chevrons (∧), not filled triangles"
+- Blind Critic: "Sees triangular shapes in grid"
+- User correction: "arrows are more like chevrons btw in the official docs"
+- Revisions: "Replace arrows with chevron shapes (two angled lines forming ∧)"
+
+**Iteration 2 - Pattern correct but no weathering**:
+- Creator: Chevrons correct, but too clean
+- Comparison Critic: "Matches description perfectly"
+- Blind Critic: "Too uniform, lacks surface texture variation"
+- Revisions: "Add more visible aging - increase grain, water stains, wear patterns"
+
+**Iteration 3 - Weathering added but tiling broken**:
+- Creator: Added prominent weathering effects
+- Comparison Critic: "Pattern doesn't tile - 36px doesn't divide 128 evenly"
+- Blind Critic: "Pattern has discontinuity at edges"
+- Revisions: "Change vertical repeat to 32px (128÷32=4 rows exactly)"
+
+**Iteration 4 - Tiling still broken**:
+- Creator: Fixed pattern dimensions but effects don't wrap
+- Comparison Critic: "Pattern dimensions correct, but water stains don't wrap at edges"
+- Blind Critic: "Has strange cutoffs near edges"
+- User: "ah but remember, the tiling"
+- Revisions: "Use modulo wrapping for ALL pixel operations: `img_array[y % SIZE, x % SIZE]`"
+
+**Iteration 5 - PIL clipping issue**:
+- Creator: Implemented modulo for effects, but chevrons still don't tile
+- Comparison Critic: "Right edge doesn't match left edge - chevrons clip at boundary"
+- User insight: "draw them differently. mirroring can be a good trick"
+- Revisions: "Replace PIL ImageDraw with pixel-level drawing using modulo wrapping"
+
+**Iteration 6 - Pattern broken by pixel drawing**:
+- Creator: Pixel-level drawing but chevrons became filled shapes
+- Comparison Critic: "Filled triangles, missing vertical lines, missing small chevrons"
+- Blind Critic: "Clean geometric but missing weathering"
+- Revisions: "Fix chevron drawing - TWO separate angled lines, keep weathering, draw vertical lines"
+
+**Iteration 7 - Chevrons too narrow**:
+- Creator: All elements present and tiling works
+- Comparison Critic: "All requirements met, tiles seamlessly"
+- User: "the 'chevrons' are too narrow, so their bases aren't touching"
+- Revisions: "Increase chevron width from 8/12px to 18/26px so bases connect"
+
+**Final Result**:
+- User: "tiling is working great though btw" and "it's 'tileable' enough btw haha. the tiny flaws are not an issue, it's quite serviceable!"
+- Status: APPROVED and ready for production
+```
+
+**Key Lessons Learned**:
+1. **Tiling is hard to get perfect** - "serviceable" tiling is often good enough for game textures
+2. **PIL ImageDraw clips at boundaries** - use pixel-level drawing with modulo for guaranteed wrapping
+3. **Pattern dimensions must divide texture size evenly** - 32px repeat on 128px texture = perfect fit
+4. **User corrections are valuable** - "chevrons not arrows" saved iterations
+5. **Both critics are essential** - comparison catches spec violations, blind catches unexpected issues
+6. **Iterate boldly** - took 7 iterations, but got there in the end!
+
+**Filesystem Convention**:
+```
+_claude_scripts/textures/
+├── backrooms_wallpaper/
+│   ├── generate.py          # Python texture generation script
+│   ├── output.png           # Generated texture (tileable!)
+│   └── iterations/          # Iteration history (optional)
+│       ├── v1.png
+│       ├── v2.png
+│       └── v3.png
+├── brown_carpet/
+│   └── generate.py
+└── ceiling_tile/
+    └── generate.py
+```
+
+**Running the Generator**:
+```bash
+# From project root, activate venv and run script:
+cd /home/andrew/projects/backrooms_power_crawl
+source venv/bin/activate
+cd _claude_scripts/textures/backrooms_wallpaper
+python generate.py  # Outputs tileable PNG
+```
+
+**Why This Works**:
+- **Iterative refinement**: Each cycle improves quality
+- **Blind critique**: Catches unintended artifacts (including tiling issues!)
+- **Comparison critique**: Ensures requirements met (including seamless tiling)
+- **Reproducible**: Python code can be re-run or tweaked
+- **Self-contained**: No external tools or manual work needed
+- **Tileable by design**: Toroidal math and pattern alignment ensure seamless textures
+
+**When NOT to Use This**:
+- User provides specific texture files to use
+- Texture requires photorealistic detail (use image sources instead)
+- Simple solid colors (just create PNG directly)
 
 ---
 

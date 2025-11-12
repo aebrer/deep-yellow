@@ -1,22 +1,43 @@
-[gd_resource type="MeshLibrary" load_steps=7 format=3 uid="uid://beijc8l4th7t4"]
+[gd_resource type="MeshLibrary" load_steps=9 format=3 uid="uid://beijc8l4th7t4"]
 
-[ext_resource type="ShaderMaterial" path="res://assets/materials/psx_floor.tres" id="1_floor_mat"]
-[ext_resource type="ShaderMaterial" path="res://assets/materials/psx_wall.tres" id="2_wall_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_brown.tres" id="1_floor_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_yellow.tres" id="2_wall_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_acoustic.tres" id="3_ceiling_mat"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_qclfb"]
 material = ExtResource("1_floor_mat")
-size = Vector2(1, 1)
+size = Vector2(2, 2)
 
 [sub_resource type="BoxMesh" id="BoxMesh_i67ov"]
 material = ExtResource("2_wall_mat")
-size = Vector3(1, 4, 1)
+size = Vector3(2, 4, 2)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ceiling"]
+material = ExtResource("3_ceiling_mat")
+size = Vector2(2, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall"]
+size = Vector3(2, 4, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(2, 0.1, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ceiling"]
+size = Vector3(2, 0.1, 2)
 
 [resource]
 item/0/name = "Floor"
 item/0/mesh = SubResource("PlaneMesh_qclfb")
 item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/0/mesh_cast_shadow = 1
-item/0/shapes = []
+item/0/shapes = [
+{
+"shape": SubResource("BoxShape3D_floor"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+}
+]
+item/0/collision_layer = 2
+item/0/collision_mask = 0
 item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/0/navigation_layers = 1
 
@@ -24,7 +45,29 @@ item/1/name = "Wall"
 item/1/mesh = SubResource("BoxMesh_i67ov")
 item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 item/1/mesh_cast_shadow = 1
-item/1/shapes = []
+item/1/shapes = [
+{
+"shape": SubResource("BoxShape3D_wall"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+}
+]
+item/1/collision_layer = 2
+item/1/collision_mask = 0
 item/1/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/1/navigation_layers = 1
+
+item/2/name = "Ceiling"
+item/2/mesh = SubResource("PlaneMesh_ceiling")
+item/2/mesh_transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 2.98, 0)
+item/2/mesh_cast_shadow = 0
+item/2/shapes = [
+{
+"shape": SubResource("BoxShape3D_ceiling"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.98, 0)
+}
+]
+item/2/collision_layer = 2
+item/2/collision_mask = 0
+item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/2/navigation_layers = 1
 
