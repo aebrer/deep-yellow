@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
-[ext_resource type="MeshLibrary" uid="uid://c8vwx8qn1yf3d" path="res://assets/grid_mesh_library.tres" id="3_meshlibrary"]
+[ext_resource type="MeshLibrary" uid="uid://beijc8l4th7t4" path="res://assets/grid_mesh_library.tres" id="3_meshlibrary"]
 [ext_resource type="Script" path="res://scripts/player/player_3d.gd" id="4_player3d"]
 [ext_resource type="Script" path="res://scripts/player/input_state_machine.gd" id="5_statemachine"]
 [ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="6_idle"]

@@ -140,7 +140,6 @@ func _analog_to_grid_8_direction(analog: Vector2) -> Vector2i:
 
 	# Use angle-based approach for cleaner diagonal snapping
 	var angle = analog.angle()
-	var angle_deg = rad_to_deg(angle)
 
 	# Convert angle to octant (8 directions)
 	# Each octant is PI/4 radians (45 degrees)

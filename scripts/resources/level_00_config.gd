@@ -119,7 +119,7 @@ entity density: very low"""
 	# EXIT CONFIGURATION
 	# ========================================================================
 	exit_spawn_chance = 0.03  # Rare exits (hard to escape)
-	exit_destinations = [1, 2]  # Can noclip to Level 1 or 2
+	exit_destinations = []  # TODO: Add Level 1, 2 when implemented
 	min_exit_distance = 60  # Must explore significantly to find exit
 
 	# ========================================================================

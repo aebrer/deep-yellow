@@ -129,8 +129,8 @@ func snap_rotate(direction: int) -> void:
 	"""Rotate camera to next 45° snap position (for keyboard Q/E)"""
 	# Snap to nearest 45° and rotate by 45°
 	var current_rotation = h_pivot.rotation_degrees.y
-	var snapped = round(current_rotation / 45.0) * 45.0
-	h_pivot.rotation_degrees.y = snapped + (direction * 45.0)
+	var snapped_angle = round(current_rotation / 45.0) * 45.0
+	h_pivot.rotation_degrees.y = snapped_angle + (direction * 45.0)
 	h_pivot.rotation_degrees.y = fmod(h_pivot.rotation_degrees.y, 360.0)
 
 # ============================================================================

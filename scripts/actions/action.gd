@@ -18,13 +18,13 @@ var action_name: String = "BaseAction"
 
 ## Check if this action can be executed in current game state
 ## Override in subclasses to add validation logic
-func can_execute(player) -> bool:
+func can_execute(_player) -> bool:
 	push_warning("Action.can_execute() not implemented for: " + action_name)
 	return false
 
 ## Execute this action on the player
 ## Override in subclasses to implement action behavior
-func execute(player) -> void:
+func execute(_player) -> void:
 	push_warning("Action.execute() not implemented for: " + action_name)
 
 ## Get a string representation of this action for debugging
