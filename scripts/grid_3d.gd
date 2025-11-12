@@ -332,7 +332,9 @@ func get_random_walkable_position() -> Vector2i:
 	"""Get random walkable position"""
 	if walkable_cells.is_empty():
 		# Fallback to grid center when no walkable cells
+		@warning_ignore("integer_division")
 		var center_x: int = grid_size.x / 2
+		@warning_ignore("integer_division")
 		var center_y: int = grid_size.y / 2
 		return Vector2i(center_x, center_y)
 	return walkable_cells.pick_random()
