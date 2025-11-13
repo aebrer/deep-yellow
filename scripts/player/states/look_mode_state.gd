@@ -63,6 +63,9 @@ func enter() -> void:
 	else:
 		Log.warn(Log.Category.STATE, "ExaminationUI not found at path: /root/Game/UI/ExaminationUI")
 
+	# Update action preview to show wait action
+	_update_action_preview()
+
 func exit() -> void:
 	super.exit()
 
@@ -151,5 +154,17 @@ func _execute_wait_action() -> void:
 		# TODO: Process environmental effects when physics system is implemented
 
 		Log.turn("===== TURN %d COMPLETE (from Look Mode) =====" % player.turn_count)
+
+func _update_action_preview() -> void:
+	"""Update action preview with wait action"""
+	if not player:
+		return
+
+	# In look mode, player will wait (pass turn) when clicking RT/LMB
+	var preview_action = WaitAction.new()
+
+	# Emit preview signal with typed array
+	var actions: Array[Action] = [preview_action]
+	player.action_preview_changed.emit(actions)
 
 # All target handling now unified - no special cases for grid tiles vs entities

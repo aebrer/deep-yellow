@@ -24,3 +24,12 @@ func execute(player) -> void:
 		player.grid_position.x,
 		player.grid_position.y
 	])
+
+func get_preview_info(player) -> Dictionary:
+	"""Get preview info for UI display"""
+	return {
+		"name": "Wait",
+		"target": "(%d, %d)" % [player.grid_position.x, player.grid_position.y],
+		"icon": "⏸",
+		"cost": ""
+	}

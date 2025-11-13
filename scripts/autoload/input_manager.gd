@@ -13,6 +13,21 @@ extends Node
 ##   InputManager.is_action_just_pressed("action_name") -> bool
 
 # ============================================================================
+# INPUT DEVICE TRACKING
+# ============================================================================
+
+enum InputDevice {
+	GAMEPAD,           ## Controller/gamepad input
+	MOUSE_KEYBOARD     ## Mouse + keyboard input
+}
+
+## Signal emitted when input device changes (gamepad ↔ mouse+keyboard)
+signal input_device_changed(device: InputDevice)
+
+## Current active input device (auto-detected from last input)
+var current_input_device: InputDevice = InputDevice.MOUSE_KEYBOARD
+
+# ============================================================================
 # CONFIGURATION
 # ============================================================================
 
@@ -92,6 +107,10 @@ func _process(_delta: float) -> void:
 	# Update continuous aim direction every frame
 	_update_aim_direction()
 
+func _input(event: InputEvent) -> void:
+	# Detect input device from event type (use _input so we catch all events, even consumed ones)
+	_detect_input_device(event)
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Generic input logging - log ALL input events when debug enabled
 	if debug_input:
@@ -111,6 +130,25 @@ func _unhandled_input(event: InputEvent) -> void:
 	for action in tracked_actions:
 		if event.is_action_pressed(action):
 			_actions_this_frame[action] = true
+
+func _detect_input_device(event: InputEvent) -> void:
+	"""Auto-detect which input device is being used based on event type"""
+	var new_device: InputDevice
+
+	# Gamepad inputs
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		new_device = InputDevice.GAMEPAD
+	# Mouse + keyboard inputs
+	elif event is InputEventKey or event is InputEventMouse:
+		new_device = InputDevice.MOUSE_KEYBOARD
+	else:
+		return  # Unknown input type, don't switch
+
+	# Only emit signal if device actually changed
+	if new_device != current_input_device:
+		current_input_device = new_device
+		input_device_changed.emit(new_device)
+		Log.input("Input device switched to: %s" % ("GAMEPAD" if new_device == InputDevice.GAMEPAD else "MOUSE+KEYBOARD"))
 
 # ============================================================================
 # AIM DIRECTION (Continuous analog input)

@@ -13,8 +13,9 @@
 [ext_resource type="Script" path="res://scripts/player/tactical_camera.gd" id="11_camera"]
 [ext_resource type="Script" path="res://scripts/player/first_person_camera.gd" id="12_fpcamera"]
 [ext_resource type="Script" path="res://scripts/ui/examination_ui.gd" id="13_examui"]
-[ext_resource type="Script" path="res://scripts/components/examinable.gd" id="14_examinable"]
-[ext_resource type="Material" path="res://post_process/dither-banding_mat.tres" id="15_dither"]
+[ext_resource type="Script" path="res://scripts/ui/action_preview_ui.gd" id="14_actionpreview"]
+[ext_resource type="Script" path="res://scripts/components/examinable.gd" id="15_examinable"]
+[ext_resource type="Material" path="res://post_process/dither-banding_mat.tres" id="16_dither"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -154,8 +155,18 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("13_examui")
 
+[node name="ActionPreviewUI" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("14_actionpreview")
+
 [node name="PostProcessDither" type="ColorRect" parent="UI"]
-material = ExtResource("15_dither")
+material = ExtResource("16_dither")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

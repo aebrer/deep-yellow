@@ -30,6 +30,7 @@ extends Node3D
 @onready var grid: Grid3D = $Grid3D
 @onready var player: Player3D = $Player3D
 @onready var move_indicator: Node3D = $MoveIndicator
+@onready var action_preview_ui: ActionPreviewUI = $UI/ActionPreviewUI
 
 func _ready() -> void:
 	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Initializing 3D viewport (640x480 with PSX shaders)")
@@ -56,4 +57,12 @@ func _ready() -> void:
 	# Link grid back to player (for line-of-sight proximity fade)
 	grid.set_player(player)
 
+	# Connect action preview signal
+	player.action_preview_changed.connect(_on_player_action_preview_changed)
+
 	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "3D viewport ready - controls active")
+
+func _on_player_action_preview_changed(actions: Array[Action]) -> void:
+	"""Forward action preview to UI"""
+	if action_preview_ui:
+		action_preview_ui.show_preview(actions, player)

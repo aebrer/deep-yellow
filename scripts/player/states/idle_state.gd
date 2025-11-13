@@ -23,6 +23,7 @@ func enter() -> void:
 	# Show forward indicator (1 cell ahead in camera direction)
 	if player:
 		player.update_move_indicator()
+		_update_action_preview()
 
 	# Check if RT/Click is already being held (from previous state)
 	var rt_currently_held = InputManager.is_action_pressed("move_confirm")
@@ -74,6 +75,7 @@ func process_frame(delta: float) -> void:
 	# Update forward indicator every frame (follows camera rotation)
 	if player:
 		player.update_move_indicator()
+		_update_action_preview()
 
 	# Handle RT/Click press and hold-to-repeat
 	if InputManager.is_action_just_pressed("move_confirm"):
@@ -113,3 +115,26 @@ func process_frame(delta: float) -> void:
 		rt_held = false
 		rt_hold_time = 0.0
 		rt_repeat_timer = 0.0
+
+func _update_action_preview() -> void:
+	"""Update action preview with current forward movement"""
+	if not player:
+		return
+
+	# Get forward direction from camera
+	var forward_direction = Vector2i.ZERO
+	if player.has_method("get_camera_forward_grid_direction"):
+		forward_direction = player.get_camera_forward_grid_direction()
+
+	if forward_direction == Vector2i.ZERO:
+		# No valid direction - hide preview
+		var empty_actions: Array[Action] = []
+		player.action_preview_changed.emit(empty_actions)
+		return
+
+	# Create movement action for preview (not executed yet)
+	var preview_action = MovementAction.new(forward_direction)
+
+	# Emit preview signal with typed array
+	var actions: Array[Action] = [preview_action]
+	player.action_preview_changed.emit(actions)

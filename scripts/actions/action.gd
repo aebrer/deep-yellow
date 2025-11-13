@@ -30,3 +30,14 @@ func execute(_player) -> void:
 ## Get a string representation of this action for debugging
 func _to_string() -> String:
 	return "[Action: %s]" % action_name
+
+## Get preview information for UI display
+## Override in subclasses to provide action-specific preview data
+## Returns dict with keys: name (String), target (String), icon (String), cost (String)
+func get_preview_info(_player) -> Dictionary:
+	return {
+		"name": action_name,
+		"target": "",
+		"icon": "?",
+		"cost": ""
+	}

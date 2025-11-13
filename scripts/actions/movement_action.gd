@@ -56,3 +56,14 @@ func execute(player) -> void:
 		player.grid_position.x, player.grid_position.y,
 		direction.x, direction.y
 	])
+
+func get_preview_info(player) -> Dictionary:
+	"""Get preview info for UI display"""
+	var target_pos = player.grid_position + direction
+
+	return {
+		"name": "Move Forward",
+		"target": "(%d, %d)" % [target_pos.x, target_pos.y],
+		"icon": "→",
+		"cost": ""
+	}

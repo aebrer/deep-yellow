@@ -6,6 +6,20 @@ extends CharacterBody3D
 ## Each action advances the entire game state by one discrete turn.
 ## No smooth interpolation - this is Caves of Qud style!
 
+# ============================================================================
+# SIGNALS
+# ============================================================================
+
+## Emitted when action preview should update (for UI)
+## actions: Array of Action objects that will execute next turn
+## Note: Emitted by states (IdleState, LookModeState), connected in game_3d.gd
+@warning_ignore("unused_signal")
+signal action_preview_changed(actions: Array[Action])
+
+# ============================================================================
+# STATE
+# ============================================================================
+
 # Grid state (SAME AS 2D VERSION)
 var grid_position: Vector2i = Vector2i(64, 64)
 var pending_action = null
