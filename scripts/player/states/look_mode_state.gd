@@ -103,8 +103,14 @@ func handle_input(event: InputEvent) -> void:
 
 	# Block all other inputs while in look mode
 	# (Camera rotation handled by FirstPersonCamera directly)
+	# (RT/LMB handled in process_frame via InputManager)
 
 func process_frame(_delta: float) -> void:
+	# Handle RT/LMB for wait action (using InputManager for proper action tracking)
+	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
+		_execute_wait_action()
+		return
+
 	# Update raycast and examination target (uses examination overlay system)
 	if not first_person_camera:
 		return
@@ -126,5 +132,24 @@ func process_frame(_delta: float) -> void:
 			# Looking at nothing
 			if examination_ui:
 				examination_ui.hide_panel()
+
+# ============================================================================
+# ACTIONS
+# ============================================================================
+
+func _execute_wait_action() -> void:
+	"""Execute a wait action (pass turn without moving) while staying in look mode"""
+	var wait_action = WaitAction.new()
+
+	Log.turn("[Look Mode] Player waiting (passing turn)")
+
+	# Execute the wait action directly (stay in look mode, don't transition)
+	if wait_action.can_execute(player):
+		wait_action.execute(player)
+
+		# TODO: Process enemy turns when enemy system is implemented
+		# TODO: Process environmental effects when physics system is implemented
+
+		Log.turn("===== TURN %d COMPLETE (from Look Mode) =====" % player.turn_count)
 
 # All target handling now unified - no special cases for grid tiles vs entities
