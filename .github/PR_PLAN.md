@@ -72,8 +72,10 @@ See `docs/EXAMINATION_SYSTEM_REDESIGN.md` for complete architecture, root cause 
 - [x] Look at floor → shows floor description in UI
 - [x] Look at wall → shows wall description in UI
 - [x] Look at ceiling → shows ceiling description in UI
-- [ ] Look at entity → shows entity info in UI (test_cube needs updating to generic placeholder)
 - [x] No false positives
+
+**Out of Scope** (deferred to entity system PR):
+- [ ] Entity examination (requires full entity system architecture - see ENTITY_SYSTEM_ARCHITECTURE.md)
 
 **Code Quality**:
 - [x] Code dramatically simplified (FirstPersonCamera: -50% lines, ExaminationUI: removed duplicate method)
