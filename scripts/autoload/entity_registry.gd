@@ -94,7 +94,7 @@ func _load_entities() -> void:
 		"Level 0's signature yellow wallpaper. Greyish-yellow with chevron patterns (#D4C5A0). Shows aging, water damage, and peeling in corners. The wallpaper appears to stretch infinitely in all directions. No anomalous properties beyond the unsettling monotony."
 	]
 	wall.description_levels = wall_descs
-	var wall_clearance: Array[int] = [0, 0, 0, 1]
+	var wall_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
 	wall.clearance_required = wall_clearance
 	var wall_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
 	wall.object_class_levels = wall_classes
@@ -118,7 +118,7 @@ func _load_entities() -> void:
 		"Level 0's brown carpet (approx. #8B6F4F). Loop pile construction, heavily worn. Perpetually damp, possibly from moisture in the air. Shows darkened traffic patterns. Slight chemical smell - likely mold or mildew. The dampness makes the carpet squelch slightly underfoot."
 	]
 	floor_tile.description_levels = floor_descs
-	var floor_clearance: Array[int] = [0, 0, 0, 1]
+	var floor_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
 	floor_tile.clearance_required = floor_clearance
 	var floor_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
 	floor_tile.object_class_levels = floor_classes
@@ -142,7 +142,7 @@ func _load_entities() -> void:
 		"Level 0's suspended acoustic ceiling. Off-white to beige tiles (#D8D0C0) with small perforations for sound dampening. Shows yellowing from age and water damage. Grid system visible between tiles. Fluorescent light panels provide inconsistent lighting - some flicker, others are dark. The ceiling height is approximately 8-9 feet, creating a claustrophobic office-like atmosphere."
 	]
 	ceiling.description_levels = ceiling_descs
-	var ceiling_clearance: Array[int] = [0, 0, 0, 1]
+	var ceiling_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
 	ceiling.clearance_required = ceiling_clearance
 	var ceiling_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
 	ceiling.object_class_levels = ceiling_classes
