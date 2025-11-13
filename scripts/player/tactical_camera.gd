@@ -92,8 +92,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		manual_pitch_override = true  # User manually controlled pitch
 		get_viewport().set_input_as_handled()
 
-	# ESC to release mouse (standard)
-	if event.is_action_pressed("ui_cancel"):
+	# ESC or Start button to toggle mouse capture (for UI/menu interaction)
+	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			get_viewport().set_input_as_handled()

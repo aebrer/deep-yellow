@@ -741,6 +741,43 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 └── data/              # JSON configs (future)
 ```
 
+### Godot 4 Gamepad Button Mapping (Verified from Engine Source)
+
+**AUTHORITATIVE MAPPING** from Godot 4 engine source code (`core/input/input_enums.h`):
+
+| Index | Constant | Xbox | PlayStation | Nintendo |
+|-------|----------|------|-------------|----------|
+| 0 | JOY_BUTTON_A | A | Cross (✕) | B |
+| 1 | JOY_BUTTON_B | B | Circle (○) | A |
+| 2 | JOY_BUTTON_X | X | Square (□) | Y |
+| 3 | JOY_BUTTON_Y | Y | Triangle (△) | X |
+| 4 | JOY_BUTTON_BACK | Back/View | Share | Minus (-) |
+| 5 | JOY_BUTTON_GUIDE | Guide/Home | PS Button | Home |
+| **6** | **JOY_BUTTON_START** | **Start/Menu** | **Options** | **Plus (+)** |
+| 7 | JOY_BUTTON_LEFT_STICK | L3 | L3 | L3 |
+| 8 | JOY_BUTTON_RIGHT_STICK | R3 | R3 | R3 |
+| 9 | JOY_BUTTON_LEFT_SHOULDER | LB | L1 | L |
+| 10 | JOY_BUTTON_RIGHT_SHOULDER | RB | R1 | R |
+| **11** | **JOY_BUTTON_DPAD_UP** | **D-Pad Up** | **D-Pad Up** | **D-Pad Up** |
+| 12 | JOY_BUTTON_DPAD_DOWN | D-Pad Down | D-Pad Down | D-Pad Down |
+| 13 | JOY_BUTTON_DPAD_LEFT | D-Pad Left | D-Pad Left | D-Pad Left |
+| 14 | JOY_BUTTON_DPAD_RIGHT | D-Pad Right | D-Pad Right | D-Pad Right |
+| 15 | JOY_BUTTON_MISC1 | Share (Series X) | - | Capture |
+| 16-19 | JOY_BUTTON_PADDLE1-4 | Elite Paddles | - | - |
+| 20 | JOY_BUTTON_TOUCHPAD | - | Touchpad Click | - |
+
+**Trigger Axes** (NOT buttons):
+- Axis 4 = Left Trigger (LT/L2) - analog 0.0 to 1.0
+- Axis 5 = Right Trigger (RT/R2) - analog 0.0 to 1.0
+
+**Common Mistakes**:
+- ❌ Start is button 11 → **WRONG!** Button 11 is D-Pad Up
+- ✅ Start is button 6 → **CORRECT!** (JOY_BUTTON_START)
+- ❌ Using InputEventJoypadButton for triggers → Use InputEventJoypadMotion with axis 4/5
+- ⚠️ A/B buttons are swapped between Xbox and Nintendo controllers
+
+**Source**: Verified from Godot 4.x engine source code and tested in production projects
+
 ### When to Update Documentation
 - **ARCHITECTURE.md**: After implementing any system
 - **DESIGN.md**: After major design decisions
