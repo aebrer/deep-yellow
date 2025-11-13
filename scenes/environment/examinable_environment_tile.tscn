@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://c1fy3qxw4qxwh"]
+[gd_scene load_steps=2 format=3 uid="uid://c1fy3qxw4qxwh"]
 
 [ext_resource type="Script" path="res://scripts/environment/examinable_environment_tile.gd" id="1_tile_script"]
-[ext_resource type="Script" path="res://scripts/components/examinable.gd" id="2_examinable"]
 
 [node name="ExaminableEnvironmentTile" type="Area3D"]
 collision_layer = 8
@@ -10,6 +9,3 @@ monitorable = false
 script = ExtResource("1_tile_script")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-
-[node name="Examinable" type="Node" parent="."]
-script = ExtResource("2_examinable")
