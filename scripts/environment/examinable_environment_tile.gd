@@ -8,6 +8,10 @@ extends Examinable
 ## This is part of the examination overlay system - separate from GridMap rendering.
 ## GridMap handles visuals, these Area3D nodes handle examination interaction.
 
+func _init() -> void:
+	"""Set entity_id early to avoid _ready() warning"""
+	entity_id = "pending"  # Will be set properly in setup()
+
 func setup(tile_type: String, entity_id_param: String, grid_pos: Vector2i, world_pos: Vector3) -> void:
 	"""Initialize this examination tile
 
