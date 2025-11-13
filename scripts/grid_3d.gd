@@ -194,6 +194,9 @@ func _generate_grid() -> void:
 	_cache_wall_materials()
 	_cache_ceiling_materials()
 
+	# Generate examination overlay
+	_generate_examination_overlay()
+
 func _cache_wall_materials() -> void:
 	"""Cache wall materials from MeshLibrary for player position updates"""
 	wall_materials.clear()
@@ -338,3 +341,18 @@ func get_random_walkable_position() -> Vector2i:
 		var center_y: int = grid_size.y / 2
 		return Vector2i(center_x, center_y)
 	return walkable_cells.pick_random()
+
+# ============================================================================
+# EXAMINATION OVERLAY SYSTEM
+# ============================================================================
+
+func _generate_examination_overlay() -> void:
+	"""Generate examination overlay using ExaminationWorldGenerator
+
+	Creates Area3D nodes with Examinable components for walls, floors, ceilings.
+	Separates examination detection (layer 4) from GridMap rendering.
+	"""
+	var generator = ExaminationWorldGenerator.new()
+	generator.generate_examination_layer(self, get_parent())
+
+	Log.system("Examination overlay generated for Grid3D")
