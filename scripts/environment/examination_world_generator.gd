@@ -20,11 +20,11 @@ const CEILING_HEIGHT = 3.0  # Actual ceiling position
 # Parent node for all examination tiles
 var examination_world: Node3D
 
-func generate_examination_layer(grid: Grid3D, parent: Node3D) -> void:
+func generate_examination_layer(grid, parent: Node3D) -> void:
 	"""Generate examination tiles for entire grid
 
 	Args:
-		grid: The Grid3D instance with GridMap data
+		grid: The Grid3D instance with GridMap data (untyped to avoid circular dependency)
 		parent: Where to add examination tiles (usually root Game node)
 	"""
 	Log.system("Generating examination layer for %dx%d grid..." % [grid.grid_size.x, grid.grid_size.y])
