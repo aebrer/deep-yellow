@@ -45,6 +45,10 @@ func enter() -> void:
 
 	Log.state("Entering Look Mode - switching to first-person camera")
 
+	# Sync first-person camera rotation to tactical camera (so they stay aligned)
+	first_person_camera.h_pivot.rotation_degrees.y = tactical_camera.h_pivot.rotation_degrees.y
+	first_person_camera.v_pivot.rotation_degrees.x = tactical_camera.v_pivot.rotation_degrees.x
+
 	# Switch cameras
 	tactical_camera.camera.current = false
 	first_person_camera.activate()
@@ -63,6 +67,11 @@ func exit() -> void:
 	super.exit()
 
 	Log.state("Exiting Look Mode - switching to tactical camera")
+
+	# Sync tactical camera rotation to first-person camera (preserve where player was looking)
+	if first_person_camera and tactical_camera:
+		tactical_camera.h_pivot.rotation_degrees.y = first_person_camera.h_pivot.rotation_degrees.y
+		tactical_camera.v_pivot.rotation_degrees.x = first_person_camera.v_pivot.rotation_degrees.x
 
 	# Switch back to tactical camera
 	if first_person_camera:
@@ -96,79 +105,26 @@ func handle_input(event: InputEvent) -> void:
 	# (Camera rotation handled by FirstPersonCamera directly)
 
 func process_frame(_delta: float) -> void:
-	# Update raycast and examination target (includes grid tiles!)
-	if first_person_camera:
-		var new_target = first_person_camera.get_current_target_or_grid()
+	# Update raycast and examination target (uses examination overlay system)
+	if not first_person_camera:
+		return
 
-		# Check if target changed
-		var target_changed = false
-		if new_target is Examinable:
-			target_changed = (new_target != current_target)
-			current_target = new_target
-			current_grid_tile = {}
-		elif new_target is Dictionary:
-			# Grid tile
-			target_changed = (new_target != current_grid_tile)
-			current_grid_tile = new_target
-			current_target = null
+	var new_target = first_person_camera.get_current_target()
+
+	# Check if target changed
+	var target_changed = (new_target != current_target)
+	current_target = new_target
+
+	# Update UI with target (or hide if nothing)
+	if target_changed:
+		if new_target:
+			# Examine the target (entity or environment tile)
+			KnowledgeDB.examine_entity(new_target.entity_id)
+			if examination_ui:
+				examination_ui.show_panel(new_target)
 		else:
-			# Nothing
-			target_changed = (current_target != null or not current_grid_tile.is_empty())
-			current_target = null
-			current_grid_tile = {}
-
-		if target_changed:
-			_on_target_changed(new_target)
-
-		# Update ExaminationUI based on current target
-		if examination_ui:
-			if current_target:
-				examination_ui.show_panel(current_target)
-			elif not current_grid_tile.is_empty():
-				examination_ui.show_panel_for_grid_tile(current_grid_tile)
-			else:
+			# Looking at nothing
+			if examination_ui:
 				examination_ui.hide_panel()
 
-# ============================================================================
-# TARGET HANDLING
-# ============================================================================
-
-func _on_target_changed(new_target: Variant) -> void:
-	"""Called when raycast target changes (Examinable or grid tile)"""
-	if new_target is Examinable:
-		Log.trace(Log.Category.STATE, "Looking at entity: %s" % new_target.entity_id)
-
-		# Update ExaminationUI
-		if examination_ui:
-			examination_ui.set_target(new_target)
-
-		# Increment discovery level on first examination
-		KnowledgeDB.examine_entity(new_target.entity_id)
-
-	elif new_target is Dictionary and new_target.get("type") == "grid_tile":
-		# Grid tile examination
-		var entity_id = _get_entity_id_for_tile(new_target.tile_type)
-		Log.trace(Log.Category.STATE, "Looking at grid tile: %s" % entity_id)
-
-		# Increment discovery level for tile type
-		KnowledgeDB.examine_entity(entity_id)
-
-	else:
-		Log.trace(Log.Category.STATE, "No target in view")
-
-		# Clear ExaminationUI
-		if examination_ui:
-			examination_ui.clear_target()
-
-func _get_entity_id_for_tile(tile_type: int) -> String:
-	"""Map GridMap tile type to entity ID"""
-	# TileType enum: FLOOR = 0, WALL = 1, CEILING = 2
-	match tile_type:
-		0:  # FLOOR
-			return "level_0_floor"
-		1:  # WALL
-			return "level_0_wall"
-		2:  # CEILING
-			return "level_0_ceiling"
-		_:
-			return "unknown_tile"
+# All target handling now unified - no special cases for grid tiles vs entities

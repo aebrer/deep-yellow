@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://c1fy3qxw4qxwh"]
+
+[ext_resource type="Script" path="res://scripts/environment/examinable_environment_tile.gd" id="1_tile_script"]
+
+[node name="ExaminableEnvironmentTile" type="StaticBody3D"]
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("1_tile_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
