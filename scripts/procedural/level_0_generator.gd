@@ -125,28 +125,50 @@ func _carve_from_room(
 	visited: Dictionary,
 	rng: RandomNumberGenerator
 ) -> void:
-	"""Recursively carve maze from room position"""
+	"""Recursively carve maze from room position
+
+	Modified recursive backtracking for Backrooms aesthetic:
+	1. Mark current room as visited (but DON'T carve it fully)
+	2. Carve small 3×3 area at room center (junction point)
+	3. For each unvisited neighbor (in random order):
+	   - Carve narrow hallway to neighbor (3 tiles wide)
+	   - Recursively visit neighbor
+	4. Backtrack when stuck
+
+	This creates narrow corridors with lots of walls, not open rooms.
+	"""
 	visited[room_pos] = true
 
-	# Carve out this room (8×8 tiles)
-	_carve_room(chunk, room_pos)
+	# Carve small 3×3 junction at room center (not full 8×8 room)
+	_carve_junction(chunk, room_pos)
 
 	# Get unvisited neighbors in random order
 	var neighbors := _get_shuffled_room_neighbors(room_pos, visited, rng)
 
 	for neighbor in neighbors:
 		if not visited.get(neighbor, false):
-			# Only recurse with 60% probability to create sparser maze
-			# This prevents visiting ALL rooms, leaving more walls
-			if rng.randf() < 0.6:
-				# Carve hallway between rooms (3 tiles wide)
-				_carve_hallway(chunk, room_pos, neighbor)
+			# Carve hallway between rooms (3 tiles wide)
+			_carve_hallway(chunk, room_pos, neighbor)
 
-				# Recursively visit neighbor
-				_carve_from_room(chunk, neighbor, visited, rng)
+			# Recursively visit neighbor
+			_carve_from_room(chunk, neighbor, visited, rng)
+
+func _carve_junction(chunk: Chunk, room_pos: Vector2i) -> void:
+	"""Carve small 3×3 junction at room center (not full room)
+
+	Creates intersection points where hallways meet, without carving
+	large open rooms. This gives the Backrooms narrow corridor aesthetic.
+	"""
+	var room_center := room_pos * ROOM_SIZE + Vector2i(ROOM_SIZE / 2, ROOM_SIZE / 2)
+
+	# Carve 3×3 area centered on room position
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var tile_pos := room_center + Vector2i(dx, dy)
+			_set_tile_in_chunk(chunk, tile_pos, SubChunk.TileType.FLOOR)
 
 func _carve_room(chunk: Chunk, room_pos: Vector2i) -> void:
-	"""Carve an 8×8 tile room"""
+	"""Carve an 8×8 tile room (DEPRECATED - use _carve_junction for narrow hallways)"""
 	var tile_start := room_pos * ROOM_SIZE
 
 	for dy in range(ROOM_SIZE):

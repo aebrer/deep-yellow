@@ -283,6 +283,11 @@ func load_chunk(chunk: Chunk) -> void:
 		walkable_cells.size()
 	])
 
+	# TODO: Examination overlay disabled for procedural mode
+	# Creating 50K+ collision shapes hits Godot's RID limit and crashes
+	# Need sparse examination system (only tiles near player, or on-demand)
+	# _generate_chunk_examination_overlay(chunk)
+
 func unload_chunk(chunk: Chunk) -> void:
 	"""Unload a chunk from GridMap
 
@@ -309,6 +314,14 @@ func unload_chunk(chunk: Chunk) -> void:
 
 			# Remove from walkable cells
 			walkable_cells.erase(world_tile_pos)
+
+	# Clean up examination tiles for this chunk
+	if chunk.position in chunk_examination_tiles:
+		var tiles: Array[Node3D] = chunk_examination_tiles[chunk.position]
+		for tile in tiles:
+			tile.queue_free()
+		chunk_examination_tiles.erase(chunk.position)
+		Log.grid("Cleaned up %d examination tiles for chunk %s" % [tiles.size(), chunk.position])
 
 	Log.grid("Unloaded chunk %s from GridMap" % chunk.position)
 
@@ -485,8 +498,114 @@ func _generate_examination_overlay() -> void:
 
 	Creates Area3D nodes with Examinable components for walls, floors, ceilings.
 	Separates examination detection (layer 4) from GridMap rendering.
+
+	NOTE: This is for static levels only. Procedural mode uses _generate_chunk_examination_overlay().
 	"""
 	var generator = ExaminationWorldGenerator.new()
 	generator.generate_examination_layer(self, get_parent())
 
 	Log.system("Examination overlay generated for Grid3D")
+
+# Template scene for examination tiles (used by procedural generation)
+const EXAM_TILE_SCENE = preload("res://scenes/environment/examinable_environment_tile.tscn")
+const TILE_SIZE_3D = Vector2(2.0, 2.0)  # X, Z dimensions
+const FLOOR_HEIGHT = 0.0
+const WALL_HEIGHT = 2.0
+const CEILING_HEIGHT = 3.0
+
+# Examination world container (created on first chunk load)
+var examination_world: Node3D = null
+
+# Track examination tiles per chunk for cleanup
+var chunk_examination_tiles: Dictionary = {}  # Vector2i(chunk_pos) -> Array[Node3D]
+
+func _generate_chunk_examination_overlay(chunk: Chunk) -> void:
+	"""Generate examination overlay for a single chunk (procedural mode)
+
+	Creates Area3D nodes with Examinable components for this chunk's tiles.
+	"""
+	# Create examination world container if needed
+	if not examination_world:
+		examination_world = Node3D.new()
+		examination_world.name = "ExaminationWorld"
+		get_parent().add_child(examination_world)
+		Log.system("Created ExaminationWorld for procedural chunks")
+
+	var chunk_tiles: Array[Node3D] = []
+	var chunk_world_offset := chunk.position * Chunk.SIZE
+
+	# Iterate through chunk's tile area
+	for y in range(Chunk.SIZE):
+		for x in range(Chunk.SIZE):
+			var world_tile_pos := chunk_world_offset + Vector2i(x, y)
+			var cell_3d := Vector3i(world_tile_pos.x, 0, world_tile_pos.y)
+			var cell_item := grid_map.get_cell_item(cell_3d)
+
+			# Create examination tile based on type
+			match cell_item:
+				TileType.FLOOR:
+					var tile = _create_floor_exam_tile(world_tile_pos)
+					chunk_tiles.append(tile)
+				TileType.WALL:
+					var tile = _create_wall_exam_tile(world_tile_pos)
+					chunk_tiles.append(tile)
+
+			# Check for ceiling
+			var ceiling_cell := Vector3i(world_tile_pos.x, 1, world_tile_pos.y)
+			var ceiling_item := grid_map.get_cell_item(ceiling_cell)
+			if ceiling_item == TileType.CEILING:
+				var tile = _create_ceiling_exam_tile(world_tile_pos)
+				chunk_tiles.append(tile)
+
+	# Store tiles for cleanup
+	chunk_examination_tiles[chunk.position] = chunk_tiles
+
+	Log.grid("Generated %d examination tiles for chunk %s" % [chunk_tiles.size(), chunk.position])
+
+func _create_floor_exam_tile(grid_pos: Vector2i) -> Node3D:
+	"""Create examination tile for floor"""
+	var world_pos := grid_to_world(grid_pos)
+	world_pos.y = FLOOR_HEIGHT
+
+	var tile = EXAM_TILE_SCENE.instantiate() as ExaminableEnvironmentTile
+	examination_world.add_child(tile)
+	tile.setup("floor", "level_0_floor", grid_pos, world_pos)
+
+	var collision := tile.get_node("CollisionShape3D") as CollisionShape3D
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(TILE_SIZE_3D.x, 0.1, TILE_SIZE_3D.y)
+	collision.shape = shape
+
+	return tile
+
+func _create_wall_exam_tile(grid_pos: Vector2i) -> Node3D:
+	"""Create examination tile for wall"""
+	var world_pos := grid_to_world(grid_pos)
+	world_pos.y = WALL_HEIGHT
+
+	var tile = EXAM_TILE_SCENE.instantiate() as ExaminableEnvironmentTile
+	examination_world.add_child(tile)
+	tile.setup("wall", "level_0_wall", grid_pos, world_pos)
+
+	var collision := tile.get_node("CollisionShape3D") as CollisionShape3D
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(TILE_SIZE_3D.x, 4.0, TILE_SIZE_3D.y)
+	collision.shape = shape
+
+	return tile
+
+func _create_ceiling_exam_tile(grid_pos: Vector2i) -> Node3D:
+	"""Create examination tile for ceiling"""
+	var world_pos := grid_to_world(grid_pos)
+	world_pos.y = CEILING_HEIGHT
+
+	var tile = EXAM_TILE_SCENE.instantiate() as ExaminableEnvironmentTile
+	examination_world.add_child(tile)
+	tile.setup("ceiling", "level_0_ceiling", grid_pos, world_pos)
+
+	var collision := tile.get_node("CollisionShape3D") as CollisionShape3D
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(TILE_SIZE_3D.x, 0.1, TILE_SIZE_3D.y)
+	collision.shape = shape
+
+	return tile

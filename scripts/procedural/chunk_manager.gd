@@ -10,10 +10,10 @@ extends Node
 
 # Constants
 const CHUNK_SIZE := 128
-const ACTIVE_RADIUS := 2  # Chunks to keep loaded around player
-const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
-const UNLOAD_RADIUS := 4  # Chunks beyond this distance are candidates for unloading
-const MAX_LOADED_CHUNKS := 50  # Conservative limit for GridMap performance
+const ACTIVE_RADIUS := 3  # Chunks to keep loaded around player
+const GENERATION_RADIUS := 3  # Chunks to pre-generate (7×7 = 49 chunks)
+const UNLOAD_RADIUS := 5  # Chunks beyond this distance are candidates for unloading
+const MAX_LOADED_CHUNKS := 60  # Increased for larger generation radius
 const CHUNK_BUDGET_MS := 4.0  # Max milliseconds per frame for chunk operations
 const MAX_CHUNKS_PER_FRAME := 3  # Hard limit to prevent burst overload
 
