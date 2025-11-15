@@ -21,10 +21,15 @@ func increase_corruption(level_id: int, amount: float, max_value: float) -> void
 		max_value: Maximum corruption value (typically 10.0)
 	"""
 	var current: float = corruption_by_level.get(level_id, 0.0)
-	var new_value := minf(current + amount, max_value)
+	var new_value := current + amount
+
+	# Apply max if specified (0 = no max)
+	if max_value > 0.0:
+		new_value = minf(new_value, max_value)
+
 	corruption_by_level[level_id] = new_value
 
-	Log.turn("Corruption increased on Level %d: %.2f (+%.2f)" % [
+	Log.grid("Level %d corruption: %.2f (+%.2f)" % [
 		level_id,
 		new_value,
 		amount

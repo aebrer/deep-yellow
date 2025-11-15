@@ -155,7 +155,7 @@ func get_entity_count() -> int:
 func _is_sub_chunk_in_bounds(pos: Vector2i) -> bool:
 	"""Check if sub-chunk position is within bounds"""
 	return pos.x >= 0 and pos.x < SUB_CHUNKS_PER_SIDE and \
-	       pos.y >= 0 and pos.y < SUB_CHUNKS_PER_SIDE
+		   pos.y >= 0 and pos.y < SUB_CHUNKS_PER_SIDE
 
 # ============================================================================
 # DEBUG

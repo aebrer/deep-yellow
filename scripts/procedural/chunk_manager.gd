@@ -119,8 +119,8 @@ func _generate_chunk(chunk_pos: Vector2i, level_id: int) -> Chunk:
 
 	# Increase corruption AFTER chunk is generated
 	# TODO: Phase 3 - Get corruption config from level generator
-	# For now, use hardcoded values
-	corruption_tracker.increase_corruption(level_id, 0.1, 10.0)
+	# For now, use hardcoded values (0.01 per chunk, no max)
+	corruption_tracker.increase_corruption(level_id, 0.01, 0.0)
 
 	chunk.state = Chunk.State.LOADED
 	return chunk
@@ -142,7 +142,7 @@ func _generate_placeholder_chunk(chunk: Chunk) -> void:
 
 					# Walls on edges, floor in middle
 					var is_edge := chunk_x == 0 or chunk_x == Chunk.SIZE - 1 or \
-					               chunk_y == 0 or chunk_y == Chunk.SIZE - 1
+								   chunk_y == 0 or chunk_y == Chunk.SIZE - 1
 
 					if is_edge:
 						sub.set_tile(Vector2i(x, y), SubChunk.TileType.WALL)
