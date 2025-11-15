@@ -19,12 +19,14 @@ const MAX_LOADED_CHUNKS := 50  # Hard limit to prevent memory issues
 var loaded_chunks: Dictionary = {}  # Vector3i(x, y, level) -> Chunk
 var generating_chunks: Array[Vector3i] = []  # Chunks queued for generation
 var world_seed: int = 0
+var visited_chunks: Dictionary = {}  # Vector3i -> bool (chunks player has entered)
+var last_player_chunk: Vector3i = Vector3i(-999, -999, -999)  # Track chunk changes
 
 # Systems (will be initialized when available)
 var corruption_tracker: CorruptionTracker
+var level_generators: Dictionary = {}  # level_id → LevelGenerator
 # var island_manager: IslandManager  # TODO: Phase 5
 # var entity_spawner: EntitySpawner  # TODO: Phase 4
-# var level_generator_factory: LevelGeneratorFactory  # TODO: Phase 2
 
 # ============================================================================
 # LIFECYCLE
@@ -34,12 +36,21 @@ func _ready() -> void:
 	# Initialize corruption tracker
 	corruption_tracker = CorruptionTracker.new()
 
+	# Initialize level generators
+	level_generators[0] = Level0Generator.new()
+
 	# Generate world seed
 	world_seed = randi()
 
-	Log.system("ChunkManager initialized (seed: %d)" % world_seed)
+	Log.system("ChunkManager initialized (seed: %d, generators: %d)" % [
+		world_seed,
+		level_generators.size()
+	])
 
 func _process(_delta: float) -> void:
+	# Check if player entered a new chunk (for corruption tracking)
+	_check_player_chunk_change()
+
 	# Update chunks around player
 	_update_chunks_around_player()
 
@@ -55,10 +66,9 @@ func _process(_delta: float) -> void:
 
 func _update_chunks_around_player() -> void:
 	"""Queue chunks for loading near player"""
-	# TODO: Get player position from Player singleton (when it exists)
-	# For now, use a placeholder position
-	var player_tile := Vector2i(64, 64)  # Center of world
-	var player_level := 0  # Level 0 for now
+	# Get actual player position from game scene
+	var player_tile := _get_player_position()
+	var player_level := _get_player_level()
 
 	var player_chunk := tile_to_chunk(player_tile)
 
@@ -73,6 +83,36 @@ func _update_chunks_around_player() -> void:
 				continue
 
 			generating_chunks.append(chunk_key)
+
+func _check_player_chunk_change() -> void:
+	"""Check if player entered a new chunk and increase corruption"""
+	var player_tile := _get_player_position()
+	var player_level := _get_player_level()
+	var player_chunk := tile_to_chunk(player_tile)
+	var chunk_key := Vector3i(player_chunk.x, player_chunk.y, player_level)
+
+	# Check if player moved to a different chunk
+	if chunk_key != last_player_chunk:
+		last_player_chunk = chunk_key
+
+		# Check if this is a NEW chunk (never visited before)
+		if chunk_key not in visited_chunks:
+			visited_chunks[chunk_key] = true
+
+			# Increase corruption when entering new chunk
+			# Get corruption amount from level generator
+			var corruption_amount := 0.01  # Default fallback
+			var generator: LevelGenerator = level_generators.get(player_level, null)
+			if generator:
+				corruption_amount = generator.get_corruption_per_chunk()
+
+			corruption_tracker.increase_corruption(player_level, corruption_amount, 0.0)
+
+			Log.grid("Entered new chunk %s (visited: %d, corruption: %.2f)" % [
+				player_chunk,
+				visited_chunks.size(),
+				corruption_tracker.get_corruption(player_level)
+			])
 
 func _process_generation_queue() -> void:
 	"""Generate one chunk per frame to avoid stuttering"""
@@ -90,46 +130,38 @@ func _process_generation_queue() -> void:
 	# if has_node("/root/Game/Grid"):
 	#     get_node("/root/Game/Grid").load_chunk(chunk)
 
-	# Log to both Grid (for detail) and System (for visibility)
-	Log.grid("Loaded chunk %s on Level %d (corruption: %.2f)" % [
-		chunk_pos,
-		level_id,
-		corruption_tracker.get_corruption(level_id)
-	])
+	# Log chunk generation (no corruption increase here)
+	Log.grid("Generated chunk %s on Level %d" % [chunk_pos, level_id])
 
 	# Also log first few chunks to System for visibility
 	if loaded_chunks.size() <= 5 or loaded_chunks.size() % 25 == 0:
-		Log.system("ChunkManager: %d chunks loaded (latest: %s, corruption: %.2f)" % [
+		Log.system("ChunkManager: %d chunks generated (latest: %s)" % [
 			loaded_chunks.size(),
-			chunk_pos,
-			corruption_tracker.get_corruption(level_id)
+			chunk_pos
 		])
 
 func _generate_chunk(chunk_pos: Vector2i, level_id: int) -> Chunk:
-	"""Generate a new chunk
-
-	For Phase 1, this creates a placeholder chunk with walls on edges.
-	Later phases will use LevelGenerator for actual maze generation.
-	"""
+	"""Generate a new chunk using LevelGenerator"""
 	var chunk := Chunk.new()
 	chunk.initialize(chunk_pos, level_id)
 	chunk.state = Chunk.State.GENERATING
 
-	# Phase 1: Simple placeholder generation (walls on edges, floor in middle)
-	_generate_placeholder_chunk(chunk)
-
-	# TODO: Phase 3 - Use LevelGenerator
-	# var generator: LevelGenerator = level_generator_factory.get_generator(level_id)
-	# generator.generate_chunk(chunk, world_seed)
+	# Get generator for this level
+	var generator: LevelGenerator = level_generators.get(level_id, null)
+	if generator:
+		# Use LevelGenerator to create maze layout
+		generator.generate_chunk(chunk, world_seed)
+	else:
+		# Fallback: Use placeholder if no generator available
+		push_warning("No generator for level %d, using placeholder" % level_id)
+		_generate_placeholder_chunk(chunk)
 
 	# TODO: Phase 4 - Spawn entities
 	# var level_config := generator.get_level_config()
 	# entity_spawner.spawn_entities_in_chunk(chunk, level_config)
 
-	# Increase corruption AFTER chunk is generated
-	# TODO: Phase 3 - Get corruption config from level generator
-	# For now, use hardcoded values (0.01 per chunk, no max)
-	corruption_tracker.increase_corruption(level_id, 0.01, 0.0)
+	# Corruption is no longer increased during generation
+	# It now increases when player ENTERS a chunk for the first time
 
 	chunk.state = Chunk.State.LOADED
 	return chunk
@@ -167,9 +199,8 @@ func _unload_distant_chunks() -> void:
 	if loaded_chunks.size() <= MAX_LOADED_CHUNKS:
 		return
 
-	# TODO: Get player position from Player singleton
-	var player_tile := Vector2i(64, 64)
-	var player_level := 0
+	var player_tile := _get_player_position()
+	var player_level := _get_player_level()
 
 	var player_chunk := tile_to_chunk(player_tile)
 
@@ -250,6 +281,39 @@ func tile_to_local(tile_pos: Vector2i) -> Vector2i:
 	)
 
 # ============================================================================
+# PLAYER QUERIES
+# ============================================================================
+
+func _get_player_position() -> Vector2i:
+	"""Get player's current grid position
+
+	Returns default (64, 64) if player not found.
+	"""
+	# Try to get player from game scene
+	if has_node("/root/Game/Player"):
+		var player: Node = get_node("/root/Game/Player")
+		if player.has("grid_position"):
+			return player.grid_position
+
+	# Fallback to default spawn position
+	return Vector2i(64, 64)
+
+func _get_player_level() -> int:
+	"""Get player's current level
+
+	Returns 0 (Level 0) by default.
+	TODO: Add level tracking to Player when multi-level support is implemented.
+	"""
+	# Try to get player from game scene
+	if has_node("/root/Game/Player"):
+		var player: Node = get_node("/root/Game/Player")
+		if player.has("current_level"):
+			return player.current_level
+
+	# Default to Level 0
+	return 0
+
+# ============================================================================
 # PUBLIC API
 # ============================================================================
 
@@ -309,9 +373,18 @@ func start_new_run(new_seed: int = -1) -> void:
 
 	loaded_chunks.clear()
 	generating_chunks.clear()
+	visited_chunks.clear()
+	last_player_chunk = Vector3i(-999, -999, -999)
 	corruption_tracker.reset_all()
 
-	Log.system("New run started (seed: %d)" % world_seed)
+	# Re-initialize level generators (fresh instances for new run)
+	level_generators.clear()
+	level_generators[0] = Level0Generator.new()
+
+	Log.system("New run started (seed: %d, generators: %d)" % [
+		world_seed,
+		level_generators.size()
+	])
 
 # ============================================================================
 # DEBUG
