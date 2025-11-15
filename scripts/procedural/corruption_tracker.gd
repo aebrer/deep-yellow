@@ -20,7 +20,7 @@ func increase_corruption(level_id: int, amount: float, max_value: float) -> void
 		amount: How much to increase (typically 0.1 per chunk)
 		max_value: Maximum corruption value (typically 10.0)
 	"""
-	var current := corruption_by_level.get(level_id, 0.0)
+	var current: float = corruption_by_level.get(level_id, 0.0)
 	var new_value := minf(current + amount, max_value)
 	corruption_by_level[level_id] = new_value
 

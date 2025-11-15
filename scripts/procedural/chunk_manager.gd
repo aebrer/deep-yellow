@@ -79,9 +79,9 @@ func _process_generation_queue() -> void:
 	if generating_chunks.is_empty():
 		return
 
-	var chunk_key := generating_chunks.pop_front()
+	var chunk_key: Vector3i = generating_chunks.pop_front()
 	var chunk_pos := Vector2i(chunk_key.x, chunk_key.y)
-	var level_id := chunk_key.z
+	var level_id: int = chunk_key.z
 
 	var chunk := _generate_chunk(chunk_pos, level_id)
 	loaded_chunks[chunk_key] = chunk
@@ -168,7 +168,7 @@ func _unload_distant_chunks() -> void:
 
 	for chunk_key in loaded_chunks.keys():
 		var chunk_pos := Vector2i(chunk_key.x, chunk_key.y)
-		var chunk_level := chunk_key.z
+		var chunk_level: int = chunk_key.z
 
 		# Only unload chunks on current level
 		if chunk_level != player_level:
