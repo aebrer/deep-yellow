@@ -40,3 +40,8 @@ Thumbs.db
 
 # Screenshots (development only, not for repo)
 screenshots/
+
+# tmp folder for random shit
+tmp/
+tmp_*/
+tmp/*

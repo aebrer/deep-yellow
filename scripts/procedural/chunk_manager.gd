@@ -16,8 +16,8 @@ signal chunk_updates_completed()
 const CHUNK_SIZE := 128
 const ACTIVE_RADIUS := 3  # Chunks to keep loaded around player
 const GENERATION_RADIUS := 3  # Chunks to pre-generate (7×7 = 49 chunks)
-const UNLOAD_RADIUS := 5  # Chunks beyond this distance are candidates for unloading
-const MAX_LOADED_CHUNKS := 32  # Memory limit
+const UNLOAD_RADIUS := 5  # Chunks beyond this distance are candidates for unloading (hysteresis buffer)
+const MAX_LOADED_CHUNKS := 64  # Memory limit - allows full 7×7 grid + buffer zone for unloading
 const CHUNK_BUDGET_MS := 4.0  # Max milliseconds per frame for chunk operations
 const MAX_CHUNKS_PER_FRAME := 3  # Hard limit to prevent burst overload
 
@@ -84,9 +84,6 @@ func _connect_to_player_signal() -> void:
 
 func on_turn_completed() -> void:
 	"""Called when a turn completes (triggered by player's turn_completed signal)"""
-	# Track if we had chunks queued before this turn
-	was_generating = not generating_chunks.is_empty()
-
 	# Check if player entered a new chunk (for corruption tracking)
 	_check_player_chunk_change()
 
@@ -96,10 +93,13 @@ func on_turn_completed() -> void:
 	# Unload distant chunks
 	_unload_distant_chunks()
 
-	# If nothing was queued, emit completion signal immediately
+	# Track if we NOW have chunks generating (after queuing)
+	was_generating = not generating_chunks.is_empty()
+
+	# If nothing is queued, emit completion signal (deferred to allow PostTurnState to connect)
 	# (PostTurnState can transition to IdleState without waiting)
-	if not was_generating and generating_chunks.is_empty():
-		chunk_updates_completed.emit()
+	if not was_generating:
+		chunk_updates_completed.emit.call_deferred()
 
 	# Mark initial load as complete after first turn
 	# (subsequent turns will load/unload max 1 chunk to avoid lag spikes)
