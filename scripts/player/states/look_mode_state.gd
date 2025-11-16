@@ -36,6 +36,10 @@ func enter() -> void:
 		examination_crosshair = game_3d.get_node_or_null("ViewportUILayer/ExaminationCrosshair")
 	if not examination_panel:
 		examination_panel = get_node_or_null("/root/Game/TextUIOverlay/ExaminationPanel")
+		if examination_panel:
+			Log.system("ExaminationPanel found at /root/Game/TextUIOverlay/ExaminationPanel")
+		else:
+			Log.warn(Log.Category.STATE, "ExaminationPanel NOT found at /root/Game/TextUIOverlay/ExaminationPanel")
 
 	if not first_person_camera:
 		push_error("[LookModeState] FirstPersonCamera not found!")
@@ -133,11 +137,16 @@ func process_frame(_delta: float) -> void:
 	if target_changed:
 		if new_target:
 			# Examine the target (entity or environment tile)
+			Log.system("Looking at: %s (entity_id: %s)" % [new_target, new_target.entity_id])
 			KnowledgeDB.examine_entity(new_target.entity_id)
 			if examination_panel:
+				Log.system("Showing examination panel")
 				examination_panel.show_panel(new_target)
+			else:
+				Log.warn(Log.Category.STATE, "Cannot show panel - examination_panel is null")
 		else:
 			# Looking at nothing
+			Log.trace(Log.Category.STATE, "Looking at nothing")
 			if examination_panel:
 				examination_panel.hide_panel()
 

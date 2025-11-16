@@ -13,6 +13,7 @@ enum TileType {
 	WALL = 1,
 	DOOR = 2,
 	EXIT_STAIRS = 3,
+	CEILING = 4,  # Added for multi-layer support (ceilings at layer Y=1)
 }
 
 # Position
@@ -20,7 +21,8 @@ var local_position: Vector2i  # Position within parent chunk (0-7, 0-7)
 var world_position: Vector2i  # Absolute tile position in world
 
 # Data
-var tile_data: Array[Array] = []  # 16×16 tile types
+var tile_data: Array[Array] = []  # 16×16 tile types (layer 0)
+var ceiling_data: Array[Array] = []  # 16×16 ceiling tiles (layer 1)
 var entities: Array[int] = []  # Entity IDs spawned in this sub-chunk
 
 # ============================================================================
@@ -28,12 +30,19 @@ var entities: Array[int] = []  # Entity IDs spawned in this sub-chunk
 # ============================================================================
 
 func _init() -> void:
-	# Initialize 16×16 grid with walls
+	# Initialize 16×16 grid with walls (layer 0)
 	for y in range(SIZE):
 		var row: Array[int] = []
 		for x in range(SIZE):
 			row.append(TileType.WALL)
 		tile_data.append(row)
+
+	# Initialize ceiling layer (layer 1) - empty by default
+	for y in range(SIZE):
+		var row: Array[int] = []
+		for x in range(SIZE):
+			row.append(-1)  # -1 = no ceiling tile
+		ceiling_data.append(row)
 
 # ============================================================================
 # TILE ACCESS
@@ -50,6 +59,42 @@ func set_tile(local_pos: Vector2i, tile_type: int) -> void:
 	if not _is_in_bounds(local_pos):
 		return
 	tile_data[local_pos.y][local_pos.x] = tile_type
+
+func get_tile_at_layer(local_pos: Vector2i, layer: int) -> int:
+	"""Get tile type at local position and layer
+
+	Args:
+		local_pos: Position within sub-chunk (0-15, 0-15)
+		layer: 0 = floor/walls, 1 = ceilings
+
+	Returns:
+		Tile type or -1 if invalid/empty
+	"""
+	if not _is_in_bounds(local_pos):
+		return -1
+
+	if layer == 0:
+		return tile_data[local_pos.y][local_pos.x]
+	elif layer == 1:
+		return ceiling_data[local_pos.y][local_pos.x]
+	else:
+		return -1
+
+func set_tile_at_layer(local_pos: Vector2i, layer: int, tile_type: int) -> void:
+	"""Set tile type at local position and layer
+
+	Args:
+		local_pos: Position within sub-chunk (0-15, 0-15)
+		layer: 0 = floor/walls, 1 = ceilings
+		tile_type: TileType value
+	"""
+	if not _is_in_bounds(local_pos):
+		return
+
+	if layer == 0:
+		tile_data[local_pos.y][local_pos.x] = tile_type
+	elif layer == 1:
+		ceiling_data[local_pos.y][local_pos.x] = tile_type
 
 func is_walkable(local_pos: Vector2i) -> bool:
 	"""Check if tile is walkable (floor or door)"""

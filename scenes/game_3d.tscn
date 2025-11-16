@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=13 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://scripts/components/examinable.gd" id="15_examinable"]
 [ext_resource type="Material" path="res://post_process/dither-banding_mat.tres" id="16_dither"]
 [ext_resource type="Material" path="res://post_process/vhs_post_process_mat.tres" id="17_vhs"]
+[ext_resource type="Script" path="res://scripts/ui/examination_panel.gd" id="18_exampanel"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -180,3 +181,16 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("14_crosshair")
+
+[node name="TextUIOverlay" type="CanvasLayer" parent="."]
+layer = 1001
+
+[node name="ExaminationPanel" type="Control" parent="TextUIOverlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_exampanel")

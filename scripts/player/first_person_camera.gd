@@ -30,6 +30,11 @@ extends Node3D
 # State
 var active: bool = false  # Controlled by LookModeState
 
+# On-demand examination tile cache
+const MAX_CACHED_TILES := 20  # Limit memory usage
+var examination_tile_cache: Dictionary = {}  # Vector2i(grid_pos) -> ExaminableEnvironmentTile
+var examination_world: Node3D = null  # Parent for cached tiles
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -98,12 +103,24 @@ func activate() -> void:
 	"""Switch to first-person camera"""
 	active = true
 	camera.current = true
+
+	# Create examination world container if needed
+	if not examination_world:
+		examination_world = Node3D.new()
+		examination_world.name = "OnDemandExaminationWorld"
+		get_tree().root.add_child(examination_world)
+		Log.camera("Created on-demand examination world")
+
 	Log.camera("First-person camera activated")
 
 func deactivate() -> void:
 	"""Switch back to tactical camera"""
 	active = false
 	camera.current = false
+
+	# Clear examination tile cache
+	_clear_examination_cache()
+
 	Log.camera("First-person camera deactivated")
 
 func adjust_fov(delta_fov: float) -> void:
@@ -126,7 +143,7 @@ func get_look_raycast() -> Dictionary:
 
 	var ray_origin = camera.project_ray_origin(screen_center)
 	var ray_direction = camera.project_ray_normal(screen_center)
-	var ray_length = 10.0  # Maximum examination distance
+	var ray_length = 5.0  # Close examination distance (too long causes distant hits)
 
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(
@@ -141,29 +158,208 @@ func get_look_raycast() -> Dictionary:
 	return result  # Empty dict if no hit, else {position, normal, collider, etc.}
 
 func get_current_target() -> Examinable:
-	"""Get what the player is looking at (SIMPLE!)
+	"""Get what the player is looking at (ON-DEMAND TILE CREATION!)
 
-	Uses new examination overlay system - objects declare what they are.
-	No more GridMap collision math, surface normals, or heuristics.
+	1. First checks examination overlay (layer 4) for existing Examinable
+	2. If not found, raycasts GridMap (layer 2) and creates examination tile on-demand
+	3. Caches tiles for reuse (max 20 tiles)
 
 	Returns:
-		Examinable component (entity OR environment tile), or null
+		Examinable component (entity OR on-demand environment tile), or null
 	"""
+	# First: Check for existing examination overlay on layer 4
 	var hit = get_look_raycast()
-	if hit.is_empty():
+	if not hit.is_empty():
+		var collider = hit.get("collider")
+		if collider:
+			# Check if collider IS an Examinable
+			if collider is Examinable:
+				return collider
+
+			# Check descendants for Examinable
+			for child in collider.get_children():
+				if child is Examinable:
+					return child
+
+	# Second: Raycast GridMap on layer 2 for on-demand tile creation
+	var gridmap_hit = _raycast_gridmap()
+	if gridmap_hit.is_empty():
+		Log.trace(Log.Category.SYSTEM, "No GridMap hit detected")
 		return null
 
-	var collider = hit.get("collider")
-	if not collider:
+	Log.trace(Log.Category.SYSTEM, "GridMap hit detected at: %s" % gridmap_hit.get("position"))
+
+	# Get Grid3D reference from scene tree (sibling of Player3D)
+	# FirstPersonCamera -> Player3D -> Game (parent) -> Grid3D (sibling)
+	var player = get_parent()  # Player3D
+	if not player:
+		Log.warn(Log.Category.SYSTEM, "Player not found (parent of FirstPersonCamera)")
 		return null
 
-	# Check if collider IS an Examinable (for entities with Examinable as root)
-	if collider is Examinable:
-		return collider
+	var game = player.get_parent()  # Game node
+	if not game:
+		Log.warn(Log.Category.SYSTEM, "Game node not found (parent of Player)")
+		return null
 
-	# Check descendants for Examinable (environment tiles have Examinable as child)
-	for child in collider.get_children():
-		if child is Examinable:
-			return child
+	var grid_3d = game.get_node_or_null("Grid3D")
+	if not grid_3d:
+		Log.warn(Log.Category.SYSTEM, "Grid3D not found as child of Game node")
+		return null
 
-	return null
+	# Convert hit position to grid coordinates and extract surface normal
+	var hit_pos: Vector3 = gridmap_hit.get("position")
+	var hit_normal: Vector3 = gridmap_hit.get("normal")
+	var grid_pos: Vector2 = grid_3d.world_to_grid(hit_pos)
+
+	# Determine tile type from GridMap using surface normal (industry-standard approach)
+	var tile_type := _get_tile_type_at_position(grid_3d, grid_pos, hit_normal)
+	if tile_type == "":
+		return null
+
+	# Check cache for existing tile
+	var cache_key := Vector2i(grid_pos.x, grid_pos.y)
+	if examination_tile_cache.has(cache_key):
+		var cached_tile: ExaminableEnvironmentTile = examination_tile_cache[cache_key]
+		return cached_tile.examinable
+
+	# Create new examination tile on-demand
+	return _create_examination_tile(grid_3d, grid_pos, tile_type, cache_key)
+
+# ============================================================================
+# ON-DEMAND EXAMINATION TILE HELPERS
+# ============================================================================
+
+func _raycast_gridmap() -> Dictionary:
+	"""Raycast GridMap collision layer (layer 2) for on-demand tile creation"""
+	var viewport = get_viewport()
+	var screen_center = viewport.get_visible_rect().size / 2.0
+
+	var ray_origin = camera.project_ray_origin(screen_center)
+	var ray_direction = camera.project_ray_normal(screen_center)
+	var ray_length = 5.0  # Close examination distance (too long causes distant hits)
+
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(
+		ray_origin,
+		ray_origin + ray_direction * ray_length
+	)
+	query.collision_mask = 2  # Layer 2 = GridMap collision
+
+	var result = space_state.intersect_ray(query)
+
+	if not result.is_empty():
+		Log.trace(Log.Category.SYSTEM, "GridMap raycast hit at Y=%.2f, normal=%s" % [result.get("position").y, result.get("normal")])
+
+	return result
+
+func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_normal: Vector3) -> String:
+	"""Determine tile type (floor/wall/ceiling) from GridMap using surface normal
+
+	Uses dot product with Vector3.UP to determine orientation (industry-standard):
+	- Floor: normal points upward (dot > 0.7)
+	- Ceiling: normal points downward (dot < -0.7)
+	- Wall: normal is horizontal (-0.7 <= dot <= 0.7)
+
+	Threshold of 0.7 ≈ cos(45°) handles slopes and float precision.
+	This is the same approach used by CharacterBody3D.is_on_floor().
+	"""
+	const THRESHOLD = 0.7  # ~45° tolerance
+
+	var cell_3d := Vector3i(grid_pos.x, 0, grid_pos.y)
+	var cell_item: int = grid_3d.grid_map.get_cell_item(cell_3d)
+
+	# Calculate dot product with up vector to classify surface
+	var dot_up = hit_normal.dot(Vector3.UP)
+
+	# DEBUG: Always log ceiling detection attempts
+	Log.system("🔍 Tile detection at (%d,%d): Y=0 item=%d, dot_up=%.2f, normal=%s" % [grid_pos.x, grid_pos.y, cell_item, dot_up, hit_normal])
+
+	# Check if wall (horizontal normal, or explicit wall tile)
+	if cell_item == grid_3d.TileType.WALL:
+		Log.system("→ Detected as WALL")
+		return "wall"
+
+	# Check for ceiling at Y=1 layer (normal points downward)
+	var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
+	var ceiling_item: int = grid_3d.grid_map.get_cell_item(ceiling_cell)
+	var passes_threshold = dot_up < -THRESHOLD
+	Log.system("  🔍 Y=1 ceiling_item=%d (CEILING=%d), dot_up=%.2f < -%.2f? %s" % [ceiling_item, grid_3d.TileType.CEILING, dot_up, THRESHOLD, passes_threshold])
+
+	if ceiling_item == grid_3d.TileType.CEILING and passes_threshold:
+		Log.system("→ ✓ Detected as CEILING!")
+		return "ceiling"
+	elif ceiling_item == grid_3d.TileType.CEILING:
+		Log.system("→ ✗ Ceiling tile exists but normal check failed (dot_up=%.2f, need < -%.2f)" % [dot_up, THRESHOLD])
+	elif passes_threshold:
+		Log.system("→ ✗ Normal points down but no ceiling tile at Y=1 (item=%d)" % ceiling_item)
+
+	# Check if floor (normal points upward)
+	if cell_item == grid_3d.TileType.FLOOR and dot_up > THRESHOLD:
+		Log.system("→ Detected as FLOOR")
+		return "floor"
+
+	Log.system("→ No tile type detected")
+	return ""
+
+func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cache_key: Vector2i) -> Examinable:
+	"""Create examination tile on-demand and add to cache"""
+	# Manage cache size (LRU-style: remove oldest if at limit)
+	if examination_tile_cache.size() >= MAX_CACHED_TILES:
+		var oldest_key = examination_tile_cache.keys()[0]
+		var oldest_tile: ExaminableEnvironmentTile = examination_tile_cache[oldest_key]
+		oldest_tile.queue_free()
+		examination_tile_cache.erase(oldest_key)
+		Log.trace(Log.Category.SYSTEM, "Evicted oldest examination tile from cache")
+
+	# Determine entity ID and world position based on tile type
+	var entity_id := ""
+	var world_pos: Vector3 = grid_3d.grid_to_world(grid_pos)
+
+	match tile_type:
+		"floor":
+			entity_id = "level_0_floor"
+			world_pos.y = 0.0
+		"wall":
+			entity_id = "level_0_wall"
+			world_pos.y = 2.0
+		"ceiling":
+			entity_id = "level_0_ceiling"
+			# CRITICAL: Y=2.98, NOT Y=3 or Y=4! Ceiling positioned just below wall tops for tactical camera.
+			# Walls top at Y=3, ceiling at Y=2.98 allows tactical camera to see maze layout from above.
+			# Matches grid_mesh_library.tres ceiling collision height.
+			world_pos.y = 2.98
+
+	# Load and instantiate examination tile scene
+	const EXAM_TILE_SCENE = preload("res://scenes/environment/examinable_environment_tile.tscn")
+	var tile := EXAM_TILE_SCENE.instantiate() as ExaminableEnvironmentTile
+	examination_world.add_child(tile)
+	tile.setup(tile_type, entity_id, grid_pos, world_pos)
+
+	# Configure collision shape based on type
+	var collision := tile.get_node("CollisionShape3D") as CollisionShape3D
+	var shape := BoxShape3D.new()
+	match tile_type:
+		"floor", "ceiling":
+			shape.size = Vector3(2.0, 0.1, 2.0)  # Thin slab
+		"wall":
+			shape.size = Vector3(2.0, 4.0, 2.0)  # Full height
+	collision.shape = shape
+
+	# Add to cache
+	examination_tile_cache[cache_key] = tile
+
+	Log.trace(Log.Category.SYSTEM, "Created on-demand examination tile: %s at %s" % [tile_type, grid_pos])
+
+	return tile.examinable
+
+func _clear_examination_cache() -> void:
+	"""Clear all cached examination tiles"""
+	for tile in examination_tile_cache.values():
+		tile.queue_free()
+	examination_tile_cache.clear()
+
+	if examination_world:
+		examination_world.queue_free()
+		examination_world = null
+
+	Log.camera("Cleared examination tile cache")

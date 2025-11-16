@@ -14,8 +14,11 @@ const EXAM_TILE_SCENE = preload("res://scenes/environment/examinable_environment
 # Tile dimensions (match GridMap cell_size)
 const TILE_SIZE = Vector2(2.0, 2.0)  # X, Z dimensions
 const FLOOR_HEIGHT = 0.0
-const WALL_HEIGHT = 2.0   # Center of wall (extends Y=0 to Y=4)
-const CEILING_HEIGHT = 3.0  # Actual ceiling position
+const WALL_HEIGHT = 2.0   # Center of wall (extends Y=0 to Y=3)
+# CRITICAL: Ceiling at Y=2.98, NOT Y=3 or Y=4! This is DELIBERATE for tactical camera.
+# Positioning ceiling just below wall tops (Y=3) allows tactical camera to see
+# maze layout from above. DO NOT change this value without understanding this tradeoff.
+const CEILING_HEIGHT = 2.98  # Positioned just below wall tops for tactical camera visibility
 
 # Parent node for all examination tiles
 var examination_world: Node3D

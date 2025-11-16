@@ -287,10 +287,13 @@ func _enforce_wall_connectivity(wfc_grid: Array, world_seed: int) -> void:
 func _apply_wfc_to_chunk(wfc_grid: Array, chunk: Chunk) -> void:
 	"""Convert WFC grid to chunk tile data
 
-	Maps WFCTile values to SubChunk.TileType values
+	Maps WFCTile values to SubChunk.TileType values.
+	Also places ceilings - for Level 0, ceiling at every position (standard height).
+	Future levels could have conditional ceiling placement or varying heights.
 	"""
 	var floor_count := 0
 	var wall_count := 0
+	var ceiling_count := 0
 	var superposition_count := 0
 
 	for y in range(Chunk.SIZE):
@@ -314,8 +317,14 @@ func _apply_wfc_to_chunk(wfc_grid: Array, chunk: Chunk) -> void:
 			var world_pos := chunk.position * Chunk.SIZE + Vector2i(x, y)
 			chunk.set_tile(world_pos, tile_type)
 
-	Log.grid("[WFC] Phase 4 (Apply): Chunk %s - Applied Floor:%d Wall:%d (Uncollapsed:%d)" % [
-		chunk.position, floor_count, wall_count, superposition_count
+			# Level 0 specific: Place ceiling everywhere (standard height)
+			# Future levels could make this conditional (e.g., no ceiling in outdoor areas)
+			# or vary ceiling height (e.g., high ceilings in large rooms)
+			chunk.set_tile_at_layer(world_pos, 1, SubChunk.TileType.CEILING)
+			ceiling_count += 1
+
+	Log.grid("[WFC] Phase 4 (Apply): Chunk %s - Applied Floor:%d Wall:%d Ceiling:%d (Uncollapsed:%d)" % [
+		chunk.position, floor_count, wall_count, ceiling_count, superposition_count
 	])
 
 	if superposition_count > 0:

@@ -120,6 +120,48 @@ func set_tile(tile_pos: Vector2i, tile_type: int) -> void:
 
 	sub.set_tile(sub_local_tile, tile_type)
 
+func get_tile_at_layer(tile_pos: Vector2i, layer: int) -> int:
+	"""Get tile at world position and layer
+
+	Args:
+		tile_pos: World tile position
+		layer: 0 = floor/walls, 1 = ceilings
+
+	Returns:
+		Tile type or -1 if invalid
+	"""
+	var sub := get_sub_chunk_at_tile(tile_pos)
+	if not sub:
+		return -1
+
+	var local_tile := tile_pos - (position * SIZE)
+	var sub_local_tile := Vector2i(
+		posmod(local_tile.x, SUB_CHUNK_SIZE),
+		posmod(local_tile.y, SUB_CHUNK_SIZE)
+	)
+
+	return sub.get_tile_at_layer(sub_local_tile, layer)
+
+func set_tile_at_layer(tile_pos: Vector2i, layer: int, tile_type: int) -> void:
+	"""Set tile at world position and layer
+
+	Args:
+		tile_pos: World tile position
+		layer: 0 = floor/walls, 1 = ceilings
+		tile_type: TileType value
+	"""
+	var sub := get_sub_chunk_at_tile(tile_pos)
+	if not sub:
+		return
+
+	var local_tile := tile_pos - (position * SIZE)
+	var sub_local_tile := Vector2i(
+		local_tile.x % SUB_CHUNK_SIZE,
+		local_tile.y % SUB_CHUNK_SIZE
+	)
+
+	sub.set_tile_at_layer(sub_local_tile, layer, tile_type)
+
 func is_walkable(tile_pos: Vector2i) -> bool:
 	"""Check if tile at world position is walkable"""
 	var sub := get_sub_chunk_at_tile(tile_pos)
