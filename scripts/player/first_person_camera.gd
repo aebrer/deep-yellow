@@ -27,6 +27,9 @@ extends Node3D
 @onready var v_pivot: Node3D = $HorizontalPivot/VerticalPivot
 @onready var camera: Camera3D = $HorizontalPivot/VerticalPivot/Camera3D
 
+# Reference to tactical camera for rotation sync
+var tactical_camera: TacticalCamera = null
+
 # State
 var active: bool = false  # Controlled by LookModeState
 
@@ -40,12 +43,12 @@ var examination_world: Node3D = null  # Parent for cached tiles
 # ============================================================================
 
 func _ready() -> void:
-	# Position at player eye height (set by parent Player3D)
-	position = Vector3(0, 1.6, 0)  # Eye height
-
-	# Initial rotation (facing forward)
-	h_pivot.rotation_degrees.y = 0.0
-	v_pivot.rotation_degrees.x = 0.0
+	# Get tactical camera reference for rotation sync
+	var player = get_parent()
+	if player:
+		tactical_camera = player.get_node_or_null("CameraRig")
+		if not tactical_camera:
+			push_error("TacticalCamera not found - FirstPersonCamera cannot sync rotation")
 
 	# Camera settings
 	camera.fov = default_fov
@@ -70,6 +73,7 @@ func _process(delta: float) -> void:
 	if abs(right_stick_y) > rotation_deadzone:
 		v_pivot.rotation_degrees.x -= right_stick_y * rotation_speed * delta
 		v_pivot.rotation_degrees.x = clamp(v_pivot.rotation_degrees.x, pitch_min, pitch_max)
+		Log.camera("FP Camera pitch updated: %.2f (stick_y=%.2f)" % [v_pivot.rotation_degrees.x, right_stick_y])
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
@@ -104,12 +108,23 @@ func activate() -> void:
 	active = true
 	camera.current = true
 
-	# Create examination world container if needed
-	if not examination_world:
-		examination_world = Node3D.new()
-		examination_world.name = "OnDemandExaminationWorld"
-		get_tree().root.add_child(examination_world)
-		Log.camera("Created on-demand examination world")
+	# Sync rotation from tactical camera
+	if tactical_camera:
+		h_pivot.rotation_degrees.y = tactical_camera.h_pivot.rotation_degrees.y
+		v_pivot.rotation_degrees.x = tactical_camera.v_pivot.rotation_degrees.x
+		Log.camera("Synced rotation from tactical camera: yaw=%.1f, pitch=%.1f" % [
+			h_pivot.rotation_degrees.y,
+			v_pivot.rotation_degrees.x
+		])
+
+	# Clear any stale cache entries (e.g., from old cache key format)
+	_clear_examination_cache()
+
+	# Create examination world container
+	examination_world = Node3D.new()
+	examination_world.name = "OnDemandExaminationWorld"
+	get_tree().root.add_child(examination_world)
+	Log.camera("Created on-demand examination world")
 
 	Log.camera("First-person camera activated")
 
@@ -117,6 +132,12 @@ func deactivate() -> void:
 	"""Switch back to tactical camera"""
 	active = false
 	camera.current = false
+
+	# Sync rotation back to tactical camera
+	if tactical_camera:
+		tactical_camera.h_pivot.rotation_degrees.y = h_pivot.rotation_degrees.y
+		tactical_camera.v_pivot.rotation_degrees.x = v_pivot.rotation_degrees.x
+		Log.camera("Synced rotation back to tactical camera")
 
 	# Clear examination tile cache
 	_clear_examination_cache()
@@ -160,14 +181,13 @@ func get_look_raycast() -> Dictionary:
 func get_current_target() -> Examinable:
 	"""Get what the player is looking at (ON-DEMAND TILE CREATION!)
 
-	1. First checks examination overlay (layer 4) for existing Examinable
-	2. If not found, raycasts GridMap (layer 2) and creates examination tile on-demand
-	3. Caches tiles for reuse (max 20 tiles)
+	Creates examination tiles on-demand at cursor position using grid coordinate lookup.
+	No GridMap raycasting - GridMap collision doesn't work for ceilings at Y=1.
 
 	Returns:
 		Examinable component (entity OR on-demand environment tile), or null
 	"""
-	# First: Check for existing examination overlay on layer 4
+	# Check for existing examination overlay on layer 4 (entities or already-created tiles)
 	var hit = get_look_raycast()
 	if not hit.is_empty():
 		var collider = hit.get("collider")
@@ -181,43 +201,103 @@ func get_current_target() -> Examinable:
 				if child is Examinable:
 					return child
 
-	# Second: Raycast GridMap on layer 2 for on-demand tile creation
-	var gridmap_hit = _raycast_gridmap()
-	if gridmap_hit.is_empty():
-		Log.trace(Log.Category.SYSTEM, "No GridMap hit detected")
-		return null
-
-	Log.trace(Log.Category.SYSTEM, "GridMap hit detected at: %s" % gridmap_hit.get("position"))
-
-	# Get Grid3D reference from scene tree (sibling of Player3D)
-	# FirstPersonCamera -> Player3D -> Game (parent) -> Grid3D (sibling)
-	var player = get_parent()  # Player3D
+	# Get Grid3D reference
+	var player = get_parent()
 	if not player:
-		Log.warn(Log.Category.SYSTEM, "Player not found (parent of FirstPersonCamera)")
 		return null
-
-	var game = player.get_parent()  # Game node
+	var game = player.get_parent()
 	if not game:
-		Log.warn(Log.Category.SYSTEM, "Game node not found (parent of Player)")
 		return null
-
 	var grid_3d = game.get_node_or_null("Grid3D")
 	if not grid_3d:
-		Log.warn(Log.Category.SYSTEM, "Grid3D not found as child of Game node")
 		return null
 
-	# Convert hit position to grid coordinates and extract surface normal
-	var hit_pos: Vector3 = gridmap_hit.get("position")
-	var hit_normal: Vector3 = gridmap_hit.get("normal")
-	var grid_pos: Vector2 = grid_3d.world_to_grid(hit_pos)
+	# Calculate ray intersection with floor/wall/ceiling planes
+	var viewport = get_viewport()
+	var screen_center = viewport.get_visible_rect().size / 2.0
+	var ray_origin = camera.project_ray_origin(screen_center)
+	var ray_direction = camera.project_ray_normal(screen_center)
 
-	# Determine tile type from GridMap using hit position and surface normal
-	var tile_type := _get_tile_type_at_position(grid_3d, grid_pos, hit_pos, hit_normal)
-	if tile_type == "":
-		return null
+	# Determine which plane to intersect based on pitch
+	var pitch = v_pivot.rotation_degrees.x
+	var tile_type := ""
+	var target_pos := Vector3.ZERO
+	var max_distance = 5.0  # Maximum examination distance
 
-	# Check cache for existing tile
-	var cache_key := Vector2i(grid_pos.x, grid_pos.y)
+	if pitch < -10:  # Looking down at floor (negative pitch = looking down)
+		tile_type = "floor"
+		# Intersect with floor plane at Y=0
+		if abs(ray_direction.y) > 0.01:  # Avoid division by zero
+			var t = (0.0 - ray_origin.y) / ray_direction.y
+			# Negative t means ray points away - need to negate direction
+			var actual_t = abs(t)
+			if actual_t < max_distance:
+				# Negate ray_direction.y to flip vertical direction
+				var corrected_dir = Vector3(ray_direction.x, -ray_direction.y, ray_direction.z)
+				target_pos = ray_origin + corrected_dir * actual_t
+			else:
+				return null
+		else:
+			return null
+	elif pitch > 10:  # Looking up at ceiling (positive pitch = looking up)
+		tile_type = "ceiling"
+		# Intersect with ceiling plane at Y=2.98
+		if abs(ray_direction.y) > 0.01:
+			var t = (2.98 - ray_origin.y) / ray_direction.y
+			# Negative t means ray points away - need to negate direction
+			var actual_t = abs(t)
+			if actual_t < max_distance:
+				# Negate ray_direction.y to flip vertical direction
+				var corrected_dir = Vector3(ray_direction.x, -ray_direction.y, ray_direction.z)
+				target_pos = ray_origin + corrected_dir * actual_t
+			else:
+				return null
+		else:
+			return null
+	else:  # Looking horizontally at walls
+		tile_type = "wall"
+		# Cast ray and find nearest wall intersection using grid traversal
+		# Start from current position and step along ray direction
+		var step_distance = 0.5  # Check every half meter
+		var found_wall = false
+		target_pos = ray_origin
+
+		for i in range(10):  # Max 10 steps = 5 meters
+			var test_pos = ray_origin + ray_direction * (step_distance * i)
+			var test_grid = grid_3d.world_to_grid(test_pos)
+			var test_cell = Vector3i(test_grid.x, 0, test_grid.y)
+			var cell_item = grid_3d.grid_map.get_cell_item(test_cell)
+
+			if cell_item == grid_3d.TileType.WALL:
+				target_pos = test_pos
+				found_wall = true
+				break
+
+		if not found_wall:
+			return null
+
+	var grid_pos: Vector2i = grid_3d.world_to_grid(target_pos)
+
+	# Verify tile exists at grid position
+	if tile_type == "ceiling":
+		var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
+		var cell_item = grid_3d.grid_map.get_cell_item(ceiling_cell)
+		if cell_item != grid_3d.TileType.CEILING:
+			return null
+	elif tile_type == "floor":
+		var floor_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
+		var cell_item = grid_3d.grid_map.get_cell_item(floor_cell)
+		if cell_item != grid_3d.TileType.FLOOR:
+			return null
+	else:  # wall
+		var wall_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
+		var cell_item = grid_3d.grid_map.get_cell_item(wall_cell)
+		if cell_item != grid_3d.TileType.WALL:
+			return null
+
+	# Check cache for existing tile (cache key MUST include tile type!)
+	# Same grid position (67, 3) can have floor, wall, AND ceiling tiles
+	var cache_key := "%d,%d,%s" % [grid_pos.x, grid_pos.y, tile_type]
 	if examination_tile_cache.has(cache_key):
 		var cached_tile: ExaminableEnvironmentTile = examination_tile_cache[cache_key]
 		return cached_tile.examinable
@@ -236,6 +316,10 @@ func _raycast_gridmap() -> Dictionary:
 
 	var ray_origin = camera.project_ray_origin(screen_center)
 	var ray_direction = camera.project_ray_normal(screen_center)
+
+	# Offset ray origin forward by camera near plane distance to avoid starting inside collision
+	ray_origin += ray_direction * camera.near
+
 	var ray_length = 5.0  # Close examination distance (too long causes distant hits)
 
 	var space_state = get_world_3d().direct_space_state
@@ -247,26 +331,50 @@ func _raycast_gridmap() -> Dictionary:
 
 	var result = space_state.intersect_ray(query)
 
+	# ALWAYS log raycast attempts, even when no hit
 	if not result.is_empty():
 		var hit_pos: Vector3 = result.get("position")
 		var hit_normal: Vector3 = result.get("normal")
-		Log.system("📍 Raycast: origin=%.1f,%.1f,%.1f dir=%.2f,%.2f,%.2f → hit=%.1f,%.1f,%.1f normal=%s" % [
+		Log.system("📍 Raycast HIT: origin=%.1f,%.1f,%.1f dir=%.2f,%.2f,%.2f → hit=%.1f,%.1f,%.1f normal=%s" % [
 			ray_origin.x, ray_origin.y, ray_origin.z,
 			ray_direction.x, ray_direction.y, ray_direction.z,
 			hit_pos.x, hit_pos.y, hit_pos.z,
 			hit_normal
 		])
+	else:
+		# Check what tiles exist at this grid position
+		var player = get_parent()
+		if player:
+			var game = player.get_parent()
+			if game:
+				var grid_3d = game.get_node_or_null("Grid3D")
+				if grid_3d:
+					var grid_pos: Vector2 = grid_3d.world_to_grid(ray_origin)
+					var floor_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
+					var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
+					var floor_item = grid_3d.grid_map.get_cell_item(floor_cell)
+					var ceiling_item = grid_3d.grid_map.get_cell_item(ceiling_cell)
+					Log.system("📍 Raycast MISS: origin=%.1f,%.1f,%.1f dir=%.2f,%.2f,%.2f | Grid(%d,%d): floor=%d ceiling=%d" % [
+						ray_origin.x, ray_origin.y, ray_origin.z,
+						ray_direction.x, ray_direction.y, ray_direction.z,
+						grid_pos.x, grid_pos.y,
+						floor_item, ceiling_item
+					])
+				else:
+					Log.system("📍 Raycast MISS (no Grid3D)")
+			else:
+				Log.system("📍 Raycast MISS (no Game node)")
+		else:
+			Log.system("📍 Raycast MISS (no Player)")
 
 	return result
 
 func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_pos: Vector3, hit_normal: Vector3) -> String:
-	"""Determine tile type (floor/wall/ceiling) from GridMap using hit position and normal
+	"""Determine tile type (floor/wall/ceiling) from surface normal
 
-	Checks GridMap tiles and validates hit position is near the expected geometry.
+	Uses surface normal to classify hits - ignores hit position since walls extend above ceiling.
 	"""
 	const THRESHOLD = 0.7  # ~45° tolerance for normal direction
-	const CEILING_Y = 2.98  # Ceiling collision height
-	const CEILING_TOLERANCE = 0.2  # Hit must be within 0.2 units of ceiling (ceiling box is 0.1 thick)
 
 	var cell_3d := Vector3i(grid_pos.x, 0, grid_pos.y)
 	var cell_item: int = grid_3d.grid_map.get_cell_item(cell_3d)
@@ -277,35 +385,29 @@ func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_pos: Vector3, hi
 	# DEBUG: Always log ceiling detection attempts
 	Log.system("🔍 Tile detection at (%d,%d): Y=0 item=%d, hit_y=%.2f, dot_up=%.2f, normal=%s" % [grid_pos.x, grid_pos.y, cell_item, hit_pos.y, dot_up, hit_normal])
 
-	# Check if wall (horizontal normal, or explicit wall tile)
-	if cell_item == grid_3d.TileType.WALL:
-		Log.system("→ Detected as WALL")
-		return "wall"
-
-	# Check for ceiling at Y=1 layer
-	# Require: ceiling tile exists AND hit position is near ceiling height
+	# Ceiling: normal points DOWN (dot product with UP is negative)
+	# Check for ceiling tile at Y=1 layer
 	var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
 	var ceiling_item: int = grid_3d.grid_map.get_cell_item(ceiling_cell)
-	var near_ceiling = abs(hit_pos.y - CEILING_Y) < CEILING_TOLERANCE
-	Log.system("  🔍 Y=1 ceiling_item=%d (CEILING=%d), hit_y=%.2f vs ceiling_y=%.2f, near=%s" % [
-		ceiling_item, grid_3d.TileType.CEILING, hit_pos.y, CEILING_Y, near_ceiling
-	])
 
-	if ceiling_item == grid_3d.TileType.CEILING and near_ceiling:
-		Log.system("→ ✓ Detected as CEILING (tile exists and hit near ceiling height)")
+	if ceiling_item == grid_3d.TileType.CEILING and dot_up < -THRESHOLD:
+		Log.system("→ ✓ Detected as CEILING (normal points down, tile exists)")
 		return "ceiling"
-	elif ceiling_item == grid_3d.TileType.CEILING:
-		Log.system("→ ✗ Ceiling tile exists but hit too far from ceiling (hit_y=%.2f, ceiling=%.2f)" % [hit_pos.y, CEILING_Y])
 
-	# Check if floor (normal points upward)
+	# Floor: normal points UP
 	if cell_item == grid_3d.TileType.FLOOR and dot_up > THRESHOLD:
 		Log.system("→ Detected as FLOOR")
 		return "floor"
 
+	# Wall: horizontal normal (not up, not down)
+	if cell_item == grid_3d.TileType.WALL or abs(dot_up) < THRESHOLD:
+		Log.system("→ Detected as WALL")
+		return "wall"
+
 	Log.system("→ No tile type detected")
 	return ""
 
-func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cache_key: Vector2i) -> Examinable:
+func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cache_key: String) -> Examinable:
 	"""Create examination tile on-demand and add to cache"""
 	# Manage cache size (LRU-style: remove oldest if at limit)
 	if examination_tile_cache.size() >= MAX_CACHED_TILES:

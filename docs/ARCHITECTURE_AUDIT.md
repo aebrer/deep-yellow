@@ -1136,10 +1136,20 @@ FirstPersonCamera.get_current_target()
     ├─→ Raycast Layer 4 (existing examination tiles)
     │   └─→ Hit? Return existing Examinable
     │
-    └─→ No hit? Raycast GridMap (Layer 2)
-        ├─→ Get grid position from hit
-        ├─→ Determine tile type (floor/wall/ceiling) from normal
-        ├─→ Check cache: examination_tile_cache[grid_pos]
+    └─→ No hit? Calculate ray-plane intersection
+        ├─→ Determine tile type from camera pitch:
+        │   ├─→ pitch < -10° → floor (looking down)
+        │   ├─→ pitch > 10° → ceiling (looking up)
+        │   └─→ -10° ≤ pitch ≤ 10° → wall (horizontal)
+        │
+        ├─→ Intersect with appropriate plane:
+        │   ├─→ Floor: Y=0 plane intersection
+        │   ├─→ Ceiling: Y=2.98 plane intersection
+        │   └─→ Wall: Grid traversal along ray
+        │
+        ├─→ Get grid position from intersection
+        ├─→ Verify tile exists in GridMap
+        ├─→ Check cache: examination_tile_cache[grid_x, grid_y, type]
         │   └─→ Found? Return cached tile
         │
         └─→ Not cached? Create new tile
@@ -1148,7 +1158,7 @@ FirstPersonCamera.get_current_target()
             ├─→ Setup(tile_type, entity_id, grid_pos, world_pos)
             ├─→ Add to examination_world container
             ├─→ Set collision layer 4
-            ├─→ Cache in examination_tile_cache[grid_pos]
+            ├─→ Cache in examination_tile_cache[grid_x, grid_y, type]
             └─→ Return Examinable component
 ```
 
