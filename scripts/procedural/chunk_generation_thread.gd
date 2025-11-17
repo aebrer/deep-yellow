@@ -122,16 +122,29 @@ func _thread_function() -> void:
 		chunk.initialize(request.pos, request.level_id)
 
 		# Use generator to populate chunk data
-		if generator:
+		# NOTE: GDScript has no exception handling - if generation crashes, thread dies
+		# We validate output to catch logic errors, but runtime crashes are not catchable
+		var generation_succeeded := false
+		if not generator:
+			push_error("[ChunkGenerationThread] No generator available for chunk at %s" % request.pos)
+		else:
 			generator.generate_chunk(chunk, request.seed)
 
-		# Add to completion queue
-		mutex.lock()
-		completion_queue.append({
-			"chunk": chunk,
-			"pos": request.pos,
-			"level_id": request.level_id
-		})
-		mutex.unlock()
+			# Validate generation produced walkable tiles (basic sanity check)
+			if chunk.get_walkable_count() == 0:
+				push_error("[ChunkGenerationThread] Generation failed for chunk at %s - no walkable tiles" % request.pos)
+			else:
+				generation_succeeded = true
+
+		# Only add successfully generated chunks to completion queue
+		if generation_succeeded:
+			mutex.lock()
+			completion_queue.append({
+				"chunk": chunk,
+				"pos": request.pos,
+				"level_id": request.level_id
+			})
+			mutex.unlock()
+		# Note: Failed chunks are dropped - ChunkManager will timeout and retry if needed
 
 		# Note: Signal emission happens in process_completed_chunks() on main thread

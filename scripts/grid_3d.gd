@@ -253,6 +253,7 @@ func load_chunk(chunk: Chunk) -> void:
 		for sub_x in range(Chunk.SUB_CHUNKS_PER_SIDE):
 			var sub_chunk := chunk.get_sub_chunk(Vector2i(sub_x, sub_y))
 			if not sub_chunk:
+				Log.warn(Log.Category.GRID, "Null sub-chunk at (%d, %d) in chunk %s - skipping tiles" % [sub_x, sub_y, chunk.position])
 				continue
 
 			# Calculate sub-chunk's world tile offset

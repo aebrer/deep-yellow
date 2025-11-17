@@ -70,9 +70,6 @@ const WALL := 1
 const MIN_FLOOR_PCT := 0.68  # 68% floor minimum
 const MAX_FLOOR_PCT := 0.75  # 75% floor maximum
 
-# Room data (stored during generation for corridor connections)
-var rooms: Array = []  # Array of Vector4(center_x, center_y, width, height)
-
 func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	"""Generate Level 0 chunk using room+corridor algorithm (ported from Python)
 
@@ -98,8 +95,8 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 			row[x] = WALL
 		grid[y] = row
 
-	# Clear rooms array from previous chunk generation
-	rooms.clear()
+	# Room storage for corridor connections (local variable to avoid race conditions)
+	var rooms: Array = []  # Array of Vector4(center_x, center_y, width, height)
 
 	# Create RNG seeded with chunk world position
 	var rng := RandomNumberGenerator.new()
@@ -126,12 +123,11 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	# ])  # Too verbose
 
 	# Generate maze based on strategy
-	rooms = []  # Reset room list
 	match strategy:
 		Strategy.ROOM_FOCUSED:
 			var num_rooms := rng.randi_range(10, 18)
-			_generate_varied_rooms(grid, num_rooms, rng)
-			_connect_rooms_naturally(grid, rng)
+			_generate_varied_rooms(grid, num_rooms, rng, rooms)
+			_connect_rooms_naturally(grid, rng, rooms)
 			_add_random_corridors(grid, 0.1, rng)
 
 		Strategy.MAZE_FOCUSED:
@@ -141,7 +137,7 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 
 		Strategy.HYBRID:
 			var num_rooms := rng.randi_range(6, 12)
-			_generate_varied_rooms(grid, num_rooms, rng)
+			_generate_varied_rooms(grid, num_rooms, rng, rooms)
 			_fill_empty_areas_with_maze(grid, rng)
 
 	var time_after_generation := Time.get_ticks_usec()
@@ -177,7 +173,7 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 # ROOM GENERATION
 # ============================================================================
 
-func _generate_varied_rooms(grid: Array, num_rooms: int, rng: RandomNumberGenerator) -> void:
+func _generate_varied_rooms(grid: Array, num_rooms: int, rng: RandomNumberGenerator, rooms: Array) -> void:
 	"""Generate rooms of varying sizes (Backrooms style)"""
 	for i in range(num_rooms):
 		# Weighted room sizes (Python: 0.15, 0.35, 0.30, 0.15, 0.05)
@@ -238,7 +234,7 @@ func _carve_rooms_in_maze(grid: Array, num_rooms: int, rng: RandomNumberGenerato
 # CORRIDOR GENERATION
 # ============================================================================
 
-func _connect_rooms_naturally(grid: Array, rng: RandomNumberGenerator) -> void:
+func _connect_rooms_naturally(grid: Array, rng: RandomNumberGenerator, rooms: Array) -> void:
 	"""Connect rooms with natural-feeling L-shaped corridors"""
 	if rooms.size() < 2:
 		return
