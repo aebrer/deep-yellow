@@ -484,16 +484,15 @@ func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
 func _ensure_connectivity(chunk: Chunk) -> bool:
 	"""Ensure chunk is traversable - can reach all edges from any floor tile
 
-	Uses PathfindingManager to verify a floor tile can reach all 4 chunk edges.
-	This is more useful than simple connectivity - it validates actual traversability.
+	Uses inline BFS since chunk isn't in Grid3D yet during generation.
+	This validates actual traversability - can reach all 4 edges from center.
 
 	Returns true if traversable, false if disconnected regions or unreachable edges.
 	"""
 	# Calculate world offset for this chunk
 	var chunk_world_offset := chunk.position * Chunk.SIZE
 
-	# Find a random floor tile to test from
-	var test_pos := Vector2i(-1, -1)
+	# Find a floor tile to test from (pick middle for better connectivity)
 	var floor_tiles: Array[Vector2i] = []
 
 	for y in range(Chunk.SIZE):
@@ -507,26 +506,69 @@ func _ensure_connectivity(chunk: Chunk) -> bool:
 		# No floor tiles at all - regenerate
 		return false
 
-	# Pick middle tile for testing (more likely to be central than random)
-	test_pos = floor_tiles[floor_tiles.size() / 2]
+	# Pick middle tile for testing (more likely to be well-connected)
+	var test_pos: Vector2i = floor_tiles[floor_tiles.size() / 2]
 
-	# Build navigation graph for this chunk only
-	# We need a temporary grid reference - get it from ChunkManager
-	var grid_ref = ChunkManager.grid_3d
-	if not grid_ref:
-		push_warning("Grid3D not available for pathfinding check, falling back to basic connectivity")
-		# Fallback: At least we have floor tiles
-		return true
+	# Check if we can reach tiles on all 4 edges using BFS
+	var reached_edges := {
+		"north": false,
+		"south": false,
+		"east": false,
+		"west": false
+	}
 
-	Pathfinding.build_navigation_graph([chunk.position], grid_ref)
+	# BFS from test position
+	var visited: Dictionary = {}  # Vector2i -> bool
+	var queue: Array[Vector2i] = [test_pos]
+	visited[test_pos] = true
 
-	# Check if we can reach all 4 chunk edges from this position
-	var can_traverse := Pathfinding.can_reach_chunk_edges(test_pos, chunk.position)
+	while queue.size() > 0:
+		var current: Vector2i = queue.pop_front()
+		var local := current - chunk_world_offset
+
+		# Check if we reached an edge
+		if local.y == 0:
+			reached_edges["north"] = true
+		if local.y == Chunk.SIZE - 1:
+			reached_edges["south"] = true
+		if local.x == 0:
+			reached_edges["west"] = true
+		if local.x == Chunk.SIZE - 1:
+			reached_edges["east"] = true
+
+		# Explore 4-directional neighbors
+		var neighbors := [
+			current + Vector2i(0, -1),  # North
+			current + Vector2i(0, 1),   # South
+			current + Vector2i(-1, 0),  # West
+			current + Vector2i(1, 0)    # East
+		]
+
+		for neighbor in neighbors:
+			if visited.has(neighbor):
+				continue
+
+			# Check if neighbor is walkable
+			if chunk.get_tile(neighbor) == FLOOR:
+				visited[neighbor] = true
+				queue.append(neighbor)
+
+	# Check if all edges were reached
+	var can_traverse := (
+		reached_edges["north"] and
+		reached_edges["south"] and
+		reached_edges["east"] and
+		reached_edges["west"]
+	)
 
 	if not can_traverse:
-		Log.grid("⚠️ Chunk %s has unreachable edges from position %s" % [
+		Log.grid("⚠️ Chunk %s has unreachable edges from position %s (N:%s S:%s E:%s W:%s)" % [
 			chunk.position,
-			test_pos
+			test_pos,
+			reached_edges["north"],
+			reached_edges["south"],
+			reached_edges["east"],
+			reached_edges["west"]
 		])
 
 	return can_traverse
