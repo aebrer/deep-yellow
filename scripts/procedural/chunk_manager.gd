@@ -35,6 +35,7 @@ var initial_load_complete: bool = false  # Track if initial area load is done
 var corruption_tracker: CorruptionTracker
 var level_generators: Dictionary = {}  # level_id → LevelGenerator
 var grid_3d: Grid3D = null  # Cached reference to Grid3D (found via search)
+var generation_thread: ChunkGenerationThread = null  # Worker thread for async generation
 # var island_manager: IslandManager  # TODO: Phase 5
 # var entity_spawner: EntitySpawner  # TODO: Phase 4
 
@@ -49,13 +50,18 @@ func _ready() -> void:
 	# Initialize level generators
 	level_generators[0] = Level0Generator.new()
 
+	# Initialize generation thread with Level 0 generator
+	generation_thread = ChunkGenerationThread.new(level_generators[0])
+	generation_thread.chunk_completed.connect(_on_chunk_completed)
+	generation_thread.start()
+
 	# Generate world seed
 	world_seed = randi()
 
 	# Find Grid3D in scene tree (it may be nested in UI structure)
 	_find_grid_3d()
 
-	Log.system("ChunkManager initialized (seed: %d, generators: %d)" % [
+	Log.system("ChunkManager initialized (seed: %d, generators: %d, threaded: true)" % [
 		world_seed,
 		level_generators.size()
 	])
@@ -66,8 +72,17 @@ func _ready() -> void:
 	# Do initial chunk load (deferred to ensure player position is set)
 	call_deferred("on_turn_completed")
 
+func _exit_tree() -> void:
+	"""Clean up worker thread on exit"""
+	if generation_thread:
+		generation_thread.stop()
+
 func _process(_delta: float) -> void:
-	# TURN-BASED: Only process generation queue to spread chunk generation over frames
+	# Process completed chunks from worker thread
+	if generation_thread:
+		generation_thread.process_completed_chunks()
+
+	# TURN-BASED: Send chunks to worker thread for generation
 	# Actual chunk loading/unloading happens in on_turn_completed() triggered by player signal
 	_process_generation_queue()
 
@@ -185,80 +200,38 @@ func _check_player_chunk_change() -> void:
 			])
 
 func _process_generation_queue() -> void:
-	"""Generate chunks with frame budget limiting (burst load nearest chunks)"""
+	"""Send chunks to worker thread for generation"""
 	if generating_chunks.is_empty():
+		# Check if thread has no work and we're waiting for completion
+		if was_generating and generation_thread and generation_thread.get_pending_count() == 0:
+			chunk_updates_completed.emit()
+			was_generating = false
 		return
 
-	var frame_start := Time.get_ticks_usec()
-	var chunks_this_frame := 0
+	# Check memory limit
+	if loaded_chunks.size() >= MAX_LOADED_CHUNKS:
+		if not hit_chunk_limit:
+			Log.grid("Hit MAX_LOADED_CHUNKS (%d), stopping generation (queue: %d)" % [MAX_LOADED_CHUNKS, generating_chunks.size()])
+			hit_chunk_limit = true
+		# Emit completion signal since we can't generate more chunks
+		if was_generating:
+			chunk_updates_completed.emit()
+			was_generating = false
+		return
 
-	# Burst load chunks while within frame budget and limits
+	# Send all queued chunks to worker thread (no frame budget needed - thread handles it!)
 	while not generating_chunks.is_empty():
-		# Check hard limit per frame
-		if chunks_this_frame >= MAX_CHUNKS_PER_FRAME:
-			break
-
-		# Check memory limit
-		if loaded_chunks.size() >= MAX_LOADED_CHUNKS:
-			if not hit_chunk_limit:
-				Log.grid("Hit MAX_LOADED_CHUNKS (%d), stopping generation (queue: %d)" % [MAX_LOADED_CHUNKS, generating_chunks.size()])
-				hit_chunk_limit = true
-			# Emit completion signal since we can't generate more chunks
-			# (PostTurnState would otherwise wait forever)
-			if was_generating:
-				chunk_updates_completed.emit()
-				was_generating = false
-			break
-
-		# Check frame budget (skip check on first chunk to avoid zero-chunk frames)
-		if chunks_this_frame > 0:
-			var elapsed_ms := (Time.get_ticks_usec() - frame_start) / 1000.0
-			if elapsed_ms > CHUNK_BUDGET_MS:
-				break
-
 		var chunk_key: Vector3i = generating_chunks.pop_front()
 		var chunk_pos := Vector2i(chunk_key.x, chunk_key.y)
 		var level_id: int = chunk_key.z
 
-		var chunk := _generate_chunk(chunk_pos, level_id)
-		loaded_chunks[chunk_key] = chunk
-
-		# Notify Grid3D to render it (use cached reference)
-		if not grid_3d:
-			_find_grid_3d()  # Try to find it again if not cached
-
-		if grid_3d:
-			grid_3d.load_chunk(chunk)
+		# Queue for async generation on worker thread
+		if generation_thread:
+			generation_thread.queue_chunk_generation(chunk_pos, level_id, world_seed)
 		else:
-			# Only warn once per session
-			if loaded_chunks.size() == 1:
-				push_warning("[ChunkManager] Grid3D not found in scene tree - procedural generation disabled")
-
-		# Log chunk generation (no corruption increase here)
-		Log.grid("Generated chunk %s on Level %d" % [chunk_pos, level_id])
-
-		# Also log first few chunks to System for visibility
-		if loaded_chunks.size() <= 5 or loaded_chunks.size() % 25 == 0:
-			Log.system("ChunkManager: %d chunks generated (latest: %s)" % [
-				loaded_chunks.size(),
-				chunk_pos
-			])
-
-		chunks_this_frame += 1
-
-	# Log burst performance
-	if chunks_this_frame > 0:
-		var elapsed_ms := (Time.get_ticks_usec() - frame_start) / 1000.0
-		if chunks_this_frame == 1:
-			Log.grid("Generated 1 chunk in %.2fms" % elapsed_ms)
-		else:
-			Log.grid("Burst loaded %d chunks in %.2fms" % [chunks_this_frame, elapsed_ms])
-
-	# Emit completion signal when generation finishes
-	# (only if we were generating - avoids spurious emissions)
-	if was_generating and generating_chunks.is_empty():
-		chunk_updates_completed.emit()
-		was_generating = false  # Reset flag
+			# Fallback: synchronous generation if thread not available
+			var chunk := _generate_chunk(chunk_pos, level_id)
+			_load_chunk_immediate(chunk, chunk_key)
 
 func _generate_chunk(chunk_pos: Vector2i, level_id: int) -> Chunk:
 	"""Generate a new chunk using LevelGenerator"""
@@ -309,6 +282,47 @@ func _generate_placeholder_chunk(chunk: Chunk) -> void:
 						sub.set_tile(Vector2i(x, y), SubChunk.TileType.WALL)
 					else:
 						sub.set_tile(Vector2i(x, y), SubChunk.TileType.FLOOR)
+
+func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
+	"""Handle chunk completion from worker thread (called via signal)"""
+	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
+
+	# Store chunk in loaded_chunks
+	loaded_chunks[chunk_key] = chunk
+
+	# Load into GridMap (deferred to ensure main thread)
+	call_deferred("_load_chunk_to_grid", chunk, chunk_key)
+
+func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
+	"""Load chunk into Grid3D (runs on main thread via call_deferred)"""
+	var chunk_pos := Vector2i(chunk_key.x, chunk_key.y)
+	var level_id := chunk_key.z
+
+	# Notify Grid3D to render it
+	if not grid_3d:
+		_find_grid_3d()
+
+	if grid_3d:
+		grid_3d.load_chunk(chunk)
+	else:
+		# Only warn once per session
+		if loaded_chunks.size() == 1:
+			push_warning("[ChunkManager] Grid3D not found in scene tree - procedural generation disabled")
+
+	# Log chunk generation
+	Log.grid("Generated chunk %s on Level %d" % [chunk_pos, level_id])
+
+	# Also log first few chunks to System for visibility
+	if loaded_chunks.size() <= 5 or loaded_chunks.size() % 25 == 0:
+		Log.system("ChunkManager: %d chunks generated (latest: %s)" % [
+			loaded_chunks.size(),
+			chunk_pos
+		])
+
+func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
+	"""Load chunk immediately (fallback for synchronous generation)"""
+	loaded_chunks[chunk_key] = chunk
+	_load_chunk_to_grid(chunk, chunk_key)
 
 # ============================================================================
 # CHUNK UNLOADING

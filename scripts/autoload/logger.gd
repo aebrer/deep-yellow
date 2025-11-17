@@ -144,6 +144,10 @@ func _exit_tree() -> void:
 
 ## Generic logging method (all others route through this)
 func msg(category: Category, level: Level, message: String) -> void:
+	# Skip logging from worker threads (scene tree access not allowed)
+	if OS.get_thread_caller_id() != OS.get_main_thread_id():
+		return
+
 	# Fast path: check if this category/level should be logged
 	if not _should_log(category, level):
 		return
