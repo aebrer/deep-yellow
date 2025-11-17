@@ -229,9 +229,6 @@ func _process_generation_queue() -> void:
 
 		if grid_3d:
 			grid_3d.load_chunk(chunk)
-
-			# Validate chunk edges can reach player position (for traversability)
-			_validate_chunk_player_connectivity(chunk, chunk_pos, level_id)
 		else:
 			# Only warn once per session
 			if loaded_chunks.size() == 1:
@@ -561,75 +558,6 @@ func start_new_run(new_seed: int = -1) -> void:
 # ============================================================================
 # CHUNK VALIDATION
 # ============================================================================
-
-func _validate_chunk_player_connectivity(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
-	"""Validate all edges of newly loaded chunk can reach player position
-
-	Uses pathfinding to verify connectivity after chunk is loaded into Grid3D.
-	"""
-	var player_pos := _get_player_position()
-	var player_level := _get_player_level()
-
-	# Only validate for chunks on same level as player
-	if level_id != player_level:
-		return
-
-	# Build navigation graph with all loaded chunks on this level
-	var chunks_on_level: Array = []
-	for chunk_key in loaded_chunks.keys():
-		if chunk_key.z == level_id:
-			chunks_on_level.append(Vector2i(chunk_key.x, chunk_key.y))
-
-	Pathfinding.build_navigation_graph(chunks_on_level, grid_3d)
-
-	# Sample middle position from each edge of the new chunk
-	const CHUNK_SIZE := 128
-	var chunk_world_offset := chunk_pos * CHUNK_SIZE
-	var edge_samples := [
-		chunk_world_offset + Vector2i(CHUNK_SIZE / 2, 0),              # North edge
-		chunk_world_offset + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE - 1), # South edge
-		chunk_world_offset + Vector2i(0, CHUNK_SIZE / 2),              # West edge
-		chunk_world_offset + Vector2i(CHUNK_SIZE - 1, CHUNK_SIZE / 2)  # East edge
-	]
-
-	var unreachable_edges: Array[String] = []
-	for i in range(edge_samples.size()):
-		var edge_pos := edge_samples[i]
-		var edge_name := ["North", "South", "West", "East"][i]
-
-		# Find nearest walkable tile on this edge
-		var walkable_pos := _find_nearest_walkable_near(edge_pos, chunk_world_offset, CHUNK_SIZE)
-		if walkable_pos == Vector2i(-1, -1):
-			unreachable_edges.append(edge_name + "(no floor)")
-			continue
-
-		# Check if this edge can reach player position using pathfinding
-		if not Pathfinding.are_positions_connected(walkable_pos, player_pos):
-			unreachable_edges.append(edge_name)
-
-	if not unreachable_edges.is_empty():
-		Log.warn(Log.Category.GRID, "Chunk %s edges unreachable from player at %s: %s" % [
-			chunk_pos,
-			player_pos,
-			", ".join(unreachable_edges)
-		])
-
-func _find_nearest_walkable_near(target: Vector2i, chunk_offset: Vector2i, size: int) -> Vector2i:
-	"""Find nearest walkable tile near target position (for edge sampling)"""
-	# Search in expanding radius around target
-	for radius in range(0, 10):
-		for dy in range(-radius, radius + 1):
-			for dx in range(-radius, radius + 1):
-				var test_pos := target + Vector2i(dx, dy)
-				# Clamp to chunk bounds
-				var local := test_pos - chunk_offset
-				if local.x < 0 or local.x >= size or local.y < 0 or local.y >= size:
-					continue
-
-				if grid_3d.is_walkable(test_pos):
-					return test_pos
-
-	return Vector2i(-1, -1)  # No walkable tile found
 
 # ============================================================================
 # DEBUG

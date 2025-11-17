@@ -148,15 +148,11 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	# Apply to chunk
 	_apply_grid_to_chunk(grid, chunk)
 
-	# Ensure connectivity (same as before - reject/retry if needed)
-	var is_connected := _ensure_connectivity(chunk)
-
 	var gen_time := Time.get_ticks_msec() - start_time
-	Log.grid("Generated Level 0 chunk at %s (walkable: %d tiles, %dms, connected: %s)" % [
+	Log.grid("Generated Level 0 chunk at %s (walkable: %d tiles, %dms)" % [
 		chunk.position,
 		chunk.get_walkable_count(),
-		gen_time,
-		is_connected
+		gen_time
 	])
 
 # ============================================================================
@@ -476,71 +472,3 @@ func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
 			# Set layer 1 (ceiling) - add ceiling above floor tiles
 			if tile_type == FLOOR:
 				chunk.set_tile_at_layer(world_tile_pos, 1, CEILING)
-
-# ============================================================================
-# CONNECTIVITY CHECK
-# ============================================================================
-
-func _ensure_connectivity(chunk: Chunk) -> bool:
-	"""Ensure chunk has floor tiles on all 4 edges for connectivity
-
-	Simpler check: Verifies each edge has at least some floor tiles so the chunk
-	can connect to adjacent chunks. The maze generator should naturally create
-	these with 68-75% floor density, but we validate to ensure traversability.
-
-	Returns true if all edges have floor tiles, false otherwise.
-	"""
-	# Calculate world offset for this chunk
-	var chunk_world_offset := chunk.position * Chunk.SIZE
-
-	# Count floor tiles on each edge
-	var edge_floors := {
-		"north": 0,
-		"south": 0,
-		"east": 0,
-		"west": 0
-	}
-
-	# Scan all edges
-	for i in range(Chunk.SIZE):
-		# North edge (y=0)
-		var north_pos := chunk_world_offset + Vector2i(i, 0)
-		if chunk.get_tile(north_pos) == FLOOR:
-			edge_floors["north"] += 1
-
-		# South edge (y=SIZE-1)
-		var south_pos := chunk_world_offset + Vector2i(i, Chunk.SIZE - 1)
-		if chunk.get_tile(south_pos) == FLOOR:
-			edge_floors["south"] += 1
-
-		# West edge (x=0)
-		var west_pos := chunk_world_offset + Vector2i(0, i)
-		if chunk.get_tile(west_pos) == FLOOR:
-			edge_floors["west"] += 1
-
-		# East edge (x=SIZE-1)
-		var east_pos := chunk_world_offset + Vector2i(Chunk.SIZE - 1, i)
-		if chunk.get_tile(east_pos) == FLOOR:
-			edge_floors["east"] += 1
-
-	# Require at least 10% of edge to be floor tiles (12.8 tiles minimum per edge)
-	var min_floor_per_edge := int(Chunk.SIZE * 0.1)
-
-	var has_connectivity := (
-		edge_floors["north"] >= min_floor_per_edge and
-		edge_floors["south"] >= min_floor_per_edge and
-		edge_floors["east"] >= min_floor_per_edge and
-		edge_floors["west"] >= min_floor_per_edge
-	)
-
-	if not has_connectivity:
-		Log.grid("⚠️ Chunk %s has insufficient edge floor tiles (N:%d S:%d E:%d W:%d, need %d)" % [
-			chunk.position,
-			edge_floors["north"],
-			edge_floors["south"],
-			edge_floors["east"],
-			edge_floors["west"],
-			min_floor_per_edge
-		])
-
-	return has_connectivity
