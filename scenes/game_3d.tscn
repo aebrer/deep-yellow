@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=13 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
@@ -8,14 +8,16 @@
 [ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="6_idle"]
 [ext_resource type="Script" path="res://scripts/player/states/look_mode_state.gd" id="7_lookmode"]
 [ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="8_executing"]
-[ext_resource type="Material" uid="uid://player_hazmat" path="res://assets/sprites/player/hazmat_suit.tres" id="9_hazmat_material"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/hazmat_suit.png" id="10_hazmat_texture"]
-[ext_resource type="Script" path="res://scripts/player/tactical_camera.gd" id="11_camera"]
-[ext_resource type="Script" path="res://scripts/player/first_person_camera.gd" id="12_fpcamera"]
-[ext_resource type="Script" path="res://scripts/ui/examination_crosshair.gd" id="13_crosshair"]
+[ext_resource type="Script" path="res://scripts/player/states/post_turn_state.gd" id="9_postturn"]
+[ext_resource type="Material" uid="uid://player_hazmat" path="res://assets/sprites/player/hazmat_suit.tres" id="10_hazmat_material"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/hazmat_suit.png" id="11_hazmat_texture"]
+[ext_resource type="Script" path="res://scripts/player/tactical_camera.gd" id="12_camera"]
+[ext_resource type="Script" path="res://scripts/player/first_person_camera.gd" id="13_fpcamera"]
+[ext_resource type="Script" path="res://scripts/ui/examination_crosshair.gd" id="14_crosshair"]
 [ext_resource type="Script" path="res://scripts/components/examinable.gd" id="15_examinable"]
 [ext_resource type="Material" path="res://post_process/dither-banding_mat.tres" id="16_dither"]
 [ext_resource type="Material" path="res://post_process/vhs_post_process_mat.tres" id="17_vhs"]
+[ext_resource type="Script" path="res://scripts/ui/examination_panel.gd" id="18_exampanel"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -82,8 +84,8 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="Model" type="Sprite3D" parent="Player3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-material_override = ExtResource("9_hazmat_material")
-texture = ExtResource("10_hazmat_texture")
+material_override = ExtResource("10_hazmat_material")
+texture = ExtResource("11_hazmat_texture")
 pixel_size = 0.03
 
 [node name="InputStateMachine" type="Node" parent="Player3D"]
@@ -98,8 +100,11 @@ script = ExtResource("7_lookmode")
 [node name="ExecutingTurnState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("8_executing")
 
+[node name="PostTurnState" type="Node" parent="Player3D/InputStateMachine"]
+script = ExtResource("9_postturn")
+
 [node name="CameraRig" type="Node3D" parent="Player3D"]
-script = ExtResource("11_camera")
+script = ExtResource("12_camera")
 default_distance = 15.0
 default_pitch = -45.0
 default_yaw = 45.0
@@ -124,7 +129,7 @@ fov = 70.0
 
 [node name="FirstPersonCamera" type="Node3D" parent="Player3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
-script = ExtResource("12_fpcamera")
+script = ExtResource("13_fpcamera")
 rotation_speed = 360.0
 mouse_sensitivity = 0.15
 rotation_deadzone = 0.3
@@ -175,4 +180,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-script = ExtResource("13_crosshair")
+script = ExtResource("14_crosshair")
+
+[node name="TextUIOverlay" type="CanvasLayer" parent="."]
+layer = 1001
+
+[node name="ExaminationPanel" type="Control" parent="TextUIOverlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_exampanel")

@@ -23,7 +23,7 @@ size = Vector3(2, 4, 2)
 size = Vector3(2, 0.1, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ceiling"]
-size = Vector3(2, 0.1, 2)
+size = Vector3(2, 1.0, 2)
 
 [resource]
 item/0/name = "Floor"

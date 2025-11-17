@@ -15,18 +15,15 @@ func _init(dir: Vector2i) -> void:
 	action_name = "Move(%d, %d)" % [dir.x, dir.y]
 
 func can_execute(player) -> bool:
-	"""Check if movement is valid (not wall, in bounds)"""
+	"""Check if movement is valid (not wall, in bounds)
+
+	For procedural generation, Grid3D handles infinite world bounds.
+	For static levels, Grid3D checks against grid_size.
+	"""
 	# Calculate target position
 	var target_pos = player.grid_position + direction
 
-	# Check bounds
-	var grid_size = player.grid.grid_size
-	if target_pos.x < 0 or target_pos.x >= grid_size.x:
-		return false
-	if target_pos.y < 0 or target_pos.y >= grid_size.y:
-		return false
-
-	# Check if tile is walkable
+	# Check if tile is walkable (Grid3D handles bounds checking)
 	if not player.grid.is_walkable(target_pos):
 		return false
 

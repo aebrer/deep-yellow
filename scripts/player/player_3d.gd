@@ -16,6 +16,10 @@ extends CharacterBody3D
 @warning_ignore("unused_signal")
 signal action_preview_changed(actions: Array[Action])
 
+## Emitted when a turn completes (for turn-based systems like ChunkManager)
+@warning_ignore("unused_signal")
+signal turn_completed()
+
 # ============================================================================
 # STATE
 # ============================================================================
@@ -44,8 +48,27 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	if grid:
-		# Start at debug position
-		grid_position = Vector2i(69, 1)
+		# Build navigation graph for starting chunk (0,0)
+		var starting_chunk := Vector2i(0, 0)
+		Pathfinding.build_navigation_graph([starting_chunk], grid)
+
+		# Find a spawn point that can reach all chunk edges
+		var spawn_found := false
+		var max_attempts := 20  # Try multiple candidates
+
+		for attempt in range(max_attempts):
+			var candidate := grid.get_random_walkable_position()
+
+			# Validate this spawn can reach all chunk edges
+			if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):
+				grid_position = candidate
+				spawn_found = true
+				Log.system("Found valid spawn at %s after %d attempts" % [candidate, attempt + 1])
+				break
+
+		if not spawn_found:
+			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches all edges, using random walkable")
+			grid_position = grid.get_random_walkable_position()
 
 		# SNAP to grid position (turn-based = no smooth movement)
 		update_visual_position()

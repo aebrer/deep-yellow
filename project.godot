@@ -23,6 +23,8 @@ Log="*res://scripts/autoload/logger.gd"
 LevelManager="*res://scripts/autoload/level_manager.gd"
 KnowledgeDB="*res://scripts/autoload/knowledge_db.gd"
 EntityRegistry="*res://scripts/autoload/entity_registry.gd"
+Pathfinding="*res://scripts/autoload/pathfinding_manager.gd"
+ChunkManager="*res://scripts/procedural/chunk_manager.gd"
 
 [display]
 

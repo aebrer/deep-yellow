@@ -26,6 +26,57 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 
 ---
 
+## ⚠️ SUPER IMPORTANT DESIGN RULE: NO QUICK FIXES
+
+**When a bug is reported, NEVER immediately push a "fix" without understanding the root cause.**
+
+**The Correct Debugging Process:**
+1. **Investigate**: Read relevant code, understand the system architecture
+2. **Diagnose**: Identify what you observe and form hypotheses about root causes
+3. **Report**: Share what you observed and what you understand so far. If you're uncertain about the root cause, say so and ask for the user's input or additional context.
+4. **Propose**: Suggest a hypothesis to verify, or ask for help if the cause isn't clear
+5. **Implement**: Only after user agrees with the diagnosis and approach
+
+**Bad Example (Quick Fix):**
+```
+User: "Chunks stopped loading after x=512"
+Bad Response: "Let me increase the generation radius!"
+*immediately edits constants without understanding why*
+```
+
+**Good Example (Proper Debugging):**
+```
+User: "Chunks stopped loading after x=512"
+Good Response: "Let me investigate the chunk loading system to understand why..."
+*reads chunk_manager.gd, checks if _process() is being called, examines logs*
+"I investigated the chunk loading system. Here's what I observed: [observations].
+Based on this, I think the issue might be [hypothesis], but I'd like to verify [X]
+to be certain. Does this align with what you're seeing?"
+```
+
+**Why This Matters:**
+- Quick fixes mask symptoms without solving problems
+- User values understanding over speed
+- Proper diagnosis prevents future bugs
+- Clean architecture requires understanding root causes
+- "Quality over speed" is the project philosophy
+
+**Red Flags That You're Quick-Fixing:**
+- Changing constants without understanding the system
+- Adding conditions to suppress symptoms
+- Implementing workarounds instead of real solutions
+- Not reading the relevant code before proposing fixes
+- Saying "let me try..." instead of "let me understand..."
+
+**When In Doubt:**
+- Read the code first
+- Share what you observed, or ask for help if the cause isn't clear
+- Ask clarifying questions
+- Model uncertainty - it's okay to say "I'm not sure" or "I need more info"
+- Only then propose a hypothesis to verify
+
+---
+
 ## 1. Behavioral Patterns Observed
 
 ### What Worked Well
@@ -126,7 +177,8 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 ┌──────────────────▼──────────────────────────────────────────┐
 │              STATE MACHINE LAYER                            │
 │  Player → InputStateMachine → Current State                 │
-│    States: IdleState, AimingMoveState, ExecutingTurnState   │
+│    States: IdleState, LookModeState, ExecutingTurnState,    │
+│            PostTurnState                                    │
 │  - State-specific input handling                            │
 │  - Turn boundaries explicit                                 │
 │  - Queries InputManager for normalized input                │
@@ -213,6 +265,22 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
   - Code examples and API documentation
   - Update this when implementing new systems
 
+- **`/home/andrew/projects/backrooms_power_crawl/docs/ARCHITECTURE_AUDIT.md`** ⚠️ **CRITICAL REFERENCE**
+  - **Complete inventory of every file in the project** (67 files analyzed)
+  - Per-method/constant/signal documentation for all scripts
+  - Git history context for each file
+  - Cross-reference mapping (dependencies and usage)
+  - Dead code identification
+  - **MUST BE KEPT UP TO DATE** when adding/removing/refactoring files
+  - **UPDATE THIS WHEN**:
+    - Adding new .gd files (add to appropriate system section)
+    - Removing files (mark as deleted with reason)
+    - Adding new methods/constants to existing files
+    - Refactoring systems (update cross-references)
+    - Major architectural changes
+  - Think of this as the "table of contents" for the entire codebase
+  - Prevents future confusion about dead code and legacy systems
+
 - **`/home/andrew/projects/backrooms_power_crawl/README.md`**
   - Project overview and setup
   - High-level feature list
@@ -221,16 +289,22 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 
 ### Key Files and Their Purposes
 
+**For complete file inventory, see `docs/ARCHITECTURE_AUDIT.md`**
+
 **Autoloads (Singletons)**
 - `/scripts/autoload/input_manager.gd` - Input normalization and device abstraction
+- `/scripts/autoload/logger.gd` - Centralized logging with category/level filtering
+- `/scripts/autoload/level_manager.gd` - Level loading, LRU cache, transitions
 
 **Player System**
-- `/scripts/player/player.gd` - Player controller, visual representation, grid position
+- `/scripts/player/player_3d.gd` - 3D player controller, turn-based movement
+- `/scripts/player/first_person_camera.gd` - Camera rig with third-person controls
 - `/scripts/player/input_state_machine.gd` - State manager, delegates to current state
 - `/scripts/player/states/player_input_state.gd` - Base state class with transition signals
 - `/scripts/player/states/idle_state.gd` - Waiting for input
-- `/scripts/player/states/aiming_move_state.gd` - Aiming movement with preview
+- `/scripts/player/states/look_mode_state.gd` - Examination mode with camera control
 - `/scripts/player/states/executing_turn_state.gd` - Processing turn actions
+- `/scripts/player/states/post_turn_state.gd` - Post-turn cleanup and state transitions
 
 **Actions (Command Pattern)**
 - `/scripts/actions/action.gd` - Base action class
@@ -238,11 +312,13 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 - `/scripts/actions/wait_action.gd` - Pass turn without moving
 
 **Core Systems**
-- `/scripts/grid.gd` - Map data, tile rendering, viewport culling
-- `/scripts/game.gd` - Main game scene coordinator
+- `/scripts/grid_3d.gd` - 3D grid with chunk streaming, viewport culling, level configuration
+- `/scripts/game_3d.gd` - Main 3D game scene coordinator
+- `/scripts/procedural/chunk_manager.gd` - Chunk streaming, infinite world generation
+- `/scripts/procedural/level_0_generator.gd` - Wave Function Collapse maze generator for Level 0
 
 **Scenes**
-- `/scenes/game.tscn` - Main gameplay scene
+- `/scenes/game_3d.tscn` - Main 3D gameplay scene
 - `/scenes/main_menu.tscn` - Menu (placeholder)
 
 ---
@@ -369,6 +445,16 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 - Keep file structure diagrams accurate
 - Document architectural decisions and rationale
 
+**Keep ARCHITECTURE_AUDIT.md current** ⚠️ **CRITICAL**
+- This is the complete file inventory - **MUST** stay synchronized with codebase
+- **When adding files**: Add entry with full method/constant/signal documentation
+- **When removing files**: Update status to "DELETED" with reason (don't just remove the entry)
+- **When refactoring**: Update cross-references, dependencies, and "Used By" sections
+- **When adding methods/constants**: Update the relevant file's documentation
+- Think of this as the project's "source of truth" for what exists and what's dead code
+- Prevents confusion for future Claude instances and developers
+- **If you skip this**, dead code will accumulate and agents will get confused again
+
 ### Don't Add Features Not in Design Docs
 
 **Stick to the vision**
@@ -448,64 +534,7 @@ If you're implementing camera controls, ask: "What does Fortnite/Gears of War/ev
 
 ---
 
-## 6. Next Steps / TODO
-
-### Working but Needs Testing
-
-**Current Implementation (Phase 1)**
-- ✅ InputManager implemented (needs controller testing)
-- ✅ State Machine implemented (needs validation)
-- ✅ Action Pattern implemented (needs testing in gameplay)
-- ✅ Grid with viewport culling (needs performance testing)
-- ⏳ **USER TESTING IN PROGRESS** - waiting for validation
-
-### Known Issues to Address
-
-**After User Testing**
-- Movement feel (is 8-way snapping comfortable?)
-- Indicator visibility (green arrow clear enough?)
-- Debug logging (too verbose? Just right?)
-- Turn counter UI (shows state, but is it useful?)
-
-### Future Features Planned
-
-**Phase 2: Examination Mode**
-- Add ExamineState to state machine
-- Right stick moves examine cursor
-- Show SCP-style tooltips for tiles/entities
-- Knowledge database integration
-
-**Phase 3: Automatic Abilities**
-- Ability system (toggleable with RB/LB/X/Y)
-- Auto-proc conditions (on move, on nearby enemy, interval)
-- Ability activation during ExecutingTurnState
-- Resource management (stamina, sanity)
-
-**Phase 4: Enemy AI**
-- Entity spawning system
-- Basic pathfinding (A* or simpler)
-- Turn queue (player, enemy1, enemy2, etc.)
-- Entity actions using same Action system
-
-**Phase 5: Physics Simulation**
-- Liquid spreading and mixing
-- Temperature simulation
-- Material interactions
-- Emergent gameplay possibilities
-
-### Long-Term Vision
-
-**See docs/DESIGN.md for full roadmap**
-- Hub area with NPCs
-- Mission types (Horde vs Hunt)
-- Knowledge/examination system
-- Containment mechanics
-- Visual corruption shaders
-- Audio integration
-
----
-
-## 7. Example Interactions
+## 6. Example Interactions
 
 ### Good Interaction Pattern
 
@@ -519,7 +548,7 @@ If you're implementing camera controls, ask: "What does Fortnite/Gears of War/ev
 4. Show cursor at grid position + stick offset
 5. Display tooltip for tile under cursor
 
-This follows the same pattern as `AimingMoveState`. The state handles input, updates cursor position, and shows UI. When examine button released, transition back to `IdleState`.
+This follows the same pattern as `LookModeState` (the current examination/camera control state). The state handles input, updates cursor position, and shows UI. When examine button released, transition back to `IdleState`.
 
 Should I implement this, or do you want to discuss the tooltip system first?"
 
@@ -537,7 +566,7 @@ Should I implement this, or do you want to discuss the tooltip system first?"
 
 ---
 
-## 8. Godot-Specific Patterns for This Project
+## 7. Godot-Specific Patterns for This Project
 
 ### Autoload Singletons
 
@@ -676,7 +705,7 @@ v_pivot.rotation_degrees.x -= event.relative.y * mouse_sensitivity
 
 ---
 
-## 9. Communication Templates
+## 8. Communication Templates
 
 ### When Explaining Godot Concepts
 
@@ -717,7 +746,7 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 
 ---
 
-## 10. Quick Reference
+## 9. Quick Reference
 
 ### File Naming Conventions
 - Scripts: `snake_case.gd`
@@ -780,6 +809,7 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 
 ### When to Update Documentation
 - **ARCHITECTURE.md**: After implementing any system
+- **ARCHITECTURE_AUDIT.md**: ⚠️ **ALWAYS** - when adding/removing/modifying files or methods
 - **DESIGN.md**: After major design decisions
 - **README.md**: After setup changes or new requirements
 - **This file (CLAUDE.md)**: After learning new user preferences or patterns
@@ -794,9 +824,43 @@ User values detailed commit messages:
 - Testing notes
 - "🤖 Generated with Claude Code" footer (auto-added)
 
+### Updating Pull Request Descriptions
+
+**Problem**: `gh pr edit` fails with GraphQL error due to Projects (classic) deprecation (as of 2025):
+```
+GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience
+```
+
+**Workaround**: Use the GitHub API directly via `gh api` instead:
+
+```bash
+# Save description to file
+cat > /tmp/pr_description.md <<'EOF'
+Your PR description here...
+EOF
+
+# Update PR via API (bypasses Projects deprecation issue)
+gh api \
+  --method PATCH \
+  -H "Accept: application/vnd.github+json" \
+  /repos/OWNER/REPO/pulls/PR_NUMBER \
+  -F body=@/tmp/pr_description.md
+```
+
+**Why this works**: The API endpoint doesn't query the deprecated projectCards field that causes `gh pr edit` to fail.
+
+**Alternative**: If you know the exact body text, you can pass it inline:
+```bash
+gh api \
+  --method PATCH \
+  -H "Accept: application/vnd.github+json" \
+  /repos/aebrer/backrooms_power_crawl/pulls/7 \
+  -f body='Your description here'
+```
+
 ---
 
-## 11. Python Tooling & Maintenance Scripts
+## 10. Python Tooling & Maintenance Scripts
 
 ### Python Virtual Environment
 

@@ -65,7 +65,7 @@ enum Category {
 @export var log_movement: bool = true
 @export var log_action: bool = true
 @export var log_turn: bool = true
-@export var log_grid: bool = false      # Disabled by default (verbose)
+@export var log_grid: bool = true       # ENABLED for procedural generation debugging
 @export var log_camera: bool = false    # Disabled by default (verbose)
 @export var log_entity: bool = true
 @export var log_ability: bool = true
@@ -144,6 +144,14 @@ func _exit_tree() -> void:
 
 ## Generic logging method (all others route through this)
 func msg(category: Category, level: Level, message: String) -> void:
+	# ⚠️ THREAD SAFETY - DO NOT REMOVE ⚠️
+	# Worker threads (e.g., ChunkGenerationThread) cannot access scene tree nodes.
+	# Attempting to emit signals from worker threads causes Godot errors:
+	# "Caller thread can't call this function in this node. Use call_deferred()..."
+	# Silently skip logging from worker threads - main thread logs are sufficient.
+	if OS.get_thread_caller_id() != OS.get_main_thread_id():
+		return
+
 	# Fast path: check if this category/level should be logged
 	if not _should_log(category, level):
 		return

@@ -42,5 +42,9 @@ func _execute_turn() -> void:
 
 	Log.turn("===== TURN %d COMPLETE =====" % player.turn_count)
 
-	# Turn complete - return to idle state
-	transition_to("IdleState")
+	# Emit turn_completed signal for turn-based systems (ChunkManager, etc.)
+	player.turn_completed.emit()
+
+	# Transition to PostTurnState to process world updates
+	# (PostTurnState blocks input while chunks generate, then returns to IdleState)
+	transition_to("PostTurnState")

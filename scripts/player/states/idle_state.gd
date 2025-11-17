@@ -29,7 +29,8 @@ func enter() -> void:
 	var rt_currently_held = InputManager.is_action_pressed("move_confirm")
 	if rt_currently_held and rt_held:
 		# Continue the hold timer
-		Log.movement("RT/Click still held - continuing hold_time=%.2fs" % rt_hold_time)
+		# Log.movement("RT/Click still held - continuing hold_time=%.2fs" % rt_hold_time)  # Too verbose
+		pass
 	else:
 		# Fresh entry or RT released - reset
 		rt_held = false
@@ -55,10 +56,10 @@ func _move_forward() -> void:
 		forward_direction = player.get_camera_forward_grid_direction()
 
 	if forward_direction == Vector2i.ZERO:
-		Log.movement("No forward direction, ignoring move")
+		# Log.movement("No forward direction, ignoring move")  # Too verbose
 		return
 
-	Log.movement_info("Moving forward: direction=%s" % forward_direction)
+	# Log.movement_info("Moving forward: direction=%s" % forward_direction)  # Too verbose
 
 	# Create and execute movement action
 	var action = MovementAction.new(forward_direction)
@@ -79,7 +80,7 @@ func process_frame(delta: float) -> void:
 
 	# Handle RT/Click press and hold-to-repeat
 	if InputManager.is_action_just_pressed("move_confirm"):
-		Log.movement("RT/Click just pressed - initial move")
+		# Log.movement("RT/Click just pressed - initial move")  # Too verbose
 		_move_forward()
 		rt_held = true
 		rt_hold_time = 0.0
@@ -107,7 +108,7 @@ func process_frame(delta: float) -> void:
 			rt_repeat_timer = 0.0
 
 		if should_repeat:
-			Log.movement("REPEAT! hold_time=%.2fs interval=%.2fs" % [rt_hold_time, current_interval])
+			# Log.movement("REPEAT! hold_time=%.2fs interval=%.2fs" % [rt_hold_time, current_interval])  # Too verbose
 			_move_forward()
 			return
 	elif not rt_is_down:

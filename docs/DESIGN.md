@@ -65,37 +65,6 @@ A top-down roguelike combining Caves of Qud's deep simulation and character buil
   - Stealth field perfect for hunts, useless in survival
   - Entity attraction helpful for hunts, deadly in hordes
 
-## Controls (Controller-First Design)
-
-### Primary Controls
-- **Left Stick**: Aim movement direction
-- **Right Trigger**: Confirm movement (committed movement, not free movement)
-- **Right Stick**: Look/Examine mode (shows tooltips and descriptions)
-- **A Button**: Stand still / Wait (pass turn without moving, see turn preview)
-
-### Item Pool Management
-- **RB, LB, X, Y**: Toggle item pools (Body/Mind/NULL/Light) on/off
-  - Items auto-execute when pool enabled
-  - Player can disable entire pools to manage resources, noise, or unwanted effects
-  - Can also toggle individual items within pools (via menu)
-
-### System Controls
-- **Start/ESC**: Pause game → Enter menu mode (UI panels become selectable)
-- **Select/Back**: Quick inventory/Character sheet toggle (planned)
-
-### Menu Mode Controls (Planned - Active when paused)
-- **D-Pad / Left Stick**: Navigate between UI panels
-- **A Button**: Select/expand item or entry
-- **B Button**: Back/close panel
-- **Right Stick**: Scroll content within selected panel
-- **Start/ESC**: Unpause → Return to gameplay
-
-### Design Philosophy
-- Minimal button usage for accessibility
-- Same control scheme for gameplay and menus
-- Deliberate movement creates tension
-- Focus on positioning, not mechanical execution
-
 ## Visual Design
 
 ### Art Style
