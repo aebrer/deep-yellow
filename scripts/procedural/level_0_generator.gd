@@ -492,22 +492,25 @@ func _ensure_connectivity(chunk: Chunk) -> bool:
 	# Calculate world offset for this chunk
 	var chunk_world_offset := chunk.position * Chunk.SIZE
 
-	# Find a floor tile to test from (pick middle for better connectivity)
-	var floor_tiles: Array[Vector2i] = []
+	# Find floor tile closest to chunk center (where player would likely spawn)
+	var chunk_center := chunk_world_offset + Vector2i(Chunk.SIZE / 2, Chunk.SIZE / 2)
+	var test_pos := Vector2i(-1, -1)
+	var closest_dist := 999999.0
 
 	for y in range(Chunk.SIZE):
 		for x in range(Chunk.SIZE):
 			var local_pos := Vector2i(x, y)
 			var world_pos := chunk_world_offset + local_pos
 			if chunk.get_tile(world_pos) == FLOOR:
-				floor_tiles.append(world_pos)
+				# Find floor tile closest to chunk center
+				var dist := world_pos.distance_squared_to(chunk_center)
+				if dist < closest_dist:
+					closest_dist = dist
+					test_pos = world_pos
 
-	if floor_tiles.is_empty():
+	if test_pos == Vector2i(-1, -1):
 		# No floor tiles at all - regenerate
 		return false
-
-	# Pick middle tile for testing (more likely to be well-connected)
-	var test_pos: Vector2i = floor_tiles[floor_tiles.size() / 2]
 
 	# Check if we can reach tiles on all 4 edges using BFS
 	var reached_edges := {
