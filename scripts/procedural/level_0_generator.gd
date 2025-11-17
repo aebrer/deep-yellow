@@ -86,7 +86,7 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	Uses world-space seeding for deterministic generation across chunk boundaries.
 	Much faster than cell-by-cell WFC (~10-20ms vs 200ms).
 	"""
-	var start_time := Time.get_ticks_msec()
+	var start_time := Time.get_ticks_usec()
 
 	# Initialize grid (all walls)
 	var grid: Array = []
@@ -117,6 +117,8 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	else:
 		strategy = Strategy.HYBRID
 
+	var time_after_init := Time.get_ticks_usec()
+
 	Log.grid("[MazeGen] Chunk %s: strategy=%s seed=%d" % [
 		chunk.position,
 		["ROOM_FOCUSED", "MAZE_FOCUSED", "HYBRID"][strategy],
@@ -142,17 +144,33 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 			_generate_varied_rooms(grid, num_rooms, rng)
 			_fill_empty_areas_with_maze(grid, rng)
 
+	var time_after_generation := Time.get_ticks_usec()
+
 	# Ensure floor percentage is in target range
 	_ensure_floor_percentage_range(grid, rng)
+
+	var time_after_floor_pct := Time.get_ticks_usec()
 
 	# Apply to chunk
 	_apply_grid_to_chunk(grid, chunk)
 
-	var gen_time := Time.get_ticks_msec() - start_time
-	Log.grid("Generated Level 0 chunk at %s (walkable: %d tiles, %dms)" % [
+	var time_after_apply := Time.get_ticks_usec()
+
+	# Calculate timing breakdown (in milliseconds)
+	var total_time := (time_after_apply - start_time) / 1000.0
+	var init_time := (time_after_init - start_time) / 1000.0
+	var gen_time := (time_after_generation - time_after_init) / 1000.0
+	var floor_pct_time := (time_after_floor_pct - time_after_generation) / 1000.0
+	var apply_time := (time_after_apply - time_after_floor_pct) / 1000.0
+
+	Log.grid("Generated Level 0 chunk at %s (walkable: %d tiles, %.1fms) [init: %.1fms, gen: %.1fms, floor%%: %.1fms, apply: %.1fms]" % [
 		chunk.position,
 		chunk.get_walkable_count(),
-		gen_time
+		total_time,
+		init_time,
+		gen_time,
+		floor_pct_time,
+		apply_time
 	])
 
 # ============================================================================
@@ -454,21 +472,31 @@ func _ensure_floor_percentage_range(grid: Array, rng: RandomNumberGenerator) -> 
 # ============================================================================
 
 func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
-	"""Apply generated grid to chunk tiles (layer 0 = floor/wall, layer 1 = ceiling)"""
+	"""Apply generated grid to chunk tiles (layer 0 = floor/wall, layer 1 = ceiling)
+
+	Optimized: Directly iterate over sub-chunks to avoid coordinate conversion overhead.
+	"""
 	const CEILING := 4  # SubChunk.TileType.CEILING
+	const SUB_CHUNK_SIZE := 16
+	const SUB_CHUNKS_PER_SIDE := 8
 
-	for y in range(Chunk.SIZE):
-		for x in range(Chunk.SIZE):
-			var local_tile_pos := Vector2i(x, y)
-			var tile_type: int = grid[y][x]
+	# Iterate over 8×8 grid of sub-chunks
+	for sub_y in range(SUB_CHUNKS_PER_SIDE):
+		for sub_x in range(SUB_CHUNKS_PER_SIDE):
+			var sub_chunk := chunk.sub_chunks[sub_y * SUB_CHUNKS_PER_SIDE + sub_x]
 
-			# Convert chunk-local coordinates to world coordinates
-			# chunk.set_tile() expects world position, not local position!
-			var world_tile_pos := chunk.position * Chunk.SIZE + local_tile_pos
+			# Iterate over 16×16 tiles in this sub-chunk
+			for tile_y in range(SUB_CHUNK_SIZE):
+				for tile_x in range(SUB_CHUNK_SIZE):
+					# Calculate position in full grid
+					var grid_x := sub_x * SUB_CHUNK_SIZE + tile_x
+					var grid_y := sub_y * SUB_CHUNK_SIZE + tile_y
+					var tile_type: int = grid[grid_y][grid_x]
 
-			# Set layer 0 (floor/wall)
-			chunk.set_tile(world_tile_pos, tile_type)
+					# Direct sub-chunk tile access (no coordinate conversion!)
+					var sub_local := Vector2i(tile_x, tile_y)
+					sub_chunk.set_tile(sub_local, tile_type)
 
-			# Set layer 1 (ceiling) - add ceiling above floor tiles
-			if tile_type == FLOOR:
-				chunk.set_tile_at_layer(world_tile_pos, 1, CEILING)
+					# Set ceiling above floor tiles
+					if tile_type == FLOOR:
+						sub_chunk.set_tile_at_layer(sub_local, 1, CEILING)
