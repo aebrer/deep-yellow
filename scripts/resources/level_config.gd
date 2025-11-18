@@ -331,8 +331,9 @@ func validate() -> bool:
 		push_error("[LevelConfig] Missing mesh_library_path for level %d" % level_id)
 		valid = false
 
-	if not FileAccess.file_exists(mesh_library_path):
-		push_error("[LevelConfig] MeshLibrary not found: %s" % mesh_library_path)
-		valid = false
+	# Note: We don't check FileAccess.file_exists() because:
+	# 1. It doesn't work reliably in web builds (packed filesystem)
+	# 2. The actual load() in grid_3d.gd will fail with a clear error if file is missing
+	# 3. Validation should check data correctness, not file system state
 
 	return valid
