@@ -55,7 +55,12 @@ func _ready() -> void:
 	camera.fov = 70.0  # Field of view
 
 	# Capture mouse for camera control (standard third-person)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# For web exports, browsers block mouse capture until user interaction (security)
+	# Mouse will be captured on first click via _unhandled_input
+	if not OS.has_feature("web"):
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		Log.camera("Web export detected - mouse will capture on first click")
 
 	Log.camera("TacticalCamera initialized - Zoom: %.1f, Rotation: %.1f°" % [
 		current_zoom,
@@ -79,6 +84,14 @@ func _process(delta: float) -> void:
 		manual_pitch_override = true
 
 func _unhandled_input(event: InputEvent) -> void:
+	# For web: Capture mouse on first click (browsers require user interaction)
+	if OS.has_feature("web") and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		if event is InputEventMouseButton and event.pressed:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			Log.camera("Mouse captured on click (web)")
+			get_viewport().set_input_as_handled()
+			return
+
 	# Mouse camera control (standard third-person!)
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# Mouse X = horizontal rotation (yaw)

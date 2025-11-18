@@ -45,6 +45,12 @@ const LEVEL_CONFIG_DIR := "res://assets/levels/"
 ## Level config file naming pattern: level_XX_config.tres
 const LEVEL_CONFIG_PATTERN := "level_%02d/level_%02d_config.tres"
 
+## Preloaded level configs (ensures they're included in web exports)
+## Web builds require preload() to include resources - runtime load() doesn't work reliably
+const PRELOADED_CONFIGS := {
+	0: preload("res://assets/levels/level_00/level_00_config.tres")
+}
+
 # ============================================================================
 # INTERNAL STATE
 # ============================================================================
@@ -73,38 +79,24 @@ func _ready() -> void:
 	_build_level_registry()
 	Log.system("Found %d registered levels" % _level_registry.size())
 
-## Build registry of available levels by scanning filesystem
+## Build registry of available levels
+##
+## Web builds cannot scan directories at runtime, so we hardcode known levels.
+## Native builds could scan, but we use the same approach for consistency.
 func _build_level_registry() -> void:
 	_level_registry.clear()
 
-	# Scan for level directories (level_00, level_01, etc.)
-	var dir := DirAccess.open(LEVEL_CONFIG_DIR)
-	if not dir:
-		push_error("[LevelManager] Failed to open level directory: %s" % LEVEL_CONFIG_DIR)
-		return
+	# Hardcoded list of known levels
+	# Add new levels here as they're created
+	var known_levels := [0]  # Level 0 exists
 
-	dir.list_dir_begin()
-	var folder_name := dir.get_next()
+	for level_id in known_levels:
+		var config_path := LEVEL_CONFIG_DIR + LEVEL_CONFIG_PATTERN % [level_id, level_id]
 
-	while folder_name != "":
-		if dir.current_is_dir() and folder_name.begins_with("level_"):
-			# Extract level ID from folder name (e.g., "level_00" -> 0)
-			var level_id_str := folder_name.substr(6, 2)  # "00"
-			var level_id := level_id_str.to_int()
-
-			# Build config path
-			var config_path := LEVEL_CONFIG_DIR + LEVEL_CONFIG_PATTERN % [level_id, level_id]
-
-			# Check if config exists
-			if FileAccess.file_exists(config_path):
-				_level_registry[level_id] = config_path
-				Log.system("Registered level %d: %s" % [level_id, config_path])
-			else:
-				push_warning("[LevelManager] Config not found for level %d: %s" % [level_id, config_path])
-
-		folder_name = dir.get_next()
-
-	dir.list_dir_end()
+		# Register the path (don't check file existence - it doesn't work in web builds)
+		# The actual load() will fail gracefully if the file isn't included
+		_level_registry[level_id] = config_path
+		Log.system("Registered level %d: %s" % [level_id, config_path])
 
 # ============================================================================
 # PUBLIC API - LOADING
@@ -140,6 +132,18 @@ func load_level(level_id: int) -> LevelConfig:
 
 ## Load level config from disk
 func _load_level_from_disk(level_id: int) -> LevelConfig:
+	# Check preloaded configs first (required for web builds)
+	if PRELOADED_CONFIGS.has(level_id):
+		var config: LevelConfig = PRELOADED_CONFIGS[level_id]
+		Log.system("Level %d loaded from PRELOADED_CONFIGS" % level_id)
+		if config.validate():
+			config.on_load()
+			return config
+		else:
+			push_error("[LevelManager] Preloaded config validation failed for level %d" % level_id)
+			return null
+
+	# Fallback: try runtime load (works in native builds)
 	if not _level_registry.has(level_id):
 		push_error("[LevelManager] Level %d not registered" % level_id)
 		return null

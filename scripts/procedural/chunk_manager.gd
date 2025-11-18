@@ -66,11 +66,21 @@ func _ready() -> void:
 		level_generators.size()
 	])
 
-	# Connect to player's turn_completed signal (deferred to ensure player exists)
-	call_deferred("_connect_to_player_signal")
+	# Connect to node_added signal to detect when game scene loads
+	# DON'T start chunk generation yet - wait for Grid3D to exist first
+	get_tree().node_added.connect(_on_node_added)
 
-	# Do initial chunk load (deferred to ensure player position is set)
-	call_deferred("on_turn_completed")
+func _on_node_added(node: Node) -> void:
+	"""Detect when game scene loads and initialize chunk generation"""
+	# The root Control node from game.tscn is named "Game"
+	# (Not "Game3D" - that's just the instance name for the nested game_3d.tscn)
+	if node.name == "Game" and node is Control and not grid_3d:
+		Log.system("Game scene detected, searching for Grid3D and starting chunk generation...")
+		# Search for Grid3D (deferred to ensure SubViewport content is ready)
+		call_deferred("_find_grid_3d")
+		call_deferred("_connect_to_player_signal")
+		# NOW trigger initial chunk load (only after game scene is loaded)
+		call_deferred("on_turn_completed")
 
 func _exit_tree() -> void:
 	"""Clean up worker thread on exit"""
@@ -78,6 +88,10 @@ func _exit_tree() -> void:
 		generation_thread.stop()
 
 func _process(_delta: float) -> void:
+	# Don't process chunks until Grid3D exists (e.g., on start menu)
+	if not grid_3d:
+		return
+
 	# Process completed chunks from worker thread
 	if generation_thread:
 		generation_thread.process_completed_chunks()
