@@ -22,6 +22,7 @@ mono_crash.*.json
 .idea/
 
 # Build outputs
+build/
 builds/
 exports/
 *.exe
