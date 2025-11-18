@@ -19,7 +19,7 @@ func _ready() -> void:
 
 func _on_start_pressed() -> void:
 	print("[StartMenu] Starting game...")
-	get_tree().change_scene_to_file("res://scenes/game_3d.tscn")
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 func _input(event: InputEvent) -> void:
 	# Also allow Space/Enter or any gamepad button to start
