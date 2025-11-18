@@ -53,6 +53,9 @@ func enter() -> void:
 
 	Log.state("Entering Look Mode - switching to first-person camera")
 
+	# Capture mouse for camera control (standard FPS controls)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
 	# Switch cameras (activate() handles rotation sync)
 	tactical_camera.camera.current = false
 	first_person_camera.activate()
@@ -74,6 +77,9 @@ func exit() -> void:
 	super.exit()
 
 	Log.state("Exiting Look Mode - switching to tactical camera")
+
+	# Release mouse cursor (back to visible)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	# Switch back to tactical camera (deactivate() handles rotation sync)
 	if first_person_camera:

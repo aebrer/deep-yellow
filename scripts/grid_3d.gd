@@ -453,7 +453,15 @@ func is_walkable(pos: Vector2i) -> bool:
 	# For procedural generation: infinite world, no bounds checking
 	if use_procedural_generation:
 		var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-		return cell_item == TileType.FLOOR
+		var is_walkable_result = cell_item == TileType.FLOOR
+
+		# Debug: Log when walkability check fails
+		if not is_walkable_result:
+			Log.warn(Log.Category.GRID, "Walkability FAILED at (%d, %d): cell_item=%d (expected FLOOR=%d)" % [
+				pos.x, pos.y, cell_item, TileType.FLOOR
+			])
+
+		return is_walkable_result
 
 	# For static levels: check bounds first
 	if not is_in_bounds(pos):
