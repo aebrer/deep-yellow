@@ -82,6 +82,10 @@ func _ready() -> void:
 		Log.system("Player3D ready at grid position: %s" % grid_position)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Block gameplay input when paused (UI navigation takes over)
+	if PauseManager and PauseManager.is_paused:
+		return
+
 	# Delegate to state machine
 	if state_machine:
 		state_machine.handle_input(event)

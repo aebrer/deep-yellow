@@ -233,6 +233,9 @@ func _setup_label_highlights() -> void:
 			tooltip_texts[label] = label.tooltip_text
 			label.tooltip_text = ""
 
+			# Add to hud_focusable group (so PauseManager can find it)
+			label.add_to_group("hud_focusable")
+
 			# Connect hover signals (always active)
 			label.mouse_entered.connect(_on_label_hovered.bind(label))
 			label.mouse_exited.connect(_on_label_unhovered.bind(label))
@@ -241,8 +244,8 @@ func _setup_label_highlights() -> void:
 			label.focus_entered.connect(_on_label_focused.bind(label))
 			label.focus_exited.connect(_on_label_unfocused.bind(label))
 
-			# Start with labels NOT focusable (will enable when paused)
-			label.focus_mode = Control.FOCUS_NONE
+			# Make focusable immediately (controller navigation only works when paused)
+			label.focus_mode = Control.FOCUS_ALL
 
 func _on_label_hovered(label: Label) -> void:
 	"""Highlight label on mouse hover"""
@@ -272,7 +275,9 @@ func _highlight_label(label: Label) -> void:
 	style.content_margin_top = 2
 	style.content_margin_bottom = 2
 
+	# Override BOTH normal and focus to disable Godot's built-in focus indicator
 	label.add_theme_stylebox_override("normal", style)
+	label.add_theme_stylebox_override("focus", style)  # Same style for focus = no dual highlights
 
 	# Show tooltip in overlay
 	if tooltip_panel and tooltip_label and label in tooltip_texts:
@@ -282,23 +287,18 @@ func _highlight_label(label: Label) -> void:
 func _unhighlight_label(label: Label) -> void:
 	"""Remove visual highlight and hide tooltip"""
 	label.remove_theme_stylebox_override("normal")
+	label.remove_theme_stylebox_override("focus")  # Remove both overrides
 
 	# Hide tooltip overlay
 	if tooltip_panel:
 		tooltip_panel.visible = false
 
 func _on_pause_toggled(is_paused: bool) -> void:
-	"""Enable/disable controller navigation based on pause state"""
-	if is_paused:
-		# Enable controller navigation
+	"""Clear highlights when unpausing"""
+	if not is_paused:
+		# Clear any highlights and focus when returning to gameplay
 		for label in tooltip_labels:
 			if label:
-				label.focus_mode = Control.FOCUS_ALL
-	else:
-		# Disable controller navigation and clear any highlights
-		for label in tooltip_labels:
-			if label:
-				label.focus_mode = Control.FOCUS_NONE
 				if label.has_focus():
 					label.release_focus()
 				_unhighlight_label(label)

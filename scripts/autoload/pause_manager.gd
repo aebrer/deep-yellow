@@ -27,10 +27,31 @@ func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _unhandled_input(event):
-	# ESC (keyboard) or START (controller) toggles pause
-	if event.is_action_pressed("ui_cancel"):
+	# ESC (keyboard via ui_cancel) or START (controller via pause action) toggles pause
+	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
 		toggle_pause()
 		get_viewport().set_input_as_handled()
+		return
+
+	# Handle controller UI navigation when paused (use just_pressed for debouncing)
+	if is_paused:
+		if event.is_action_pressed("ui_up") and not Input.is_action_pressed("ui_down"):
+			# Only navigate if this is a fresh press (use InputManager for debouncing)
+			if InputManager and InputManager.is_action_just_pressed("ui_up"):
+				navigate_hud(Vector2i(0, -1))
+				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_down") and not Input.is_action_pressed("ui_up"):
+			if InputManager and InputManager.is_action_just_pressed("ui_down"):
+				navigate_hud(Vector2i(0, 1))
+				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_left") and not Input.is_action_pressed("ui_right"):
+			if InputManager and InputManager.is_action_just_pressed("ui_left"):
+				navigate_hud(Vector2i(-1, 0))
+				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_right") and not Input.is_action_pressed("ui_left"):
+			if InputManager and InputManager.is_action_just_pressed("ui_right"):
+				navigate_hud(Vector2i(1, 0))
+				get_viewport().set_input_as_handled()
 
 func toggle_pause():
 	"""Toggle pause state."""
@@ -47,17 +68,29 @@ func _enter_hud_mode():
 	# Pause the 3D viewport (not the entire tree)
 	var game_3d = get_tree().get_first_node_in_group("game_3d_viewport")
 	if game_3d:
+		Log.system("PauseManager: Found game_3d node '%s', disabling..." % game_3d.name)
 		game_3d.process_mode = Node.PROCESS_MODE_DISABLED
+	else:
+		Log.warn(Log.Category.SYSTEM, "PauseManager: game_3d_viewport node NOT FOUND!")
 
 	# Show mouse cursor
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	# Register focusable HUD elements
 	_refresh_focusable_elements()
+	Log.system("PauseManager: Found %d focusable elements" % focusable_elements.size())
+	for i in range(min(3, focusable_elements.size())):
+		Log.system("  - Element %d: %s" % [i, focusable_elements[i].name])
 
-	# Focus first element
+	# Focus first element (only for controller, not mouse)
 	if focusable_elements.size() > 0:
-		set_hud_focus(focusable_elements[0])
+		if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
+			Log.system("PauseManager: Focusing first element '%s' (controller mode)" % focusable_elements[0].name)
+			set_hud_focus(focusable_elements[0])
+		else:
+			Log.system("PauseManager: Skipping auto-focus (mouse/keyboard mode)")
+	else:
+		Log.warn(Log.Category.SYSTEM, "PauseManager: No focusable elements found!")
 
 	Log.system("Entered HUD interaction mode (paused)")
 
@@ -66,7 +99,10 @@ func _exit_hud_mode():
 	# Resume the 3D viewport
 	var game_3d = get_tree().get_first_node_in_group("game_3d_viewport")
 	if game_3d:
+		Log.system("PauseManager: Found game_3d node '%s' for resume, enabling..." % game_3d.name)
 		game_3d.process_mode = Node.PROCESS_MODE_INHERIT
+	else:
+		Log.warn(Log.Category.SYSTEM, "PauseManager: game_3d_viewport node NOT FOUND on resume!")
 
 	# Capture mouse for camera control
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -108,7 +144,9 @@ func set_hud_focus(element: Control):
 		current_focus.release_focus()
 
 	current_focus = element
+	Log.system("PauseManager: Calling grab_focus() on '%s'" % element.name)
 	element.grab_focus()
+	Log.system("PauseManager: Element has focus = %s" % element.has_focus())
 	emit_signal("hud_focus_changed", element)
 
 func navigate_hud(direction: Vector2i):
@@ -125,12 +163,3 @@ func navigate_hud(direction: Vector2i):
 		current_index += direction.y
 		current_index = clamp(current_index, 0, focusable_elements.size() - 1)
 		set_hud_focus(focusable_elements[current_index])
-
-func _process(_delta):
-	if not is_paused:
-		return
-
-	# Handle controller navigation
-	var stick_direction = InputManager.get_aim_direction_grid()
-	if stick_direction != Vector2i.ZERO:
-		navigate_hud(stick_direction)
