@@ -53,6 +53,13 @@ func _ready() -> void:
 	# Grid reference will be set by Game node
 	await get_tree().process_frame
 
+	# CRITICAL: Wait for initial chunks to load before spawning
+	# This ensures walkable_cells is populated and spawn position is valid
+	if ChunkManager:
+		Log.system("Player waiting for initial chunk load to complete...")
+		await ChunkManager.initial_load_completed
+		Log.system("Initial chunks loaded, proceeding with player spawn")
+
 	if grid:
 		# Build navigation graph for starting chunk (0,0)
 		var starting_chunk := Vector2i(0, 0)

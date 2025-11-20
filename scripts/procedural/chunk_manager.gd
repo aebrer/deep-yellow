@@ -12,6 +12,14 @@ extends Node
 @warning_ignore("unused_signal")
 signal chunk_updates_completed()
 
+## Emitted when initial chunk load completes (all chunks in 7×7 grid loaded)
+@warning_ignore("unused_signal")
+signal initial_load_completed()
+
+## Emitted during initial load to report progress (loaded_count, total_count)
+@warning_ignore("unused_signal")
+signal initial_load_progress(loaded_count: int, total_count: int)
+
 ## Emitted when player enters a new chunk (for EXP rewards)
 signal new_chunk_entered(chunk_position: Vector3i)
 
@@ -133,11 +141,9 @@ func on_turn_completed() -> void:
 	if not was_generating:
 		chunk_updates_completed.emit.call_deferred()
 
-	# Mark initial load as complete after first turn
-	# (subsequent turns will load/unload max 1 chunk to avoid lag spikes)
-	if not initial_load_complete and loaded_chunks.size() > 0:
-		initial_load_complete = true
-		Log.system("Initial chunk load complete, switching to 1-chunk-per-turn mode")
+	# Note: Initial load completion is now checked in _process_generation_queue() every frame
+	# This avoids chicken-and-egg problem where player can't take turns until spawned,
+	# but spawn waits for initial load completion
 
 # ============================================================================
 # CHUNK LOADING
@@ -226,6 +232,20 @@ func _process_generation_queue() -> void:
 		if was_generating and generation_thread and generation_thread.get_pending_count() == 0:
 			chunk_updates_completed.emit()
 			was_generating = false
+
+		# Check for initial load completion (when queue is empty and chunks are loaded)
+		if not initial_load_complete and loaded_chunks.size() > 0:
+			var expected_chunks := (GENERATION_RADIUS * 2 + 1) * (GENERATION_RADIUS * 2 + 1)  # 7×7 = 49
+			var has_all_chunks := loaded_chunks.size() >= expected_chunks
+
+			if has_all_chunks or (generation_thread and generation_thread.get_pending_count() == 0):
+				initial_load_complete = true
+				Log.system("Initial chunk load complete (%d/%d chunks), switching to 1-chunk-per-turn mode" % [
+					loaded_chunks.size(),
+					expected_chunks
+				])
+				initial_load_completed.emit()
+
 		return
 
 	# Check memory limit
@@ -309,6 +329,11 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 
 	# Store chunk in loaded_chunks
 	loaded_chunks[chunk_key] = chunk
+
+	# Emit progress during initial load
+	if not initial_load_complete:
+		var expected_chunks := (GENERATION_RADIUS * 2 + 1) * (GENERATION_RADIUS * 2 + 1)  # 7×7 = 49
+		initial_load_progress.emit(loaded_chunks.size(), expected_chunks)
 
 	# Load into GridMap (deferred to ensure main thread)
 	call_deferred("_load_chunk_to_grid", chunk, chunk_key)
