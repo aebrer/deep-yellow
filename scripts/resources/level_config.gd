@@ -258,11 +258,11 @@ func on_generation_complete() -> void:
 
 ## Called when player enters this level
 func on_enter() -> void:
-	Log.system("Entered level: %s" % display_name)
+	Log.player("Entered level: %s" % display_name)
 
 ## Called when player exits this level
 func on_exit() -> void:
-	Log.system("Exited level: %s" % display_name)
+	Log.player("Exited level: %s" % display_name)
 
 ## Called when level is unloaded from memory
 func on_unload() -> void:

@@ -9,6 +9,9 @@ var rt_held: bool = false
 var rt_hold_time: float = 0.0
 var rt_repeat_timer: float = 0.0
 
+## Blocked movement tracking (prevent spam)
+var last_blocked_direction: Vector2i = Vector2i(-999, -999)  # Invalid initial value
+
 # Repeat timing configuration
 const INITIAL_DELAY: float = 0.3
 const REPEAT_INTERVAL_START: float = 0.25
@@ -65,9 +68,12 @@ func _move_forward() -> void:
 	var action = MovementAction.new(forward_direction)
 	if action.can_execute(player):
 		player.pending_action = action
+		last_blocked_direction = Vector2i(-999, -999)  # Reset blocked tracking on success
 		transition_to("ExecutingTurnState")
 	else:
-		Log.warn(Log.Category.MOVEMENT, "Cannot move forward - blocked!")
+		# Only warn on initial press, not during hold-to-repeat (fast players can tell it's blocked)
+		if not rt_held:
+			Log.warn(Log.Category.MOVEMENT, "Cannot move forward - blocked!")
 
 func process_frame(delta: float) -> void:
 	if not InputManager:
@@ -116,6 +122,7 @@ func process_frame(delta: float) -> void:
 		rt_held = false
 		rt_hold_time = 0.0
 		rt_repeat_timer = 0.0
+		last_blocked_direction = Vector2i(-999, -999)  # Reset blocked tracking on release
 
 func _update_action_preview() -> void:
 	"""Update action preview with current forward movement"""

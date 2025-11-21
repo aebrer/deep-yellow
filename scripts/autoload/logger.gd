@@ -28,9 +28,10 @@ enum Level {
 	TRACE = 0,   # Most verbose - every frame events
 	DEBUG = 1,   # Debug info - state changes, calculations
 	INFO = 2,    # Normal info - important events
-	WARN = 3,    # Warnings - unexpected but recoverable
-	ERROR = 4,   # Errors - serious issues
-	NONE = 5     # Disable all logging
+	PLAYER = 3,  # Player-facing messages - levelups, exp, kills, level transitions
+	WARN = 4,    # Warnings - unexpected but recoverable
+	ERROR = 5,   # Errors - serious issues
+	NONE = 6     # Disable all logging
 }
 
 # ============================================================================
@@ -109,6 +110,7 @@ const LEVEL_NAMES = {
 	Level.TRACE: "TRACE",
 	Level.DEBUG: "DEBUG",
 	Level.INFO: "INFO",
+	Level.PLAYER: "PLAYER",
 	Level.WARN: "WARN",
 	Level.ERROR: "ERROR",
 }
@@ -242,6 +244,10 @@ func trace(category: Category, message: String) -> void:
 # SYSTEM category (always logged unless global level is ERROR+)
 func system(message: String) -> void:
 	msg(Category.SYSTEM, Level.INFO, message)
+
+# PLAYER-facing messages (levelups, exp, kills, level transitions)
+func player(message: String) -> void:
+	msg(Category.SYSTEM, Level.PLAYER, message)
 
 # ============================================================================
 # FORMATTING

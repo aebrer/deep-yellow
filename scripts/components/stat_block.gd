@@ -366,7 +366,7 @@ func gain_exp(amount: int) -> void:
 	var multiplied = amount * (clearance_level + 1)
 	exp += multiplied
 	emit_signal("exp_gained", multiplied, exp)
-	Log.system("Gained %d EXP (×%d = %d total, now %d)" % [amount, clearance_level + 1, multiplied, exp])
+	Log.player("Gained %d EXP (×%d = %d total, now %d)" % [amount, clearance_level + 1, multiplied, exp])
 
 	_check_level_up()
 

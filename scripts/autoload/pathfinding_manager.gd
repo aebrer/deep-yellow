@@ -192,16 +192,31 @@ func can_reach_chunk_edges(pos: Vector2i, chunk_pos: Vector2i, min_adjacent: int
 	var reachable_count := 0
 
 	for adj_chunk in adjacent_chunks:
-		# Sample a point near the center of the adjacent chunk
-		var adj_center: Vector2i = adj_chunk * CHUNK_SIZE + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
+		# Sample multiple points in the adjacent chunk for more reliable connectivity checking
+		# Try center, and 4 quadrants (more robust than single center point)
+		var sample_offsets := [
+			Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2),      # Center
+			Vector2i(CHUNK_SIZE / 4, CHUNK_SIZE / 4),      # Top-left quadrant
+			Vector2i(3 * CHUNK_SIZE / 4, CHUNK_SIZE / 4),  # Top-right quadrant
+			Vector2i(CHUNK_SIZE / 4, 3 * CHUNK_SIZE / 4),  # Bottom-left quadrant
+			Vector2i(3 * CHUNK_SIZE / 4, 3 * CHUNK_SIZE / 4), # Bottom-right quadrant
+		]
 
-		# Find nearest walkable tile in that chunk (within 32 tiles of center)
-		var nearest: Vector2i = _find_nearest_walkable_near(adj_center, 32)
-		if nearest == Vector2i(-1, -1):
-			continue  # No walkable tile in this adjacent chunk (might not be loaded yet)
+		var chunk_reachable := false
+		for offset in sample_offsets:
+			var sample_pos: Vector2i = adj_chunk * CHUNK_SIZE + offset
 
-		# Check if we can path from spawn to this adjacent chunk
-		if are_positions_connected(pos, nearest):
+			# Find nearest walkable tile near this sample point
+			var nearest: Vector2i = _find_nearest_walkable_near(sample_pos, 16)
+			if nearest == Vector2i(-1, -1):
+				continue  # No walkable tile near this sample point
+
+			# Check if we can path from spawn to this point
+			if are_positions_connected(pos, nearest):
+				chunk_reachable = true
+				break  # Found a reachable point in this chunk
+
+		if chunk_reachable:
 			reachable_count += 1
 
 	return reachable_count >= min_adjacent

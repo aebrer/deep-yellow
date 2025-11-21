@@ -150,8 +150,8 @@ entity density: very low"""
 
 func on_load() -> void:
 	super.on_load()
-	Log.system("welcome to the backrooms. you are in the lobby.")
-	Log.system("the fluorescent lights buzz overhead. the air smells of mold.")
+	Log.player("welcome to the backrooms. you are in the lobby.")
+	Log.player("the fluorescent lights buzz overhead. the air smells of mold.")
 
 func on_enter() -> void:
 	super.on_enter()
@@ -160,4 +160,4 @@ func on_enter() -> void:
 
 func on_exit() -> void:
 	super.on_exit()
-	Log.system("you noclip out of level 0...")
+	Log.player("you noclip out of level 0...")

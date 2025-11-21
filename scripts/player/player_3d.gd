@@ -76,10 +76,22 @@ func _ready() -> void:
 		# Find a spawn point that can reach at least 2/4 adjacent chunks
 		# This ensures player isn't stuck in a dead-end or isolated area
 		var spawn_found := false
-		var max_attempts := 20  # Try multiple candidates
+		var max_attempts := 100  # Increased attempts for better reliability
+
+		# Constrain spawn candidates to starting chunk only (not all 49 loaded chunks)
+		# This ensures candidates are in the pathfinding graph we just built
+		const CHUNK_SIZE := 128
+		var starting_chunk_offset := starting_chunk * CHUNK_SIZE
 
 		for attempt in range(max_attempts):
-			var candidate := grid.get_random_walkable_position()
+			# Sample candidate from within starting chunk (0,0)
+			var local_x := randi() % CHUNK_SIZE
+			var local_y := randi() % CHUNK_SIZE
+			var candidate := starting_chunk_offset + Vector2i(local_x, local_y)
+
+			# Skip if not walkable (in a wall)
+			if not grid.is_walkable(candidate):
+				continue
 
 			# Validate spawn can reach at least 2 adjacent chunks (not in isolated area)
 			if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):  # Default min_adjacent = 2
@@ -89,8 +101,28 @@ func _ready() -> void:
 				break
 
 		if not spawn_found:
-			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches 2+ adjacent chunks, using random walkable")
-			grid_position = grid.get_random_walkable_position()
+			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches 2+ adjacent chunks, using center of starting chunk")
+			# Fallback: use center of starting chunk and hope for the best
+			grid_position = starting_chunk_offset + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
+			# Find nearest walkable if center is a wall (search within starting chunk only)
+			if not grid.is_walkable(grid_position):
+				# Spiral search outward from center within starting chunk
+				var found_walkable := false
+				for radius in range(1, CHUNK_SIZE / 2):
+					for dx in range(-radius, radius + 1):
+						for dy in range(-radius, radius + 1):
+							if abs(dx) + abs(dy) != radius:
+								continue  # Only check tiles at this exact radius
+
+							var test_pos := grid_position + Vector2i(dx, dy)
+							if grid.is_walkable(test_pos):
+								grid_position = test_pos
+								found_walkable = true
+								break
+						if found_walkable:
+							break
+					if found_walkable:
+						break
 
 		# SNAP to grid position (turn-based = no smooth movement)
 		update_visual_position()
@@ -223,7 +255,7 @@ func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 	if stats:
 		var exp_reward = 10 * (stats.level + 1)
 		stats.gain_exp(exp_reward)
-		Log.system("Entered new chunk %s - awarded %d EXP (Level %d)" % [
+		Log.player("Entered new chunk %s - awarded %d EXP (Level %d)" % [
 			Vector2i(chunk_position.x, chunk_position.y),
 			exp_reward,
 			stats.level
@@ -231,10 +263,10 @@ func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 
 func _on_level_increased(old_level: int, new_level: int) -> void:
 	"""Called when Level increases - trigger perk selection"""
-	Log.system("Player Level Up! %d → %d" % [old_level, new_level])
+	Log.player("Player Level Up! %d → %d" % [old_level, new_level])
 	# TODO: Show perk selection UI
 
 func _on_clearance_increased(old_level: int, new_level: int) -> void:
 	"""Called when Clearance increases (via perk choice) - sync with KnowledgeDB"""
 	KnowledgeDB.set_clearance_level(new_level)
-	Log.system("Player Clearance increased: %d → %d (knowledge unlocked)" % [old_level, new_level])
+	Log.player("Player Clearance increased: %d → %d (knowledge unlocked)" % [old_level, new_level])

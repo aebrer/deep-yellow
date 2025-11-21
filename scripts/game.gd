@@ -57,6 +57,11 @@ func set_examine_text(description: String) -> void:
 
 func _on_log_message(category: Log.Category, level: Log.Level, message: String) -> void:
 	"""Handle log messages and display them in the UI"""
+	# Filter: Only show PLAYER level and above (player-facing messages, warnings, errors)
+	# This keeps the in-game log clean for players
+	if level < Log.Level.PLAYER:
+		return  # Skip TRACE, DEBUG, INFO
+
 	# Choose color based on level
 	var color := "gray"
 	match level:
@@ -64,6 +69,8 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 			color = "#ff6b6b"  # Red
 		Log.Level.WARN:
 			color = "#ffd93d"  # Yellow
+		Log.Level.PLAYER:
+			color = "#6bffb8"  # Bright cyan/green (player-facing messages)
 		Log.Level.INFO:
 			color = "white"
 		Log.Level.DEBUG:

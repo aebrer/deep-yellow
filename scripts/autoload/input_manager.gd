@@ -124,7 +124,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		"toggle_ability_2",
 		"toggle_ability_3",
 		"toggle_ability_4",
-		"examine_mode"
+		"examine_mode",
+		"pause"
 	]
 
 	for action in tracked_actions:
