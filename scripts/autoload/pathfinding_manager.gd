@@ -159,37 +159,52 @@ func get_path_distance(from: Vector2i, to: Vector2i) -> float:
 	# Path includes start and end, so distance is path.size() - 1
 	return float(path.size() - 1)
 
-## Check if a position can reach all chunk edges (for spawn validation)
-func can_reach_chunk_edges(pos: Vector2i, chunk_pos: Vector2i) -> bool:
-	"""Check if position can reach all 4 edges of a chunk
+## Check if a position can reach adjacent chunks (better than edge checking for mazes)
+func can_reach_chunk_edges(pos: Vector2i, chunk_pos: Vector2i, min_adjacent: int = 2) -> bool:
+	"""Check if spawn position can reach adjacent chunks (better for maze-like levels)
 
-	Useful for spawn point validation to ensure player can traverse the chunk.
+	Instead of checking edges (which might be walled off), checks if spawn can reach
+	neighboring chunks. This ensures player isn't stuck in an isolated dead-end.
+
+	Args:
+		pos: Grid position to test
+		chunk_pos: Current chunk position
+		min_adjacent: Minimum adjacent chunks that must be reachable (default 2/4)
 
 	Returns:
-		true if position can reach at least one point on each edge
+		true if position can reach at least min_adjacent neighboring chunks
 	"""
 	const CHUNK_SIZE := 128
-	var chunk_world_offset := chunk_pos * CHUNK_SIZE
 
-	# Sample points on each edge (middle of each edge)
-	var edge_samples := [
-		chunk_world_offset + Vector2i(CHUNK_SIZE / 2, 0),              # North edge
-		chunk_world_offset + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE - 1), # South edge
-		chunk_world_offset + Vector2i(0, CHUNK_SIZE / 2),              # West edge
-		chunk_world_offset + Vector2i(CHUNK_SIZE - 1, CHUNK_SIZE / 2)  # East edge
+	# First check: spawn must be walkable itself (not in a wall)
+	if not pos_to_id.has(pos):
+		return false
+
+	# Define adjacent chunk positions (N, S, W, E)
+	var adjacent_chunks := [
+		chunk_pos + Vector2i(0, -1),  # North
+		chunk_pos + Vector2i(0, 1),   # South
+		chunk_pos + Vector2i(-1, 0),  # West
+		chunk_pos + Vector2i(1, 0)    # East
 	]
 
-	# Check if we can reach at least one point on each edge
-	for edge_pos in edge_samples:
-		# Find nearest walkable tile near this edge sample
-		var nearest := _find_nearest_walkable_on_edge(edge_pos, chunk_world_offset, CHUNK_SIZE)
+	# Count how many adjacent chunks are reachable
+	var reachable_count := 0
+
+	for adj_chunk in adjacent_chunks:
+		# Sample a point near the center of the adjacent chunk
+		var adj_center: Vector2i = adj_chunk * CHUNK_SIZE + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
+
+		# Find nearest walkable tile in that chunk (within 32 tiles of center)
+		var nearest: Vector2i = _find_nearest_walkable_near(adj_center, 32)
 		if nearest == Vector2i(-1, -1):
-			return false  # No walkable tile on this edge
+			continue  # No walkable tile in this adjacent chunk (might not be loaded yet)
 
-		if not are_positions_connected(pos, nearest):
-			return false  # Can't reach this edge
+		# Check if we can path from spawn to this adjacent chunk
+		if are_positions_connected(pos, nearest):
+			reachable_count += 1
 
-	return true
+	return reachable_count >= min_adjacent
 
 ## Find nearest walkable tile on a chunk edge
 func _find_nearest_walkable_on_edge(sample: Vector2i, chunk_offset: Vector2i, size: int) -> Vector2i:
@@ -220,6 +235,27 @@ func _find_nearest_walkable_on_edge(sample: Vector2i, chunk_offset: Vector2i, si
 				return test_pos
 
 	return Vector2i(-1, -1)  # No walkable tile found on edge
+
+## Find nearest walkable tile near a position (spiral search)
+func _find_nearest_walkable_near(center: Vector2i, max_radius: int) -> Vector2i:
+	"""Find nearest walkable tile within max_radius of center using spiral search"""
+	# Check center first
+	if pos_to_id.has(center):
+		return center
+
+	# Spiral search outward from center
+	for radius in range(1, max_radius + 1):
+		# Check all tiles at this radius (Manhattan distance)
+		for dx in range(-radius, radius + 1):
+			for dy in range(-radius, radius + 1):
+				if abs(dx) + abs(dy) != radius:
+					continue  # Only check tiles exactly at this radius
+
+				var test_pos := center + Vector2i(dx, dy)
+				if pos_to_id.has(test_pos):
+					return test_pos
+
+	return Vector2i(-1, -1)  # No walkable tile found within radius
 
 ## Get all points in the graph (for debugging)
 func get_point_count() -> int:

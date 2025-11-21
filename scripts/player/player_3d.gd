@@ -61,26 +61,35 @@ func _ready() -> void:
 		Log.system("Initial chunks loaded, proceeding with player spawn")
 
 	if grid:
-		# Build navigation graph for starting chunk (0,0)
+		# Build navigation graph for starting chunk (0,0) AND adjacent chunks
+		# This allows spawn validation to check connectivity to neighboring chunks
 		var starting_chunk := Vector2i(0, 0)
-		Pathfinding.build_navigation_graph([starting_chunk], grid)
+		var chunks_to_load := [
+			starting_chunk,
+			starting_chunk + Vector2i(0, -1),  # North
+			starting_chunk + Vector2i(0, 1),   # South
+			starting_chunk + Vector2i(-1, 0),  # West
+			starting_chunk + Vector2i(1, 0)    # East
+		]
+		Pathfinding.build_navigation_graph(chunks_to_load, grid)
 
-		# Find a spawn point that can reach all chunk edges
+		# Find a spawn point that can reach at least 2/4 adjacent chunks
+		# This ensures player isn't stuck in a dead-end or isolated area
 		var spawn_found := false
 		var max_attempts := 20  # Try multiple candidates
 
 		for attempt in range(max_attempts):
 			var candidate := grid.get_random_walkable_position()
 
-			# Validate this spawn can reach all chunk edges
-			if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):
+			# Validate spawn can reach at least 2 adjacent chunks (not in isolated area)
+			if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):  # Default min_adjacent = 2
 				grid_position = candidate
 				spawn_found = true
-				Log.system("Found valid spawn at %s after %d attempts" % [candidate, attempt + 1])
+				Log.system("Found valid spawn at %s after %d attempts (reaches 2+ adjacent chunks)" % [candidate, attempt + 1])
 				break
 
 		if not spawn_found:
-			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches all edges, using random walkable")
+			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches 2+ adjacent chunks, using random walkable")
 			grid_position = grid.get_random_walkable_position()
 
 		# SNAP to grid position (turn-based = no smooth movement)
