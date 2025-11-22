@@ -29,6 +29,13 @@ func _ready() -> void:
 	look_button.button_down.connect(_on_look_button_down)
 	look_button.button_up.connect(_on_look_button_up)
 
+	# Add visual border to touchpad for clarity
+	var touchpad_style = StyleBoxFlat.new()
+	touchpad_style.bg_color = Color(0, 0, 0, 0)  # Transparent background
+	touchpad_style.border_color = Color(1, 1, 1, 0.3)  # Semi-transparent white border
+	touchpad_style.set_border_width_all(2)
+	touchpad.add_theme_stylebox_override("panel", touchpad_style)
+
 	Log.system("TouchControls ready")
 
 	# Debug: Log initial sizes and mouse_filter settings

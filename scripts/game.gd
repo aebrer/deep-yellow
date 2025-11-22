@@ -301,11 +301,11 @@ func _switch_to_portrait() -> void:
 		touch_controls.get_parent().remove_child(touch_controls)
 	portrait_container.add_child(touch_controls)
 	touch_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	touch_controls.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	touch_controls.size_flags_stretch_ratio = 0.6  # Small portion of vertical space (buttons need ~140px total)
+	touch_controls.size_flags_vertical = Control.SIZE_SHRINK_END  # Stay at bottom, don't expand
+	touch_controls.custom_minimum_size = Vector2(0, 150)  # Guarantee enough space for buttons (80 + 60 + 10 separation)
 	touch_controls.visible = true
 
-	Log.system("Touch controls added with EXPAND_FILL (mouse_filter fixed)")
+	Log.system("Touch controls added with minimum size 150px")
 
 	Log.system("Portrait layout active with touch controls")
 
