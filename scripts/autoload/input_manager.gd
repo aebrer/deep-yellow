@@ -489,5 +489,6 @@ func set_look_button_pressed(pressed: bool) -> void:
 	"""Set look button hold state (called by TouchControls on press/release)"""
 	# Update touch button state - transition detection happens in _update_touch_buttons()
 	_touch_look_pressed = pressed
-	Log.system("[InputManager] Touch look button: %s (state now: %s)" % ("pressed" if pressed else "released", _touch_look_pressed))
-	Log.input("Touch look button: %s" % ("pressed" if pressed else "released"))
+	var state_text = "pressed" if pressed else "released"
+	Log.system("[InputManager] Touch look button: %s (state now: %s)" % [state_text, _touch_look_pressed])
+	Log.input("Touch look button: %s" % state_text)

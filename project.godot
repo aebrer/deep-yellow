@@ -32,7 +32,6 @@ PauseManager="*res://scripts/autoload/pause_manager.gd"
 window/size/viewport_width=1600
 window/size/viewport_height=900
 window/size/mode=2
-window/stretch/mode="disabled"
 window/stretch/aspect="ignore"
 
 [gui]
