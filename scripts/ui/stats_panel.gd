@@ -313,13 +313,15 @@ func _on_pause_toggled(is_paused: bool) -> void:
 		for label in tooltip_labels:
 			if label:
 				label.focus_mode = Control.FOCUS_ALL
+				label.mouse_filter = Control.MOUSE_FILTER_STOP  # Allow mouse hover
 	else:
-		# Disable focus and clear highlights when unpausing
+		# Disable focus and mouse interaction when unpausing
 		for label in tooltip_labels:
 			if label:
 				if label.has_focus():
 					label.release_focus()
 				label.focus_mode = Control.FOCUS_NONE
+				label.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let mouse pass through!
 				_unhighlight_label(label)
 
 # ============================================================================

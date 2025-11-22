@@ -31,6 +31,10 @@ func _ready() -> void:
 
 	Log.system("TouchControls ready")
 
+	# Debug: Log initial sizes and mouse_filter settings
+	await get_tree().process_frame  # Wait for layout
+	_debug_log_layout()
+
 func _input(event: InputEvent) -> void:
 	"""Handle touch input globally (allows mouse to pass through to viewport)"""
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
@@ -136,3 +140,52 @@ func _is_touch_in_touchpad(touch_pos: Vector2) -> bool:
 	# Get touchpad global rect
 	var touchpad_rect = touchpad.get_global_rect()
 	return touchpad_rect.has_point(touch_pos)
+
+func _debug_log_layout() -> void:
+	"""Debug logging for touch controls layout and settings"""
+	Log.system("=== TouchControls Layout Debug ===")
+
+	# Root control
+	var root_rect = get_global_rect()
+	Log.system("Root (TouchControls): size=%v, pos=%v, mouse_filter=%d" % [
+		root_rect.size, root_rect.position, mouse_filter
+	])
+
+	# HBoxContainer
+	var hbox = $HBoxContainer
+	var hbox_rect = hbox.get_global_rect()
+	Log.system("HBoxContainer: size=%v, pos=%v, mouse_filter=%d" % [
+		hbox_rect.size, hbox_rect.position, hbox.mouse_filter
+	])
+
+	# Touchpad
+	if touchpad:
+		var touchpad_rect = touchpad.get_global_rect()
+		Log.system("Touchpad: size=%v, pos=%v, mouse_filter=%d, visible=%s" % [
+			touchpad_rect.size, touchpad_rect.position, touchpad.mouse_filter, touchpad.visible
+		])
+
+	# ButtonContainer
+	if button_container:
+		var btn_container_rect = button_container.get_global_rect()
+		Log.system("ButtonContainer: size=%v, pos=%v, mouse_filter=%d" % [
+			btn_container_rect.size, btn_container_rect.position, button_container.mouse_filter
+		])
+
+	# Confirm button
+	if confirm_button:
+		var confirm_rect = confirm_button.get_global_rect()
+		Log.system("ConfirmButton: size=%v, pos=%v, visible=%s, min_size=%v" % [
+			confirm_rect.size, confirm_rect.position, confirm_button.visible,
+			confirm_button.custom_minimum_size
+		])
+
+	# Look button
+	if look_button:
+		var look_rect = look_button.get_global_rect()
+		Log.system("LookButton: size=%v, pos=%v, visible=%s, min_size=%v" % [
+			look_rect.size, look_rect.position, look_button.visible,
+			look_button.custom_minimum_size
+		])
+
+	Log.system("=== End TouchControls Debug ===")

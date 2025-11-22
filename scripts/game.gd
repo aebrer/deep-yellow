@@ -25,6 +25,7 @@ var player: Node3D
 enum LayoutMode { LANDSCAPE, PORTRAIT }
 var current_layout: LayoutMode = LayoutMode.LANDSCAPE
 var last_viewport_size: Vector2 = Vector2.ZERO
+var _switching_layout: bool = false  # Guard flag to prevent feedback loop
 
 ## References to layout containers
 @onready var margin_container: MarginContainer = $MarginContainer
@@ -189,6 +190,11 @@ func _on_chunk_updates_completed() -> void:
 
 func _check_aspect_ratio() -> void:
 	"""Detect aspect ratio and switch layout if needed"""
+	# Prevent feedback loop: ignore resize events triggered during layout switch
+	if _switching_layout:
+		Log.system("Ignoring aspect ratio check during layout switch (preventing feedback loop)")
+		return
+
 	# Use get_window().size for accurate canvas size on web exports
 	var window_size := get_window().size
 	var aspect_ratio := float(window_size.x) / float(window_size.y)
@@ -215,6 +221,7 @@ func _check_aspect_ratio() -> void:
 func _switch_to_portrait() -> void:
 	"""Switch UI layout to portrait mode (vertical stack)"""
 	Log.system("Switching to portrait layout")
+	_switching_layout = true  # Set guard flag
 	current_layout = LayoutMode.PORTRAIT
 
 	# Hide landscape container
@@ -280,15 +287,13 @@ func _switch_to_portrait() -> void:
 	info_row.add_child(minimap_node)
 	minimap_node.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	minimap_node.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Expand vertically
-	minimap_node.custom_minimum_size = Vector2(100, 100)
 
 	log_container.get_parent().remove_child(log_container)
 	info_row.add_child(log_container)
 	log_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_container.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Expand vertically
-	log_container.custom_minimum_size = Vector2(0, 0)  # Remove min size constraint
 
-	# 4. Touch controls at bottom
+	# 5. Touch controls at bottom (mouse_filter=IGNORE on containers allows mouse passthrough)
 	if not touch_controls:
 		touch_controls = TOUCH_CONTROLS_SCENE.instantiate()
 
@@ -296,15 +301,22 @@ func _switch_to_portrait() -> void:
 		touch_controls.get_parent().remove_child(touch_controls)
 	portrait_container.add_child(touch_controls)
 	touch_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	touch_controls.size_flags_vertical = Control.SIZE_SHRINK_END
-	touch_controls.custom_minimum_size = Vector2(0, 120)
+	touch_controls.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	touch_controls.size_flags_stretch_ratio = 0.6  # Small portion of vertical space (buttons need ~140px total)
 	touch_controls.visible = true
 
+	Log.system("Touch controls added with EXPAND_FILL (mouse_filter fixed)")
+
 	Log.system("Portrait layout active with touch controls")
+
+	# Clear guard flag AFTER all deferred layout events complete
+	# This catches spurious resize events triggered by node reparenting
+	call_deferred("_clear_layout_switch_flag")
 
 func _switch_to_landscape() -> void:
 	"""Switch UI layout back to landscape mode (horizontal split)"""
 	Log.system("Switching to landscape layout")
+	_switching_layout = true  # Set guard flag
 	current_layout = LayoutMode.LANDSCAPE
 
 	# Hide touch controls
@@ -378,3 +390,11 @@ func _switch_to_landscape() -> void:
 	core_inventory.visible = true
 
 	Log.system("Landscape layout restored")
+
+	# Clear guard flag AFTER all deferred layout events complete
+	call_deferred("_clear_layout_switch_flag")
+
+func _clear_layout_switch_flag() -> void:
+	"""Clear layout switch guard flag (called deferred after layout complete)"""
+	_switching_layout = false
+	Log.system("Layout switch guard flag cleared")

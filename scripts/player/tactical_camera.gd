@@ -96,8 +96,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+	# Debug: Log all mouse events to diagnose portrait mode issue
+	if event is InputEventMouseMotion:
+		Log.camera("MouseMotion event received - relative: %v, mode: %s" % [event.relative, Input.mouse_mode])
+
 	# Mouse camera control (standard third-person!)
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		Log.camera("Applying mouse rotation - yaw: %.2f, pitch: %.2f" % [event.relative.x, event.relative.y])
+
 		# Mouse X = horizontal rotation (yaw)
 		h_pivot.rotation_degrees.y -= event.relative.x * mouse_sensitivity
 		h_pivot.rotation_degrees.y = fmod(h_pivot.rotation_degrees.y, 360.0)
