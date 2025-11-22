@@ -265,22 +265,6 @@ to be certain. Does this align with what you're seeing?"
   - Code examples and API documentation
   - Update this when implementing new systems
 
-- **`/home/andrew/projects/backrooms_power_crawl/docs/ARCHITECTURE_AUDIT.md`** ⚠️ **CRITICAL REFERENCE**
-  - **Complete inventory of every file in the project** (67 files analyzed)
-  - Per-method/constant/signal documentation for all scripts
-  - Git history context for each file
-  - Cross-reference mapping (dependencies and usage)
-  - Dead code identification
-  - **MUST BE KEPT UP TO DATE** when adding/removing/refactoring files
-  - **UPDATE THIS WHEN**:
-    - Adding new .gd files (add to appropriate system section)
-    - Removing files (mark as deleted with reason)
-    - Adding new methods/constants to existing files
-    - Refactoring systems (update cross-references)
-    - Major architectural changes
-  - Think of this as the "table of contents" for the entire codebase
-  - Prevents future confusion about dead code and legacy systems
-
 - **`/home/andrew/projects/backrooms_power_crawl/README.md`**
   - Project overview and setup
   - High-level feature list
@@ -288,8 +272,6 @@ to be certain. Does this align with what you're seeing?"
   - Quick reference for new contributors
 
 ### Key Files and Their Purposes
-
-**For complete file inventory, see `docs/ARCHITECTURE_AUDIT.md`**
 
 **Autoloads (Singletons)**
 - `/scripts/autoload/input_manager.gd` - Input normalization and device abstraction
@@ -444,16 +426,6 @@ to be certain. Does this align with what you're seeing?"
 - Move planned features from "🔮 Planned" to "✅ Implemented"
 - Keep file structure diagrams accurate
 - Document architectural decisions and rationale
-
-**Keep ARCHITECTURE_AUDIT.md current** ⚠️ **CRITICAL**
-- This is the complete file inventory - **MUST** stay synchronized with codebase
-- **When adding files**: Add entry with full method/constant/signal documentation
-- **When removing files**: Update status to "DELETED" with reason (don't just remove the entry)
-- **When refactoring**: Update cross-references, dependencies, and "Used By" sections
-- **When adding methods/constants**: Update the relevant file's documentation
-- Think of this as the project's "source of truth" for what exists and what's dead code
-- Prevents confusion for future Claude instances and developers
-- **If you skip this**, dead code will accumulate and agents will get confused again
 
 ### Don't Add Features Not in Design Docs
 
@@ -809,7 +781,6 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 
 ### When to Update Documentation
 - **ARCHITECTURE.md**: After implementing any system
-- **ARCHITECTURE_AUDIT.md**: ⚠️ **ALWAYS** - when adding/removing/modifying files or methods
 - **DESIGN.md**: After major design decisions
 - **README.md**: After setup changes or new requirements
 - **This file (CLAUDE.md)**: After learning new user preferences or patterns

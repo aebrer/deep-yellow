@@ -201,64 +201,6 @@ func _render_full_map(player_pos: Vector2i) -> void:
 	# Update texture
 	map_texture.update(map_image)
 
-func _render_incremental(delta: Vector2i, player_pos: Vector2i) -> void:
-	"""Incremental render - only new tile strips that scrolled in"""
-	var grid_map: GridMap = grid.grid_map
-	if not grid_map:
-		return
-
-	var half_size := MAP_SIZE / 2
-
-	# Render horizontal strip if moved vertically
-	if delta.y != 0:
-		var strip_y := player_pos.y + (half_size if delta.y > 0 else -half_size)
-		for x in range(player_pos.x - half_size, player_pos.x + half_size):
-			var tile_pos := Vector2i(x, strip_y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if not _is_valid_screen_pos(screen_pos):
-				continue
-
-			var cell_item := grid_map.get_cell_item(Vector3i(x, 0, strip_y))
-
-			var color: Color
-			if cell_item == -1:
-				color = COLOR_UNLOADED
-			elif cell_item == 1:
-				color = COLOR_WALL
-			else:
-				color = COLOR_WALKABLE
-
-			map_image.set_pixelv(screen_pos, color)
-
-	# Render vertical strip if moved horizontally
-	if delta.x != 0:
-		var strip_x := player_pos.x + (half_size if delta.x > 0 else -half_size)
-		for y in range(player_pos.y - half_size, player_pos.y + half_size):
-			var tile_pos := Vector2i(strip_x, y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if not _is_valid_screen_pos(screen_pos):
-				continue
-
-			var cell_item := grid_map.get_cell_item(Vector3i(strip_x, 0, y))
-
-			var color: Color
-			if cell_item == -1:
-				color = COLOR_UNLOADED
-			elif cell_item == 1:
-				color = COLOR_WALL
-			else:
-				color = COLOR_WALKABLE
-
-			map_image.set_pixelv(screen_pos, color)
-
-	# Redraw dynamic elements
-	_update_dynamic_elements(player_pos)
-
-	# Update texture
-	map_texture.update(map_image)
-
 func _update_dynamic_elements(player_pos: Vector2i) -> void:
 	"""Redraw only trail and player marker (tiles unchanged)"""
 	# Draw player trail
