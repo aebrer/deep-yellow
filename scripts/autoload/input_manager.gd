@@ -396,3 +396,34 @@ func get_debug_info() -> Dictionary:
 		"actions_this_frame": _actions_this_frame.keys(),
 		"deadzone": aim_deadzone
 	}
+
+# ============================================================================
+# TOUCH INPUT (Mobile/Portrait Mode)
+# ============================================================================
+
+## Set movement direction directly from touch controls
+## Used by touch controls to bypass stick/keyboard input
+func set_movement_direction(direction: Vector2i) -> void:
+	"""Set aim direction from touch swipe (called by TouchControls)"""
+	aim_direction_grid = direction
+	# Convert grid direction back to normalized vector for consistency
+	if direction != Vector2i.ZERO:
+		aim_direction = Vector2(direction).normalized()
+	else:
+		aim_direction = Vector2.ZERO
+
+	Log.input("Touch movement direction set: %v" % direction)
+
+## Trigger confirm action from touch controls
+## Synthesizes a move_confirm action press
+func trigger_confirm_action() -> void:
+	"""Trigger confirm action from touch button (called by TouchControls)"""
+	_actions_this_frame["move_confirm"] = true
+	Log.input("Touch confirm action triggered")
+
+## Trigger look mode from touch controls
+## Synthesizes an examine_mode action press
+func trigger_look_mode() -> void:
+	"""Trigger look mode from touch button (called by TouchControls)"""
+	_actions_this_frame["examine_mode"] = true
+	Log.input("Touch look mode triggered")
