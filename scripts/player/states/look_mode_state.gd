@@ -116,6 +116,12 @@ func handle_input(event: InputEvent) -> void:
 	# (RT/LMB handled in process_frame via InputManager)
 
 func process_frame(_delta: float) -> void:
+	# Check if look mode button released (works for touch controls + gamepad/keyboard)
+	if InputManager and not InputManager.is_action_pressed("examine_mode"):
+		Log.system("[LookModeState] Look button released - transitioning to IdleState")
+		transition_to("IdleState")
+		return
+
 	# Handle RT/LMB for wait action (using InputManager for proper action tracking)
 	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
 		_execute_wait_action()

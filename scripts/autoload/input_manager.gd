@@ -452,6 +452,8 @@ func get_debug_info() -> Dictionary:
 ## Used by touch controls to bypass stick/keyboard input
 func set_movement_direction(direction: Vector2i) -> void:
 	"""Set aim direction from touch swipe (called by TouchControls)"""
+	Log.system("[InputManager] set_movement_direction() called with direction=%v" % [direction])
+
 	aim_direction_grid = direction
 	# Convert grid direction back to normalized vector for consistency
 	if direction != Vector2i.ZERO:
@@ -459,6 +461,7 @@ func set_movement_direction(direction: Vector2i) -> void:
 	else:
 		aim_direction = Vector2.ZERO
 
+	Log.system("[InputManager] Updated aim_direction=%v, aim_direction_grid=%v" % [aim_direction, aim_direction_grid])
 	Log.input("Touch movement direction set: %v" % direction)
 
 ## Trigger confirm action from touch controls

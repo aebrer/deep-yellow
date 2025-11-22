@@ -84,6 +84,12 @@ func process_frame(delta: float) -> void:
 		player.update_move_indicator()
 		_update_action_preview()
 
+	# Check for look mode activation (touch controls synthesize this action)
+	if InputManager.is_action_just_pressed("examine_mode"):
+		Log.system("[IdleState] examine_mode action detected - transitioning to LookModeState")
+		transition_to("LookModeState")
+		return
+
 	# Handle RT/Click press and hold-to-repeat
 	if InputManager.is_action_just_pressed("move_confirm"):
 		# Log.movement("RT/Click just pressed - initial move")  # Too verbose

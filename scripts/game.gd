@@ -305,6 +305,17 @@ func _switch_to_portrait() -> void:
 	touch_controls.custom_minimum_size = Vector2(0, 150)  # Guarantee enough space for buttons (80 + 60 + 10 separation)
 	touch_controls.visible = true
 
+	# Pass camera reference to touch controls (use local player var)
+	if player:
+		var tactical_camera = player.get_node_or_null("CameraRig")
+		if tactical_camera and touch_controls.has_method("set_camera_reference"):
+			touch_controls.set_camera_reference(tactical_camera)
+			Log.system("Touch controls camera reference set")
+		else:
+			Log.warn(Log.Category.SYSTEM, "Cannot set touch controls camera reference - camera=%s, has_method=%s" % [tactical_camera != null, touch_controls.has_method("set_camera_reference")])
+	else:
+		Log.warn(Log.Category.SYSTEM, "Cannot set touch controls camera reference - player is null")
+
 	Log.system("Touch controls added with minimum size 150px")
 
 	Log.system("Portrait layout active with touch controls")

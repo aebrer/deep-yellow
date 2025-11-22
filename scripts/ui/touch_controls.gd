@@ -3,10 +3,10 @@ extends Control
 ## Touch control overlay for mobile/portrait mode
 ##
 ## Features:
-## - Left side: Invisible touchpad for directional swipe input (8-direction)
+## - Left side: Touchpad for camera rotation (swipe to aim)
 ## - Right side: Action buttons (Confirm Move, Look Mode)
 ## - Only visible in portrait mode
-## - Sends input events through InputManager
+## - Camera rotation handled directly, confirm/look buttons via InputManager
 
 ## Minimum swipe distance to register a direction (pixels)
 @export var swipe_threshold: float = 30.0
@@ -22,6 +22,10 @@ var touchpad_touch_index: int = -1
 var touchpad_start_pos: Vector2 = Vector2.ZERO
 var touchpad_current_pos: Vector2 = Vector2.ZERO
 
+## Player reference (for camera control)
+var player: Node3D = null
+var tactical_camera: Node = null
+
 func _ready() -> void:
 	# Connect button signals (use button_down/button_up for hold tracking)
 	confirm_button.button_down.connect(_on_confirm_button_down)
@@ -36,7 +40,15 @@ func _ready() -> void:
 	touchpad_style.set_border_width_all(2)
 	touchpad.add_theme_stylebox_override("panel", touchpad_style)
 
-	Log.system("TouchControls ready")
+	Log.system("TouchControls ready (camera reference will be set by game.gd)")
+
+func set_camera_reference(camera: Node) -> void:
+	"""Set the tactical camera reference (called by game.gd)"""
+	tactical_camera = camera
+	if tactical_camera:
+		Log.system("TouchControls: Camera reference set successfully")
+	else:
+		Log.warn(Log.Category.SYSTEM, "TouchControls: Camera reference is null")
 
 	# Debug: Log initial sizes and mouse_filter settings
 	await get_tree().process_frame  # Wait for layout
@@ -73,35 +85,49 @@ func _on_touchpad_input(event: InputEvent) -> void:
 			touchpad_touch_index = event.index
 			touchpad_start_pos = event.position
 			touchpad_current_pos = event.position
-			Log.input("Touchpad touch started at: %v" % [touchpad_start_pos])
+			Log.system("[TouchControls] Touchpad touch STARTED - index=%d, pos=%v" % [event.index, touchpad_start_pos])
 		else:
 			# Touch ended - detect swipe direction
+			Log.system("[TouchControls] Touchpad touch ENDED - index=%d, tracking_index=%d" % [event.index, touchpad_touch_index])
 			if touchpad_touch_index == event.index:
+				Log.system("[TouchControls] Index match! Calling _detect_swipe_direction()")
 				_detect_swipe_direction()
 				touchpad_touch_index = -1
+			else:
+				Log.system("[TouchControls] Index mismatch - ignoring touch end")
 
 	elif event is InputEventScreenDrag:
+		Log.system("[TouchControls] Touchpad DRAG - index=%d, tracking_index=%d, pos=%v" % [event.index, touchpad_touch_index, event.position])
 		if touchpad_touch_index == event.index:
 			touchpad_current_pos = event.position
+			Log.system("[TouchControls] Updated current_pos=%v" % [touchpad_current_pos])
 
 func _detect_swipe_direction() -> void:
 	"""Detect 8-directional swipe from start to end position"""
 	var swipe_vector := touchpad_current_pos - touchpad_start_pos
 	var swipe_distance := swipe_vector.length()
 
+	Log.system("[TouchControls] _detect_swipe_direction() called - start=%v, end=%v, vector=%v, distance=%.1f" % [
+		touchpad_start_pos, touchpad_current_pos, swipe_vector, swipe_distance
+	])
+
 	# Ignore short swipes
 	if swipe_distance < swipe_threshold:
-		Log.input("Swipe too short: %.1f < %.1f" % [swipe_distance, swipe_threshold])
+		Log.system("[TouchControls] Swipe too short: %.1f < %.1f threshold" % [swipe_distance, swipe_threshold])
 		return
 
 	# Convert swipe to 8-direction
 	var angle := swipe_vector.angle()  # Radians, 0 = right, increases counterclockwise
 	var direction := _angle_to_direction(angle)
 
-	Log.input("Swipe detected: %v -> direction %v" % [swipe_vector, direction])
+	Log.system("[TouchControls] Swipe DETECTED! vector=%v, angle=%.2f rad, direction=%v" % [swipe_vector, angle, direction])
 
-	# Send direction input to InputManager
-	InputManager.set_movement_direction(direction)
+	# Rotate camera to face the swiped direction (like right stick on gamepad)
+	if tactical_camera and tactical_camera.has_method("snap_to_grid_direction"):
+		Log.system("[TouchControls] Rotating camera to direction %v" % [direction])
+		tactical_camera.snap_to_grid_direction(direction)
+	else:
+		Log.warn(Log.Category.SYSTEM, "TouchControls: Cannot rotate camera - tactical_camera not available")
 
 func _angle_to_direction(angle: float) -> Vector2i:
 	"""Convert angle (radians) to 8-directional grid vector"""
