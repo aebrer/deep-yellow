@@ -133,7 +133,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		"toggle_ability_2",
 		"toggle_ability_3",
 		"toggle_ability_4",
-		"examine_mode",
+		"look_mode",
 		"pause"
 	]
 
@@ -283,11 +283,11 @@ func _update_touch_buttons() -> void:
 		_actions_this_frame["move_confirm"] = true
 		Log.input("Touch confirm action synthesized (current: %s, last: %s)" % [_touch_confirm_pressed, _touch_confirm_pressed_last_frame])
 
-	# Look button (LT equivalent for examine mode) - detect "just pressed" transition
+	# Look button (LT equivalent for look mode) - detect "just pressed" transition
 	var touch_look_just_pressed = _touch_look_pressed and not _touch_look_pressed_last_frame
 	if touch_look_just_pressed:
-		_actions_this_frame["examine_mode"] = true
-		Log.system("[InputManager] Touch look action synthesized! examine_mode=true")
+		_actions_this_frame["look_mode"] = true
+		Log.system("[InputManager] Touch look action synthesized! look_mode=true")
 		Log.input("Touch look action synthesized (current: %s, last: %s)" % [_touch_look_pressed, _touch_look_pressed_last_frame])
 
 	# Debug: Log state changes
@@ -322,12 +322,12 @@ func is_action_pressed(action: String) -> bool:
 		# 4. Regular keyboard/button action is pressed (Space)
 		return right_trigger_pressed or left_mouse_pressed or _touch_confirm_pressed or Input.is_action_pressed(action)
 
-	# Special handling for examine_mode - check LT trigger state + touch button
-	if action == "examine_mode":
-		# examine_mode is "pressed" if any of:
-		# 1. Physical LT trigger is above threshold
+	# Special handling for look_mode - check LT trigger state + touch button
+	if action == "look_mode":
+		# look_mode is "pressed" if any of:
+		# 1. Physical LT trigger is above threshold (already mapped in project.godot)
 		# 2. Touch look button is pressed (mobile/portrait mode)
-		# 3. Regular keyboard/button action is pressed (Shift)
+		# 3. RMB (already mapped in project.godot)
 		return left_trigger_pressed or _touch_look_pressed or Input.is_action_pressed(action)
 
 	# For other actions, use Godot's built-in system
@@ -472,10 +472,10 @@ func trigger_confirm_action() -> void:
 	Log.input("Touch confirm action triggered")
 
 ## Trigger look mode from touch controls
-## Synthesizes an examine_mode action press
+## Synthesizes a look_mode action press
 func trigger_look_mode() -> void:
 	"""Trigger look mode from touch button (called by TouchControls)"""
-	_actions_this_frame["examine_mode"] = true
+	_actions_this_frame["look_mode"] = true
 	Log.input("Touch look mode triggered")
 
 ## Set confirm button state (hold) from touch controls

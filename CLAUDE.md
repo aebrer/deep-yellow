@@ -226,6 +226,36 @@ to be certain. Does this align with what you're seeing?"
 - Input parity is NON-NEGOTIABLE (see Section 5)
 - **Test with controller** before considering a feature "done"
 
+**Definitive Control Mappings (Current State)**
+
+**⚠️ CRITICAL: Do NOT add controls not listed here without explicit user request!**
+
+These are the ONLY controls currently implemented. Don't assume other inputs exist or should be added.
+
+**Controller:**
+- RT → Confirm actions (move forward, wait in look mode)
+- LT → Look mode (first-person examination)
+- Right stick → Camera controls (tactical + look mode)
+- Left stick → Navigate HUD when paused
+- START → Toggle pause status
+
+**Mouse + Keyboard:**
+- LMB → Confirm actions (move forward, wait in look mode)
+- RMB → Look mode (first-person examination)
+- Mouse movement → Camera controls (tactical + look mode)
+- ESC → Toggle pause status
+- Mouse hover over HUD → Navigate HUD when paused
+
+**Mobile/Touch (portrait mode only):**
+- ConfirmMove button → Confirm actions
+- LookMode button → Look mode
+- Touchpad area → Camera controls (tactical + look mode)
+- Pause control → NOT MAPPED (mobile doesn't have pause)
+- Tap HUD item → Show tooltip
+
+**NOT IMPLEMENTED:**
+- Any other inputs not explicitly listed above
+
 **Forward Indicator Movement System (THE NEW ERA)**
 - Always-on green arrow shows 1 cell ahead in camera direction
 - Rotate camera to aim where you want to go
