@@ -69,12 +69,6 @@ var right_trigger_pressed: bool = false
 var _left_trigger_just_pressed: bool = false
 var _right_trigger_just_pressed: bool = false
 
-## Touch button state - for mobile/portrait mode (separate from gamepad triggers)
-var _touch_confirm_pressed: bool = false
-var _touch_confirm_pressed_last_frame: bool = false
-var _touch_look_pressed: bool = false
-var _touch_look_pressed_last_frame: bool = false
-
 ## Mouse button state - for input parity (left click = RT)
 var left_mouse_pressed: bool = false
 var _left_mouse_just_pressed: bool = false
@@ -109,9 +103,6 @@ func _process(_delta: float) -> void:
 
 	# Update mouse button state
 	_update_mouse_buttons()
-
-	# Update touch button state (detect transitions)
-	_update_touch_buttons()
 
 	# Update continuous aim direction every frame
 	_update_aim_direction()
@@ -270,35 +261,6 @@ func _update_mouse_buttons() -> void:
 		_actions_this_frame["move_confirm"] = true
 		# Input event logging handled by _log_input_event()
 
-func _update_touch_buttons() -> void:
-	"""Detect touch button state transitions (called during _process)"""
-	# Touch button signals update _touch_*_pressed immediately (async from button signals)
-	# We detect transitions by comparing current state to last frame's state
-
-	# Confirm button (RT equivalent) - detect "just pressed" transition
-	var touch_confirm_just_pressed = _touch_confirm_pressed and not _touch_confirm_pressed_last_frame
-	if touch_confirm_just_pressed:
-		_actions_this_frame["move_confirm"] = true
-		Log.input("Touch confirm action synthesized (current: %s, last: %s)" % [_touch_confirm_pressed, _touch_confirm_pressed_last_frame])
-
-	# Look button (LT equivalent for look mode) - detect "just pressed" transition
-	var touch_look_just_pressed = _touch_look_pressed and not _touch_look_pressed_last_frame
-	if touch_look_just_pressed:
-		_actions_this_frame["look_mode"] = true
-		Log.system("[InputManager] Touch look action synthesized! look_mode=true")
-		Log.input("Touch look action synthesized (current: %s, last: %s)" % [_touch_look_pressed, _touch_look_pressed_last_frame])
-
-	# Debug: Log state changes
-	if _touch_confirm_pressed != _touch_confirm_pressed_last_frame:
-		Log.input("Touch confirm state changed: last=%s, current=%s" % [_touch_confirm_pressed_last_frame, _touch_confirm_pressed])
-	if _touch_look_pressed != _touch_look_pressed_last_frame:
-		Log.system("[InputManager] Touch look state changed: last=%s, current=%s" % [_touch_look_pressed_last_frame, _touch_look_pressed])
-		Log.input("Touch look state changed: last=%s, current=%s" % [_touch_look_pressed_last_frame, _touch_look_pressed])
-
-	# Update last frame state for next frame
-	_touch_confirm_pressed_last_frame = _touch_confirm_pressed
-	_touch_look_pressed_last_frame = _touch_look_pressed
-
 # ============================================================================
 # ACTION QUERIES
 # ============================================================================
@@ -311,22 +273,20 @@ func is_action_just_pressed(action: String) -> bool:
 ## Check if an action is currently held down
 ## Handles both regular actions AND trigger-synthesized actions
 func is_action_pressed(action: String) -> bool:
-	# Special handling for move_confirm - check RT trigger state + mouse button + touch button
+	# Special handling for move_confirm - check RT trigger state + mouse button
 	if action == "move_confirm":
 		# move_confirm is "pressed" if any of:
 		# 1. Physical RT trigger is above threshold
 		# 2. Left mouse button is pressed (input parity!)
-		# 3. Touch confirm button is pressed (mobile/portrait mode)
-		# 4. Regular keyboard/button action is pressed (Space)
-		return right_trigger_pressed or left_mouse_pressed or _touch_confirm_pressed or Input.is_action_pressed(action)
+		# 3. Regular keyboard/button action is pressed (Space)
+		return right_trigger_pressed or left_mouse_pressed or Input.is_action_pressed(action)
 
-	# Special handling for look_mode - check LT trigger state + touch button
+	# Special handling for look_mode - check LT trigger state
 	if action == "look_mode":
 		# look_mode is "pressed" if any of:
 		# 1. Physical LT trigger is above threshold (already mapped in project.godot)
-		# 2. Touch look button is pressed (mobile/portrait mode)
-		# 3. RMB (already mapped in project.godot)
-		return left_trigger_pressed or _touch_look_pressed or Input.is_action_pressed(action)
+		# 2. RMB (already mapped in project.godot)
+		return left_trigger_pressed or Input.is_action_pressed(action)
 
 	# For other actions, use Godot's built-in system
 	return Input.is_action_pressed(action)
@@ -441,55 +401,3 @@ func get_debug_info() -> Dictionary:
 		"actions_this_frame": _actions_this_frame.keys(),
 		"deadzone": aim_deadzone
 	}
-
-# ============================================================================
-# TOUCH INPUT (Mobile/Portrait Mode)
-# ============================================================================
-
-## Set movement direction directly from touch controls
-## Used by touch controls to bypass stick/keyboard input
-func set_movement_direction(direction: Vector2i) -> void:
-	"""Set aim direction from touch swipe (called by TouchControls)"""
-	Log.system("[InputManager] set_movement_direction() called with direction=%v" % [direction])
-
-	aim_direction_grid = direction
-	# Convert grid direction back to normalized vector for consistency
-	if direction != Vector2i.ZERO:
-		aim_direction = Vector2(direction).normalized()
-	else:
-		aim_direction = Vector2.ZERO
-
-	Log.system("[InputManager] Updated aim_direction=%v, aim_direction_grid=%v" % [aim_direction, aim_direction_grid])
-	Log.input("Touch movement direction set: %v" % direction)
-
-## Trigger confirm action from touch controls
-## Synthesizes a move_confirm action press
-func trigger_confirm_action() -> void:
-	"""Trigger confirm action from touch button (called by TouchControls)"""
-	_actions_this_frame["move_confirm"] = true
-	Log.input("Touch confirm action triggered")
-
-## Trigger look mode from touch controls
-## Synthesizes a look_mode action press
-func trigger_look_mode() -> void:
-	"""Trigger look mode from touch button (called by TouchControls)"""
-	_actions_this_frame["look_mode"] = true
-	Log.input("Touch look mode triggered")
-
-## Set confirm button state (hold) from touch controls
-## Mimics RT (right trigger) behavior
-func set_confirm_button_pressed(pressed: bool) -> void:
-	"""Set confirm button hold state (called by TouchControls on press/release)"""
-	# Update touch button state - transition detection happens in _update_touch_buttons()
-	_touch_confirm_pressed = pressed
-	Log.input("Touch confirm button: %s" % ("pressed" if pressed else "released"))
-
-## Set look button state (hold) from touch controls
-## Mimics LT (left trigger) behavior for examine mode
-func set_look_button_pressed(pressed: bool) -> void:
-	"""Set look button hold state (called by TouchControls on press/release)"""
-	# Update touch button state - transition detection happens in _update_touch_buttons()
-	_touch_look_pressed = pressed
-	var state_text = "pressed" if pressed else "released"
-	Log.system("[InputManager] Touch look button: %s (state now: %s)" % [state_text, _touch_look_pressed])
-	Log.input("Touch look button: %s" % state_text)

@@ -117,7 +117,7 @@ func handle_input(event: InputEvent) -> void:
 
 func process_frame(_delta: float) -> void:
 	# Check if look mode button released
-	# InputManager.is_action_pressed handles: LT trigger, RMB, touch look button
+	# InputManager.is_action_pressed handles: LT trigger, RMB
 	if InputManager and not InputManager.is_action_pressed("look_mode"):
 		Log.system("[LookModeState] Look button released - transitioning to IdleState")
 		transition_to("IdleState")

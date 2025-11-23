@@ -12,6 +12,7 @@ var description_label: RichTextLabel
 
 # State
 var current_target: Examinable = null
+var _is_portrait_mode: bool = false
 
 # Scroll settings
 const SCROLL_SPEED: float = 50.0
@@ -180,6 +181,31 @@ func show_panel(target: Examinable) -> void:
 func hide_panel() -> void:
 	"""Hide the panel"""
 	panel.visible = false
+
+func set_portrait_mode(is_portrait: bool) -> void:
+	"""Switch between portrait (bottom overlay) and landscape (left side) positioning"""
+	_is_portrait_mode = is_portrait
+
+	if is_portrait:
+		# Portrait mode: Bottom ~1/3 overlay, landscape orientation
+		panel.anchor_left = 0.0
+		panel.anchor_top = 0.67  # Start at 2/3 down the screen
+		panel.anchor_right = 1.0
+		panel.anchor_bottom = 1.0
+		panel.offset_left = 8
+		panel.offset_top = 8
+		panel.offset_right = -8
+		panel.offset_bottom = -8
+	else:
+		# Landscape mode: Left 1/3, full height
+		panel.anchor_left = 0.0
+		panel.anchor_top = 0.0
+		panel.anchor_right = 0.33
+		panel.anchor_bottom = 1.0
+		panel.offset_left = 16
+		panel.offset_top = 16
+		panel.offset_right = -16
+		panel.offset_bottom = -16
 
 func set_target(target: Examinable) -> void:
 	current_target = target

@@ -188,7 +188,7 @@ func _on_input_device_changed(device: InputManager.InputDevice) -> void:
 # ============================================================================
 
 func set_portrait_mode(is_portrait: bool) -> void:
-	"""Reposition action preview for portrait mode (avoid overlapping touch controls)"""
+	"""Reposition action preview for portrait mode"""
 	if not panel:
 		return
 

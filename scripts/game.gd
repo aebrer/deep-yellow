@@ -42,10 +42,6 @@ var _switching_layout: bool = false  # Guard flag to prevent feedback loop
 ## Portrait layout container (created dynamically)
 var portrait_container: VBoxContainer = null
 
-## Touch controls (for portrait mode)
-var touch_controls: Control = null
-const TOUCH_CONTROLS_SCENE := preload("res://scenes/ui/touch_controls.tscn")
-
 func _ready() -> void:
 	# Connect to logging system for UI display
 	Log.message_logged.connect(_on_log_message)
@@ -265,9 +261,13 @@ func _switch_to_portrait() -> void:
 	if stats_panel and stats_panel.has_method("set_layout_mode"):
 		stats_panel.set_layout_mode(1)  # 1 = HORIZONTAL (can't reference enum from here)
 
-	# Reposition action preview to top-right (avoid overlapping touch controls)
+	# Reposition action preview to top-right
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(true)
+
+	# Reposition examination panel to bottom overlay
+	if examination_panel and examination_panel.has_method("set_portrait_mode"):
+		examination_panel.set_portrait_mode(true)
 
 	# 3. Build panel (compact - subsections horizontal)
 	core_inventory.get_parent().remove_child(core_inventory)
@@ -293,32 +293,7 @@ func _switch_to_portrait() -> void:
 	log_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_container.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Expand vertically
 
-	# 5. Touch controls at bottom (mouse_filter=IGNORE on containers allows mouse passthrough)
-	if not touch_controls:
-		touch_controls = TOUCH_CONTROLS_SCENE.instantiate()
-
-	if touch_controls.get_parent():
-		touch_controls.get_parent().remove_child(touch_controls)
-	portrait_container.add_child(touch_controls)
-	touch_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	touch_controls.size_flags_vertical = Control.SIZE_SHRINK_END  # Stay at bottom, don't expand
-	touch_controls.custom_minimum_size = Vector2(0, 150)  # Guarantee enough space for buttons (80 + 60 + 10 separation)
-	touch_controls.visible = true
-
-	# Pass camera reference to touch controls (use local player var)
-	if player:
-		var tactical_camera = player.get_node_or_null("CameraRig")
-		if tactical_camera and touch_controls.has_method("set_camera_reference"):
-			touch_controls.set_camera_reference(tactical_camera)
-			Log.system("Touch controls camera reference set")
-		else:
-			Log.warn(Log.Category.SYSTEM, "Cannot set touch controls camera reference - camera=%s, has_method=%s" % [tactical_camera != null, touch_controls.has_method("set_camera_reference")])
-	else:
-		Log.warn(Log.Category.SYSTEM, "Cannot set touch controls camera reference - player is null")
-
-	Log.system("Touch controls added with minimum size 150px")
-
-	Log.system("Portrait layout active with touch controls")
+	Log.system("Portrait layout active")
 
 	# Clear guard flag AFTER all deferred layout events complete
 	# This catches spurious resize events triggered by node reparenting
@@ -329,10 +304,6 @@ func _switch_to_landscape() -> void:
 	Log.system("Switching to landscape layout")
 	_switching_layout = true  # Set guard flag
 	current_layout = LayoutMode.LANDSCAPE
-
-	# Hide touch controls
-	if touch_controls:
-		touch_controls.visible = false
 
 	# Hide portrait container
 	if portrait_container:
@@ -389,6 +360,10 @@ func _switch_to_landscape() -> void:
 	# Restore action preview to bottom-right
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(false)
+
+	# Restore examination panel to left side
+	if examination_panel and examination_panel.has_method("set_portrait_mode"):
+		examination_panel.set_portrait_mode(false)
 
 	if core_inventory.get_parent():
 		core_inventory.get_parent().remove_child(core_inventory)
