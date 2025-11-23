@@ -1,0 +1,205 @@
+[gd_scene load_steps=2 format=3 uid="uid://core_inventory"]
+
+[ext_resource type="Script" path="res://scripts/ui/core_inventory.gd" id="1"]
+
+[node name="CoreInventory" type="VBoxContainer"]
+script = ExtResource("1")
+mouse_filter = 2
+
+[node name="InventoryTitle" type="Label" parent="."]
+layout_mode = 2
+text = "CORE INVENTORY"
+
+[node name="Spacer1" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="BodyPool" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="BodyTitle" type="Label" parent="BodyPool"]
+layout_mode = 2
+text = "BODY POOL"
+
+[node name="BodySlot0" type="HBoxContainer" parent="BodyPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="BodyPool/BodySlot0"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="BodyPool/BodySlot0"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="BodySlot1" type="HBoxContainer" parent="BodyPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="BodyPool/BodySlot1"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="BodyPool/BodySlot1"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="BodySlot2" type="HBoxContainer" parent="BodyPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="BodyPool/BodySlot2"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="BodyPool/BodySlot2"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="Spacer2" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="MindPool" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="MindTitle" type="Label" parent="MindPool"]
+layout_mode = 2
+text = "MIND POOL"
+
+[node name="MindSlot0" type="HBoxContainer" parent="MindPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="MindPool/MindSlot0"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MindPool/MindSlot0"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="MindSlot1" type="HBoxContainer" parent="MindPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="MindPool/MindSlot1"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MindPool/MindSlot1"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="MindSlot2" type="HBoxContainer" parent="MindPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="MindPool/MindSlot2"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="MindPool/MindSlot2"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="Spacer3" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="NullPool" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="NullTitle" type="Label" parent="NullPool"]
+layout_mode = 2
+text = "NULL POOL"
+
+[node name="NullSlot0" type="HBoxContainer" parent="NullPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="NullPool/NullSlot0"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="NullPool/NullSlot0"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="NullSlot1" type="HBoxContainer" parent="NullPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="NullPool/NullSlot1"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="NullPool/NullSlot1"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="NullSlot2" type="HBoxContainer" parent="NullPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="NullPool/NullSlot2"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="NullPool/NullSlot2"]
+layout_mode = 2
+text = "<empty>"
+
+[node name="Spacer4" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="LightPool" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="LightTitle" type="Label" parent="LightPool"]
+layout_mode = 2
+text = "LIGHT POOL"
+
+[node name="LightSlot0" type="HBoxContainer" parent="LightPool"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Icon" type="TextureRect" parent="LightPool/LightSlot0"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="LightPool/LightSlot0"]
+layout_mode = 2
+text = "<empty>"

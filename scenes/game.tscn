@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/ui/action_preview_ui.gd" id="5_action_preview"]
 [ext_resource type="PackedScene" uid="uid://stats_panel" path="res://scenes/ui/stats_panel.tscn" id="6_stats_panel"]
 [ext_resource type="PackedScene" uid="uid://cqk3y5v8x7m8p" path="res://scenes/ui/minimap.tscn" id="7_minimap"]
+[ext_resource type="PackedScene" uid="uid://core_inventory" path="res://scenes/ui/core_inventory.tscn" id="8_core_inventory"]
 
 [node name="Game" type="Control"]
 layout_mode = 3
@@ -169,18 +170,5 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="CoreInventory" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
+[node name="CoreInventory" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer" instance=ExtResource("8_core_inventory")]
 layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Title" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory"]
-layout_mode = 2
-text = "build"
-
-[node name="Items" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory"]
-layout_mode = 2
-text = "[PLACEHOLDER]
-[empty]
-[empty]
-[empty]
-[empty]"

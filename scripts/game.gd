@@ -12,7 +12,7 @@ extends Control
 @onready var game_3d: Node3D = $MarginContainer/HBoxContainer/LeftSide/ViewportPanel/MarginContainer/SubViewportContainer/SubViewport/Game3D
 @onready var log_text: RichTextLabel = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/VBoxContainer/LogText
 @onready var stats_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet/StatsPanel
-@onready var inventory_items: Label = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory/Items
+@onready var core_inventory_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory
 @onready var examination_panel: ExaminationPanel = $TextUIOverlay/ExaminationPanel
 @onready var action_preview_ui: ActionPreviewUI = $TextUIOverlay/ActionPreviewUI
 @onready var minimap: Control = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/Minimap/MarginContainer/AspectRatioContainer/MinimapControl
@@ -66,6 +66,11 @@ func _ready() -> void:
 	if stats_panel:
 		stats_panel.set_player(player)
 		Log.system("StatsPanel connected to player")
+
+	# Wire up core inventory to player
+	if core_inventory_panel:
+		core_inventory_panel.set_player(player)
+		Log.system("CoreInventory connected to player")
 
 	# Wire up minimap to grid and player
 	if minimap:
