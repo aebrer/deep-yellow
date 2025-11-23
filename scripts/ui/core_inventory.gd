@@ -74,7 +74,7 @@ func _ready():
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle B button to cancel reordering"""
-	if not PauseManager or not PauseManager.is_paused():
+	if not PauseManager or not PauseManager.is_paused:
 		return
 
 	# B button or ESC = cancel reorder
@@ -308,7 +308,7 @@ func _on_slot_unfocused(slot: Control) -> void:
 func _on_slot_input(event: InputEvent, slot: Control) -> void:
 	"""Handle input events for slot (A/LMB=toggle, X/RMB=reorder)"""
 	# Only handle input when paused
-	if not PauseManager or not PauseManager.is_paused():
+	if not PauseManager or not PauseManager.is_paused:
 		return
 
 	# Get slot index and pool type
