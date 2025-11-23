@@ -32,96 +32,48 @@ func _load_entities() -> void:
 	# Generic placeholder for unregistered entities
 	var unknown = EntityInfo.new()
 	unknown.entity_id = "unknown_entity"
-	var unknown_names: Array[String] = [
-		"████████",
-		"???",
-		"Unidentified Object",
-		"Unknown Entity"
-	]
-	unknown.name_levels = unknown_names
-	var unknown_descs: Array[String] = [
-		"[DATA EXPUNGED]",
-		"Movement detected. Origin unknown. Recommend maintaining distance.",
-		"Entity classification pending. Exhibits anomalous properties. [CLEARANCE REQUIRED]",
-		"Placeholder entity for examination system testing. Actual entity data will be loaded from Backrooms/SCP wikis."
-	]
-	unknown.description_levels = unknown_descs
-	var unknown_clearance: Array[int] = [0, 0, 1, 2]
-	unknown.clearance_required = unknown_clearance
-	var unknown_classes: Array[String] = ["[REDACTED]", "Unknown", "Unclassified", "Pending"]
-	unknown.object_class_levels = unknown_classes
-	unknown.threat_level = 1  # Low threat placeholder
+	unknown.entity_name = "Unknown Entity"
+	unknown.visual_description = "Movement detected. Origin unknown."
+	unknown.clearance_info[0] = ""  # No additional info at clearance 0
+	unknown.clearance_info[1] = "Entity classification pending. Exhibits anomalous properties."
+	unknown.clearance_info[2] = "Placeholder entity for examination system testing."
+	unknown.object_class = "Unclassified"
+	unknown.threat_level = 1
 	_entities["unknown_entity"] = unknown
 
-	# Create Level 0: Wall (same as wallpaper since walls ARE wallpaper)
+	# Create Level 0: Wall (yellow wallpaper)
 	var wall = EntityInfo.new()
 	wall.entity_id = "level_0_wall"
-	var wall_names: Array[String] = [
-		"Wall Surface",
-		"Wallpaper",
-		"Yellow Wallpaper",
-		"Level 0 Wall"
-	]
-	wall.name_levels = wall_names
-	var wall_descs: Array[String] = [
-		"A vertical surface.",
-		"Standard wallpaper covering the wall. Shows signs of age and moisture damage.",
-		"Yellow wallpaper with chevron patterns typical of Level 0. Water staining visible along edges.",
-		"Level 0's signature yellow wallpaper. Greyish-yellow with chevron patterns (#D4C5A0). Shows aging, water damage, and peeling in corners. The wallpaper appears to stretch infinitely in all directions. No anomalous properties beyond the unsettling monotony."
-	]
-	wall.description_levels = wall_descs
-	var wall_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
-	wall.clearance_required = wall_clearance
-	var wall_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
-	wall.object_class_levels = wall_classes
+	wall.entity_name = "Yellow Wallpaper"
+	wall.visual_description = "A vertical surface covered in greyish-yellow wallpaper with chevron patterns. Shows signs of age with water staining visible along edges and peeling in corners."
+	wall.clearance_info[0] = ""  # No additional info at clearance 0
+	wall.clearance_info[1] = "Standard office wallpaper typical of Level 0. Color approximately #D4C5A0."
+	wall.clearance_info[2] = "The wallpaper appears to stretch infinitely in all directions, creating an unsettling monotony. No anomalous properties detected beyond the psychological effect of endless repetition."
+	wall.object_class = "Safe"
 	wall.threat_level = 0
 	_entities["level_0_wall"] = wall
 
 	# Create Level 0: Floor (brown carpet)
 	var floor_tile = EntityInfo.new()
 	floor_tile.entity_id = "level_0_floor"
-	var floor_names: Array[String] = [
-		"Floor",
-		"Carpet",
-		"Brown Carpet",
-		"Level 0 Carpet"
-	]
-	floor_tile.name_levels = floor_names
-	var floor_descs: Array[String] = [
-		"A horizontal surface.",
-		"Worn carpet. Damp in places. The pattern is difficult to discern.",
-		"Brown carpet with geometric patterns. Moist texture. Shows heavy wear patterns from countless footsteps.",
-		"Level 0's brown carpet (approx. #8B6F4F). Loop pile construction, heavily worn. Perpetually damp, possibly from moisture in the air. Shows darkened traffic patterns. Slight chemical smell - likely mold or mildew. The dampness makes the carpet squelch slightly underfoot."
-	]
-	floor_tile.description_levels = floor_descs
-	var floor_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
-	floor_tile.clearance_required = floor_clearance
-	var floor_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
-	floor_tile.object_class_levels = floor_classes
+	floor_tile.entity_name = "Brown Carpet"
+	floor_tile.visual_description = "A horizontal surface covered in worn brown carpet with geometric patterns. Damp in places. Shows heavy wear patterns from countless footsteps."
+	floor_tile.clearance_info[0] = ""  # No additional info at clearance 0
+	floor_tile.clearance_info[1] = "Loop pile construction, heavily worn. Color approximately #8B6F4F. The pattern is difficult to discern due to age and traffic."
+	floor_tile.clearance_info[2] = "Perpetually damp, possibly from moisture in the air. Shows darkened traffic patterns suggesting high foot traffic. Slight chemical smell detected - likely mold or mildew growth. The dampness makes the carpet squelch slightly underfoot."
+	floor_tile.object_class = "Safe"
 	floor_tile.threat_level = 0
 	_entities["level_0_floor"] = floor_tile
 
 	# Create Level 0: Ceiling (acoustic tiles)
 	var ceiling = EntityInfo.new()
 	ceiling.entity_id = "level_0_ceiling"
-	var ceiling_names: Array[String] = [
-		"Ceiling",
-		"Ceiling Tiles",
-		"Acoustic Ceiling",
-		"Level 0 Ceiling"
-	]
-	ceiling.name_levels = ceiling_names
-	var ceiling_descs: Array[String] = [
-		"An overhead surface.",
-		"Suspended ceiling with acoustic tiles. Some tiles appear stained or discolored.",
-		"Off-white acoustic ceiling tiles with perforation pattern. Water stains visible. Fluorescent light panels intermittently placed.",
-		"Level 0's suspended acoustic ceiling. Off-white to beige tiles (#D8D0C0) with small perforations for sound dampening. Shows yellowing from age and water damage. Grid system visible between tiles. Fluorescent light panels provide inconsistent lighting - some flicker, others are dark. The ceiling height is approximately 8-9 feet, creating a claustrophobic office-like atmosphere."
-	]
-	ceiling.description_levels = ceiling_descs
-	var ceiling_clearance: Array[int] = [0, 0, 0, 0]  # Environment tiles never require clearance
-	ceiling.clearance_required = ceiling_clearance
-	var ceiling_classes: Array[String] = ["N/A", "N/A", "Safe", "Safe"]
-	ceiling.object_class_levels = ceiling_classes
+	ceiling.entity_name = "Acoustic Ceiling"
+	ceiling.visual_description = "An overhead suspended ceiling with off-white acoustic tiles featuring a perforation pattern. Some tiles appear stained or discolored. Fluorescent light panels are intermittently placed."
+	ceiling.clearance_info[0] = ""  # No additional info at clearance 0
+	ceiling.clearance_info[1] = "Off-white to beige tiles (color approximately #D8D0C0) with small perforations for sound dampening. Grid system visible between tiles. Shows yellowing from age and water damage."
+	ceiling.clearance_info[2] = "Fluorescent light panels provide inconsistent lighting - some flicker, others are completely dark. The ceiling height is approximately 8-9 feet, creating a claustrophobic office-like atmosphere typical of commercial spaces from the 1980s-1990s."
+	ceiling.object_class = "Safe"
 	ceiling.threat_level = 0
 	_entities["level_0_ceiling"] = ceiling
 
