@@ -354,8 +354,7 @@ func _on_slot_input(event: InputEvent, slot: Control) -> void:
 				else:
 					_drop_reorder(slot, pool_type, slot_index)
 			elif item:  # Only toggle if slot has an item
-				pool.toggle_item(slot_index)
-				Log.system("Toggled item in slot %d" % slot_index)
+				_toggle_item(pool_type, slot_index)
 			get_viewport().set_input_as_handled()
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
@@ -376,8 +375,7 @@ func _on_slot_input(event: InputEvent, slot: Control) -> void:
 				else:
 					_drop_reorder(slot, pool_type, slot_index)
 			elif item:  # Only toggle if slot has an item
-				pool.toggle_item(slot_index)
-				Log.system("Toggled item in slot %d" % slot_index)
+				_toggle_item(pool_type, slot_index)
 			get_viewport().set_input_as_handled()
 
 		elif event.button_index == JOY_BUTTON_B:
@@ -479,8 +477,34 @@ func _start_reorder(slot: Control, pool_type: Item.PoolType, slot_index: int) ->
 	# Emit signal to update action preview
 	reorder_state_changed.emit(true)
 
+func _toggle_item(pool_type: Item.PoolType, slot_index: int) -> void:
+	"""Toggle an item ON/OFF (consumes a turn)"""
+	if not player:
+		return
+
+	# Create toggle action
+	var action = ToggleItemAction.new(pool_type, slot_index)
+
+	if not action.can_execute(player):
+		Log.warn(Log.Category.SYSTEM, "Cannot toggle item at slot %d" % slot_index)
+		return
+
+	# Set as pending action (like movement)
+	player.pending_action = action
+	player.return_state = "IdleState"
+
+	# Unpause to allow execution
+	if PauseManager:
+		PauseManager.toggle_pause()
+
+	# Transition to pre-turn state to execute the action
+	if player.state_machine:
+		player.state_machine.change_state("PreTurnState")
+
+	Log.system("Queued toggle action for slot %d" % slot_index)
+
 func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target_slot_index: int) -> void:
-	"""Drop item at new position (reorder within same pool)"""
+	"""Drop item at new position (reorder within same pool, consumes a turn)"""
 	if not reordering_slot:
 		return
 
@@ -490,20 +514,34 @@ func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target
 		_cancel_reorder()
 		return
 
-	var pool = _get_pool(reordering_pool_type)
-	if not pool:
+	if not player:
 		_cancel_reorder()
 		return
 
-	# Reorder items in pool
-	pool.reorder(reordering_slot_index, target_slot_index)
-	Log.system("Reordered item from slot %d to slot %d in %s pool" % [
-		reordering_slot_index,
-		target_slot_index,
-		Item.PoolType.keys()[reordering_pool_type]
-	])
+	# Create reorder action
+	var action = ReorderItemAction.new(reordering_pool_type, reordering_slot_index, target_slot_index)
 
+	if not action.can_execute(player):
+		Log.warn(Log.Category.SYSTEM, "Cannot reorder items")
+		_cancel_reorder()
+		return
+
+	# Set as pending action (like movement)
+	player.pending_action = action
+	player.return_state = "IdleState"
+
+	# Cancel reorder UI state
 	_cancel_reorder()
+
+	# Unpause to allow execution
+	if PauseManager:
+		PauseManager.toggle_pause()
+
+	# Transition to pre-turn state to execute the action
+	if player.state_machine:
+		player.state_machine.change_state("PreTurnState")
+
+	Log.system("Queued reorder action from slot %d to %d" % [reordering_slot_index, target_slot_index])
 
 func _cancel_reorder() -> void:
 	"""Cancel current reorder operation"""
