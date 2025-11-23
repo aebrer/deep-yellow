@@ -36,10 +36,6 @@ func _execute_turn() -> void:
 	player.pending_action.execute(player)
 	player.pending_action = null
 
-	# Regenerate mana (NULL/2 per turn)
-	if player.stats:
-		player.stats.regenerate_mana()
-
 	# Execute all item pools (BODY → MIND → NULL → LIGHT)
 	player.execute_item_pools()
 

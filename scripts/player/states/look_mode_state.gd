@@ -166,19 +166,15 @@ func process_frame(_delta: float) -> void:
 # ============================================================================
 
 func _execute_wait_action() -> void:
-	"""Execute a wait action (pass turn without moving) while staying in look mode"""
+	"""Execute a wait action (pass turn without moving) via state machine flow"""
 	var wait_action = WaitAction.new()
 
-	Log.turn("[Look Mode] Player waiting (passing turn)")
-
-	# Execute the wait action directly (stay in look mode, don't transition)
+	# Set pending action and return state, then transition through turn flow
+	# PreTurnState → ExecutingTurnState → PostTurnState → back to LookModeState
 	if wait_action.can_execute(player):
-		wait_action.execute(player)
-
-		# TODO: Process enemy turns when enemy system is implemented
-		# TODO: Process environmental effects when physics system is implemented
-
-		Log.turn("===== TURN %d COMPLETE (from Look Mode) =====" % player.turn_count)
+		player.pending_action = wait_action
+		player.return_state = "LookModeState"  # Return here after turn completes
+		transition_to("PreTurnState")
 
 func _update_action_preview() -> void:
 	"""Update action preview with wait action"""

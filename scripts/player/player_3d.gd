@@ -27,6 +27,7 @@ signal turn_completed()
 # Grid state (SAME AS 2D VERSION)
 var grid_position: Vector2i = Vector2i(64, 64)
 var pending_action = null
+var return_state: String = "IdleState"  # State to return to after turn completes
 var turn_count: int = 0
 
 # Stats (NEW)

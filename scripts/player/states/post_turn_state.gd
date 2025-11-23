@@ -18,9 +18,10 @@ func enter() -> void:
 		if not ChunkManager.chunk_updates_completed.is_connected(_on_chunk_updates_complete):
 			ChunkManager.chunk_updates_completed.connect(_on_chunk_updates_complete, CONNECT_ONE_SHOT)
 	else:
-		# Fallback: if ChunkManager not found, skip directly to idle
-		Log.warn(Log.Category.STATE, "ChunkManager not found, skipping PostTurnState")
-		transition_to("IdleState")
+		# Fallback: if ChunkManager not found, skip directly to return state
+		var target_state = player.return_state if player and player.return_state else "IdleState"
+		Log.warn(Log.Category.STATE, "ChunkManager not found, skipping PostTurnState, returning to %s" % target_state)
+		transition_to(target_state)
 
 func handle_input(_event: InputEvent) -> void:
 	# Block ALL input during post-turn processing
@@ -29,5 +30,8 @@ func handle_input(_event: InputEvent) -> void:
 
 func _on_chunk_updates_complete() -> void:
 	"""Called when ChunkManager finishes chunk generation"""
-	Log.state("Chunk updates complete, returning to idle")
-	transition_to("IdleState")
+	var target_state = "IdleState"
+	if player and player.return_state:
+		target_state = player.return_state
+	Log.state("Chunk updates complete, returning to %s" % target_state)
+	transition_to(target_state)

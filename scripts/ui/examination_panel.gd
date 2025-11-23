@@ -27,6 +27,10 @@ func _ready() -> void:
 	# Hide by default
 	panel.visible = false
 
+	# Connect to pause manager to update position when pausing (portrait mode only)
+	if PauseManager:
+		PauseManager.pause_toggled.connect(_on_pause_toggled)
+
 func _build_panel() -> void:
 	"""Build examination panel (left third of screen)"""
 	panel = PanelContainer.new()
@@ -183,19 +187,12 @@ func hide_panel() -> void:
 	panel.visible = false
 
 func set_portrait_mode(is_portrait: bool) -> void:
-	"""Switch between portrait (bottom overlay) and landscape (left side) positioning"""
+	"""Switch between portrait (dynamic positioning) and landscape (left side) positioning"""
 	_is_portrait_mode = is_portrait
 
 	if is_portrait:
-		# Portrait mode: Bottom ~1/3 overlay, landscape orientation
-		panel.anchor_left = 0.0
-		panel.anchor_top = 0.67  # Start at 2/3 down the screen
-		panel.anchor_right = 1.0
-		panel.anchor_bottom = 1.0
-		panel.offset_left = 8
-		panel.offset_top = 8
-		panel.offset_right = -8
-		panel.offset_bottom = -8
+		# Portrait mode: Position based on pause state (top half paused, bottom half unpaused)
+		_update_portrait_position()
 	else:
 		# Landscape mode: Left 1/3, full height
 		panel.anchor_left = 0.0
@@ -206,6 +203,36 @@ func set_portrait_mode(is_portrait: bool) -> void:
 		panel.offset_top = 16
 		panel.offset_right = -16
 		panel.offset_bottom = -16
+
+func _update_portrait_position() -> void:
+	"""Update portrait mode position based on pause state"""
+	if not _is_portrait_mode:
+		return
+
+	var is_paused = PauseManager and PauseManager.is_paused
+
+	if is_paused:
+		# Paused: Top half of screen
+		panel.anchor_left = 0.0
+		panel.anchor_top = 0.0
+		panel.anchor_right = 1.0
+		panel.anchor_bottom = 0.5
+	else:
+		# Unpaused: Bottom half of screen
+		panel.anchor_left = 0.0
+		panel.anchor_top = 0.5
+		panel.anchor_right = 1.0
+		panel.anchor_bottom = 1.0
+
+	# Same offsets for both paused/unpaused
+	panel.offset_left = 8
+	panel.offset_top = 8
+	panel.offset_right = -8
+	panel.offset_bottom = -8
+
+func _on_pause_toggled(_is_paused: bool) -> void:
+	"""Update position when pause state changes (portrait mode only)"""
+	_update_portrait_position()
 
 func set_target(target: Examinable) -> void:
 	current_target = target

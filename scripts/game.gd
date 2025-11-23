@@ -256,8 +256,14 @@ func _switch_to_portrait() -> void:
 	Log.system("Portrait mode: Viewport container mouse_filter set to STOP")
 
 	# 2. Stats panel (compact - subsections horizontal)
+	# Wrap in PanelContainer to preserve black background
+	var stats_panel_container = PanelContainer.new()
+	stats_panel_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats_panel_container.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait_container.add_child(stats_panel_container)
+
 	character_sheet.get_parent().remove_child(character_sheet)
-	portrait_container.add_child(character_sheet)
+	stats_panel_container.add_child(character_sheet)
 	character_sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	character_sheet.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	character_sheet.visible = true
@@ -279,18 +285,30 @@ func _switch_to_portrait() -> void:
 		examination_panel.set_portrait_mode(true)
 
 	# 3. Build panel (compact - subsections horizontal)
+	# Wrap in PanelContainer to preserve black background
+	var inventory_panel_container = PanelContainer.new()
+	inventory_panel_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inventory_panel_container.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait_container.add_child(inventory_panel_container)
+
 	core_inventory.get_parent().remove_child(core_inventory)
-	portrait_container.add_child(core_inventory)
+	inventory_panel_container.add_child(core_inventory)
 	core_inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	core_inventory.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	core_inventory.visible = true
 
 	# 4. Minimap + Log row (compact info strip)
+	# Wrap in PanelContainer to preserve black background
+	var info_panel_container = PanelContainer.new()
+	info_panel_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_panel_container.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait_container.add_child(info_panel_container)
+
 	var info_row = HBoxContainer.new()
 	info_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	info_row.add_theme_constant_override("separation", 5)
-	portrait_container.add_child(info_row)
+	info_panel_container.add_child(info_row)
 
 	minimap_node.get_parent().remove_child(minimap_node)
 	info_row.add_child(minimap_node)
@@ -380,10 +398,6 @@ func _switch_to_landscape() -> void:
 
 	if core_inventory.get_parent():
 		core_inventory.get_parent().remove_child(core_inventory)
-	# Add spacer before inventory
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
-	right_side_vbox.add_child(spacer)
 	right_side_vbox.add_child(core_inventory)
 	core_inventory.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	core_inventory.visible = true

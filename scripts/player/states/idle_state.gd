@@ -68,8 +68,9 @@ func _move_forward() -> void:
 	var action = MovementAction.new(forward_direction)
 	if action.can_execute(player):
 		player.pending_action = action
+		player.return_state = "IdleState"  # Return here after turn completes
 		last_blocked_direction = Vector2i(-999, -999)  # Reset blocked tracking on success
-		transition_to("ExecutingTurnState")
+		transition_to("PreTurnState")
 	else:
 		# Only warn on initial press, not during hold-to-repeat (fast players can tell it's blocked)
 		if not rt_held:

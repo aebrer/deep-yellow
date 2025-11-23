@@ -40,22 +40,22 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Create panel (bottom-right corner)
+	# Create panel (center top)
 	panel = PanelContainer.new()
 	panel.name = "ActionPreviewPanel"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(panel)
 
-	# Position in bottom-right corner (auto-sizes based on content)
-	panel.anchor_left = 1.0   # Right edge
-	panel.anchor_top = 1.0    # Bottom edge
-	panel.anchor_right = 1.0
-	panel.anchor_bottom = 1.0
-	panel.offset_left = -280   # 280px from right edge
-	panel.offset_right = -16   # 16px margin from edge
-	panel.offset_bottom = -16  # 16px margin from bottom
-	# No offset_top - let content determine height
-	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN  # Grow upward from bottom
+	# Position at center top (auto-sizes based on content)
+	panel.anchor_left = 0.5   # Center horizontally
+	panel.anchor_top = 0.0    # Top edge
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.0
+	panel.offset_left = -140   # 280px wide panel, centered (-280/2)
+	panel.offset_right = 140   # 280px wide panel, centered (+280/2)
+	panel.offset_top = 16      # 16px margin from top
+	# No offset_bottom - let content determine height
+	panel.grow_vertical = Control.GROW_DIRECTION_END  # Grow downward from top
 
 	# Style panel (consistent with examination UI)
 	var style = StyleBoxFlat.new()
@@ -188,21 +188,5 @@ func _on_input_device_changed(device: InputManager.InputDevice) -> void:
 # ============================================================================
 
 func set_portrait_mode(is_portrait: bool) -> void:
-	"""Reposition action preview for portrait mode"""
-	if not panel:
-		return
-
-	if is_portrait:
-		# Move to top-right corner in portrait mode
-		panel.anchor_top = 0.0    # Top edge
-		panel.anchor_bottom = 0.0
-		panel.offset_top = 16     # 16px margin from top
-		panel.offset_bottom = 0   # No bottom offset
-		panel.grow_vertical = Control.GROW_DIRECTION_END  # Grow downward from top
-	else:
-		# Restore to bottom-right corner in landscape mode
-		panel.anchor_top = 1.0    # Bottom edge
-		panel.anchor_bottom = 1.0
-		panel.offset_top = 0      # No top offset
-		panel.offset_bottom = -16 # 16px margin from bottom
-		panel.grow_vertical = Control.GROW_DIRECTION_BEGIN  # Grow upward from bottom
+	"""Position is always center top in both modes - no change needed"""
+	pass  # Panel stays at center top in both portrait and landscape
