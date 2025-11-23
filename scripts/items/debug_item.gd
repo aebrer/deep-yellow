@@ -47,8 +47,10 @@ func _init():
 	# Scaling hint (CONSTANT - always shown)
 	scaling_hint = "Effects intensify with level"
 
-	# TODO: Add ground sprite when assets are ready
-	# ground_sprite = preload("res://assets/sprites/items/debug_item.png")
+	# Create simple red square placeholder sprite
+	var img = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1.0, 0.0, 0.0, 1.0))  # Red
+	ground_sprite = ImageTexture.create_from_image(img)
 
 # ============================================================================
 # CORE METHODS (override)
