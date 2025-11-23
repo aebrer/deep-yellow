@@ -13,6 +13,7 @@ var action_list: VBoxContainer  # Shows list of actions that will execute
 # State
 var current_actions: Array[Action] = []
 var current_input_device: InputManager.InputDevice = InputManager.InputDevice.MOUSE_KEYBOARD
+var is_paused: bool = false
 
 # ============================================================================
 # LIFECYCLE
@@ -28,6 +29,11 @@ func _ready() -> void:
 	if InputManager:
 		InputManager.input_device_changed.connect(_on_input_device_changed)
 		current_input_device = InputManager.current_input_device
+
+	# Connect to PauseManager for pause state changes
+	if PauseManager:
+		PauseManager.pause_toggled.connect(_on_pause_toggled)
+		is_paused = PauseManager.is_paused
 
 	# Hide by default (will show when actions provided)
 	panel.visible = false
@@ -101,11 +107,17 @@ func _build_ui() -> void:
 
 func show_preview(actions: Array[Action], player) -> void:
 	"""Display preview for given actions"""
+	# Store actions for later (when unpausing)
+	current_actions = actions
+
 	if actions.is_empty():
 		hide_preview()
 		return
 
-	current_actions = actions
+	# If paused, show pause message instead of actions
+	if is_paused:
+		_show_pause_message()
+		return
 
 	# Clear previous action list
 	for child in action_list.get_children():
@@ -168,11 +180,27 @@ func _add_action_entry(info: Dictionary) -> void:
 
 func _update_header() -> void:
 	"""Update header text based on current input device"""
+	if is_paused:
+		header_label.text = "GAME PAUSED"
+		return
+
 	var button_text = "[Left Click]"
 	if current_input_device == InputManager.InputDevice.GAMEPAD:
 		button_text = "[RT]"
 
 	header_label.text = "%s Next Turn" % button_text
+
+func _show_pause_message() -> void:
+	"""Show pause message instead of action preview"""
+	# Clear action list
+	for child in action_list.get_children():
+		child.queue_free()
+
+	# Update header to show pause state
+	header_label.text = "GAME PAUSED"
+
+	# Show panel
+	panel.visible = true
 
 # ============================================================================
 # SIGNALS
@@ -182,6 +210,18 @@ func _on_input_device_changed(device: InputManager.InputDevice) -> void:
 	"""Handle input device switching"""
 	current_input_device = device
 	_update_header()
+
+func _on_pause_toggled(paused: bool) -> void:
+	"""Handle pause state changes"""
+	is_paused = paused
+
+	if paused:
+		# Show pause message
+		_show_pause_message()
+	else:
+		# When unpausing, hide the pause message
+		# The game will call show_preview() again with current actions
+		hide_preview()
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
