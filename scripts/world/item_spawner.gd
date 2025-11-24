@@ -211,9 +211,10 @@ func _get_tile_at_world_pos(chunk, world_pos: Vector2i):
 		var local_y = world_pos.y - subchunk.world_position.y
 
 		# Check if position is in this subchunk
-		if local_x >= 0 and local_x < subchunk.tile_data.size():
-			if local_y >= 0 and local_y < subchunk.tile_data[0].size():
-				return subchunk.tile_data[local_x][local_y]
+		# CRITICAL: tile_data is stored as [y][x] (row-major), not [x][y]
+		if local_y >= 0 and local_y < subchunk.tile_data.size():
+			if local_x >= 0 and local_x < subchunk.tile_data[0].size():
+				return subchunk.tile_data[local_y][local_x]
 
 	return null
 
