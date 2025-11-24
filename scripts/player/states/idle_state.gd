@@ -49,7 +49,7 @@ func handle_input(event: InputEvent) -> void:
 	# Initial movement press handled in process_frame for consistent timing
 
 func _move_forward() -> void:
-	"""Move forward in camera direction"""
+	"""Move forward in camera direction (or pick up item if present)"""
 	if not player:
 		return
 
@@ -62,10 +62,18 @@ func _move_forward() -> void:
 		# Log.movement("No forward direction, ignoring move")  # Too verbose
 		return
 
-	# Log.movement_info("Moving forward: direction=%s" % forward_direction)  # Too verbose
+	# Check if there's an item at the target position
+	var target_position = player.grid_position + forward_direction
+	var item_at_target = _get_item_at_position(target_position)
 
-	# Create and execute movement action
-	var action = MovementAction.new(forward_direction)
+	# Create appropriate action (pickup or movement)
+	var action: Action
+	if item_at_target:
+		action = PickupItemAction.new(target_position, item_at_target)
+	else:
+		action = MovementAction.new(forward_direction)
+
+	# Execute action
 	if action.can_execute(player):
 		player.pending_action = action
 		player.return_state = "IdleState"  # Return here after turn completes
@@ -132,7 +140,7 @@ func process_frame(delta: float) -> void:
 		last_blocked_direction = Vector2i(-999, -999)  # Reset blocked tracking on release
 
 func _update_action_preview() -> void:
-	"""Update action preview with current forward movement"""
+	"""Update action preview with current forward movement or item pickup"""
 	if not player:
 		return
 
@@ -147,9 +155,33 @@ func _update_action_preview() -> void:
 		player.action_preview_changed.emit(empty_actions)
 		return
 
-	# Create movement action for preview (not executed yet)
-	var preview_action = MovementAction.new(forward_direction)
+	# Check if there's an item at the target position
+	var target_position = player.grid_position + forward_direction
+	var item_at_target = _get_item_at_position(target_position)
+
+	var preview_action: Action
+
+	if item_at_target:
+		# Show pickup action
+		preview_action = PickupItemAction.new(target_position, item_at_target)
+	else:
+		# Show movement action
+		preview_action = MovementAction.new(forward_direction)
 
 	# Emit preview signal with typed array
 	var actions: Array[Action] = [preview_action]
 	player.action_preview_changed.emit(actions)
+
+func _get_item_at_position(grid_pos: Vector2i) -> Dictionary:
+	"""Check if there's an item at the given grid position
+
+	Args:
+		grid_pos: Grid coordinates to check
+
+	Returns:
+		Item data Dictionary if item exists, empty Dictionary otherwise
+	"""
+	if not player or not player.grid or not player.grid.item_renderer:
+		return {}
+
+	return player.grid.item_renderer.get_item_at(grid_pos)
