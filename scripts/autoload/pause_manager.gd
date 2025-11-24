@@ -87,15 +87,9 @@ func _enter_hud_mode():
 	for i in range(min(3, focusable_elements.size())):
 		Log.system("  - Element %d: %s" % [i, focusable_elements[i].name])
 
-	# Focus first element (only for controller, not mouse)
-	if focusable_elements.size() > 0:
-		if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
-			Log.system("PauseManager: Focusing first element '%s' (controller mode)" % focusable_elements[0].name)
-			set_hud_focus(focusable_elements[0])
-		else:
-			Log.system("PauseManager: Skipping auto-focus (mouse/keyboard mode)")
-	else:
-		Log.warn(Log.Category.SYSTEM, "PauseManager: No focusable elements found!")
+	# NOTE: Focus is player-determined, not auto-grabbed by PauseManager
+	# Individual UI panels (CoreInventory, ItemSlotSelectionPanel) handle their own focus
+	# Auto-grabbing focus here caused race conditions with panel focus management
 
 	Log.system("Entered HUD interaction mode (paused)")
 

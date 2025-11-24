@@ -2,7 +2,7 @@
 
 **Project**: Backrooms Power Crawl - Turn-based Roguelike in Godot 4.x
 **Developer**: Drew Brereton (aebrer) - Python/generative art background, new to game dev
-**Last Updated**: 2025-11-13 (Added critical rules for agentic texture workflow - no pink elephants!)
+**Last Updated**: 2025-11-24 (Added "Trust User Instincts" rule - user hunches are often RIGHT!)
 
 ---
 
@@ -74,6 +74,14 @@ to be certain. Does this align with what you're seeing?"
 - Ask clarifying questions
 - Model uncertainty - it's okay to say "I'm not sure" or "I need more info"
 - Only then propose a hypothesis to verify
+
+**CRITICAL: Trust the User's Instincts**
+- **If the user mentions a hunch, PRIORITIZE IT even if it seems unrelated or "dumb"**
+- The user knows their codebase and has context you don't have
+- User instincts are often correct even when the connection isn't immediately obvious
+- Don't dismiss user observations as "probably unrelated" - investigate them thoroughly first
+- Example: User said "gray focus box and auto-selection are related" - seemed unrelated at first, but they were RIGHT
+- The user catches patterns and correlations from observing the actual running game that you can't see from code alone
 
 ---
 

@@ -28,6 +28,7 @@ var current_pool: ItemPool = null
 var current_pool_type: Item.PoolType = Item.PoolType.BODY
 var player_ref: Player3D = null
 var item_position: Vector2i = Vector2i.ZERO  ## World position of item being picked up
+var _accepting_input: bool = false  ## Only accept button presses after panel fully set up
 
 func _ready() -> void:
 	# Fill screen for centering
@@ -99,6 +100,8 @@ func show_slot_selection(item: Item, pool: ItemPool, player: Player3D, position:
 		player: Player reference
 		position: World position of item (for removal after pickup)
 	"""
+	Log.system("show_slot_selection: %s at %s" % [item.item_name, position])
+
 	current_item = item
 	current_pool = pool
 	current_pool_type = pool.pool_type
@@ -113,6 +116,12 @@ func show_slot_selection(item: Item, pool: ItemPool, player: Player3D, position:
 
 	# Show panel and pause game via PauseManager
 	visible = true
+	_accepting_input = false  # Block input until after focus is set
+
+	# CRITICAL FIX: Wait one frame before pausing to ensure destruction completes
+	# Even though we use free() instead of queue_free(), this provides extra safety
+	await get_tree().process_frame
+
 	if PauseManager:
 		PauseManager.toggle_pause()
 
@@ -131,11 +140,27 @@ func _update_panel_position() -> void:
 
 func _rebuild_content() -> void:
 	"""Rebuild UI content for current item/pool"""
-	# Clear old content
+	Log.system("_rebuild_content: clearing %d old children" % scroll_container.get_node("ContentVBox").get_child_count())
+
+	# Clear old content - CRITICAL: Remove from group and destroy immediately
 	var vbox = scroll_container.get_node("ContentVBox")
 	for child in vbox.get_children():
-		child.queue_free()
+		# Release focus from old buttons before deleting
+		if child is Button and child.has_focus():
+			child.release_focus()
+
+		# CRITICAL FIX: Remove from hud_focusable group BEFORE destruction
+		# This prevents PauseManager from finding stale buttons
+		if child.is_in_group("hud_focusable"):
+			child.remove_from_group("hud_focusable")
+
+		# CRITICAL FIX: Use free() instead of queue_free() for immediate destruction
+		# queue_free() is deferred until end of frame, leaving old buttons in scene tree
+		# Old buttons would still be found by PauseManager and get focused, causing autocombine
+		child.free()
 	slot_buttons.clear()
+
+	Log.system("_rebuild_content: building UI for %s" % (current_item.item_name if current_item else "null"))
 
 	# Header
 	var header = Label.new()
@@ -237,6 +262,21 @@ func _create_slot_button(slot_index: int) -> Button:
 	button.add_theme_font_size_override("font_size", 14)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+	# Create custom yellow highlight style (replaces Godot's gray focus box)
+	var focus_style = StyleBoxFlat.new()
+	focus_style.bg_color = Color(1.0, 1.0, 0.5, 0.3)  # Yellow transparent background
+	focus_style.border_color = Color(1.0, 1.0, 0.5, 0.8)  # Yellow border
+	focus_style.set_border_width_all(2)
+	focus_style.content_margin_left = 4
+	focus_style.content_margin_right = 4
+	focus_style.content_margin_top = 2
+	focus_style.content_margin_bottom = 2
+
+	# Override BOTH normal and focus styleboxes to disable Godot's default gray indicator
+	# This matches the CoreInventory pattern for the custom "janky yellow" selector
+	button.add_theme_stylebox_override("normal", StyleBoxFlat.new())  # Transparent normal state
+	button.add_theme_stylebox_override("focus", focus_style)  # Yellow when focused
+
 	# Add to focusable group for PauseManager pattern
 	button.add_to_group("hud_focusable")
 
@@ -249,6 +289,19 @@ func _on_slot_selected(slot_index: int, action_type: ActionType) -> void:
 		slot_index: Selected slot
 		action_type: What action to perform
 	"""
+	Log.system("_on_slot_selected: slot=%d, action=%d, visible=%s, accepting=%s, item=%s" % [
+		slot_index,
+		action_type,
+		visible,
+		_accepting_input,
+		current_item.item_name if current_item else "null"
+	])
+
+	# Ignore if panel not ready (prevents queued-for-deletion buttons from firing)
+	if not visible or not _accepting_input:
+		Log.system("  Ignoring - panel not ready (visible=%s, accepting=%s)" % [visible, _accepting_input])
+		return
+
 	# Create action to execute the pickup
 	var action = PickupToSlotAction.new(current_item, current_pool_type, slot_index, action_type, item_position)
 
@@ -291,7 +344,12 @@ func _on_pause_toggled(is_paused: bool) -> void:
 		# Auto-focus first button for gamepad navigation
 		if not slot_buttons.is_empty():
 			slot_buttons[0].grab_focus()
+
+		# Enable input acceptance after panel is fully set up
+		_accepting_input = true
 	else:
+		# Disable input acceptance when unpausing
+		_accepting_input = false
 		# Disable focus when unpausing
 		for button in slot_buttons:
 			button.focus_mode = Control.FOCUS_NONE
@@ -303,14 +361,16 @@ func _on_pause_toggled(is_paused: bool) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle gamepad-specific inputs (A/B buttons)"""
-	if not visible:
+	if not visible or not _accepting_input:
 		return
 
 	if event is InputEventJoypadButton:
 		# A button to activate focused button
 		if event.button_index == JOY_BUTTON_A and event.pressed:
 			var focused = get_viewport().gui_get_focus_owner()
-			if focused and focused is Button:
+			# CRITICAL: Only activate if focused button is in our current slot_buttons array
+			# This prevents activating old buttons that are being destroyed
+			if focused and focused is Button and focused in slot_buttons:
 				focused.pressed.emit()
 				get_viewport().set_input_as_handled()
 			return
@@ -329,20 +389,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(_delta: float) -> void:
 	"""Handle RT/A button activation of focused button"""
-	if not visible:
+	if not visible or not _accepting_input:
 		return
 
 	# Check for move_confirm (RT/A/Space/LMB via InputManager)
 	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
 		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused is Button:
+		# CRITICAL: Only activate if focused button is in our current slot_buttons array
+		# This prevents activating old buttons that are being queue_free()'d
+		if focused and focused is Button and focused in slot_buttons:
 			focused.pressed.emit()
 			return
 
 	# Also check ui_accept (standard Godot action for button activation)
 	if Input.is_action_just_pressed("ui_accept"):
 		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused is Button:
+		# CRITICAL: Only activate if focused button is in our current slot_buttons array
+		if focused and focused is Button and focused in slot_buttons:
 			focused.pressed.emit()
 			return
 
