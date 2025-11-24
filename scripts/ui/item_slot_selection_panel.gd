@@ -262,7 +262,12 @@ func _create_slot_button(slot_index: int) -> Button:
 	button.add_theme_font_size_override("font_size", 14)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	# Create custom yellow highlight style (replaces Godot's gray focus box)
+	# Create transparent normal state (no background when not focused)
+	var normal_style = StyleBoxFlat.new()
+	normal_style.bg_color = Color(0, 0, 0, 0)  # Fully transparent
+	normal_style.set_border_width_all(0)  # No border
+
+	# Create custom yellow highlight style (when focused)
 	var focus_style = StyleBoxFlat.new()
 	focus_style.bg_color = Color(1.0, 1.0, 0.5, 0.3)  # Yellow transparent background
 	focus_style.border_color = Color(1.0, 1.0, 0.5, 0.8)  # Yellow border
@@ -273,9 +278,10 @@ func _create_slot_button(slot_index: int) -> Button:
 	focus_style.content_margin_bottom = 2
 
 	# Override BOTH normal and focus styleboxes to disable Godot's default gray indicator
-	# This matches the CoreInventory pattern for the custom "janky yellow" selector
-	button.add_theme_stylebox_override("normal", StyleBoxFlat.new())  # Transparent normal state
-	button.add_theme_stylebox_override("focus", focus_style)  # Yellow when focused
+	# Normal: Fully transparent (invisible when not focused)
+	# Focus: Yellow highlight (visible when focused)
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("focus", focus_style)
 
 	# Add to focusable group for PauseManager pattern
 	button.add_to_group("hud_focusable")
@@ -341,9 +347,8 @@ func _on_pause_toggled(is_paused: bool) -> void:
 			cancel_button.focus_mode = Control.FOCUS_ALL
 			cancel_button.mouse_filter = Control.MOUSE_FILTER_STOP
 
-		# Auto-focus first button for gamepad navigation
-		if not slot_buttons.is_empty():
-			slot_buttons[0].grab_focus()
+		# NOTE: Focus is player-determined, not auto-grabbed
+		# Player navigates with mouse or gamepad to select option
 
 		# Enable input acceptance after panel is fully set up
 		_accepting_input = true
