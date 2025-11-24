@@ -301,3 +301,48 @@ func _on_pause_toggled(is_paused: bool) -> void:
 			cancel_button.focus_mode = Control.FOCUS_NONE
 			cancel_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+func _unhandled_input(event: InputEvent) -> void:
+	"""Handle gamepad-specific inputs (A/B buttons)"""
+	if not visible:
+		return
+
+	if event is InputEventJoypadButton:
+		# A button to activate focused button
+		if event.button_index == JOY_BUTTON_A and event.pressed:
+			var focused = get_viewport().gui_get_focus_owner()
+			if focused and focused is Button:
+				focused.pressed.emit()
+				get_viewport().set_input_as_handled()
+			return
+
+		# B button to cancel (industry standard)
+		if event.button_index == JOY_BUTTON_B and event.pressed:
+			_on_cancel_pressed()
+			get_viewport().set_input_as_handled()
+			return
+
+	# ESC or pause action to cancel
+	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
+		_on_cancel_pressed()
+		get_viewport().set_input_as_handled()
+		return
+
+func _process(_delta: float) -> void:
+	"""Handle RT/A button activation of focused button"""
+	if not visible:
+		return
+
+	# Check for move_confirm (RT/A/Space/LMB via InputManager)
+	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
+		var focused = get_viewport().gui_get_focus_owner()
+		if focused and focused is Button:
+			focused.pressed.emit()
+			return
+
+	# Also check ui_accept (standard Godot action for button activation)
+	if Input.is_action_just_pressed("ui_accept"):
+		var focused = get_viewport().gui_get_focus_owner()
+		if focused and focused is Button:
+			focused.pressed.emit()
+			return
+
