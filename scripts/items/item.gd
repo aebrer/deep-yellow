@@ -30,12 +30,6 @@ enum PoolType {
 	LIGHT   # Light generation (single slot)
 }
 
-enum Rarity {
-	COMMON,   # Frequently spawns
-	RARE,     # Occasional spawns
-	UNIQUE    # Very rare, special items
-}
-
 # ============================================================================
 # EXPORTED PROPERTIES (set in editor/subclasses)
 # ============================================================================
@@ -43,7 +37,7 @@ enum Rarity {
 @export var item_id: String = ""  ## Unique identifier (e.g., "brass_knuckles")
 @export var item_name: String = ""  ## Display name shown to player
 @export var pool_type: PoolType = PoolType.BODY  ## Which pool this item belongs to
-@export var rarity: Rarity = Rarity.COMMON  ## Spawn frequency
+@export var rarity: ItemRarity.Tier = ItemRarity.Tier.COMMON  ## Spawn frequency tier
 
 # Visual description (ALWAYS shown at all clearance levels - what it looks like)
 @export_group("Descriptions")

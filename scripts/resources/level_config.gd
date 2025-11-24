@@ -177,7 +177,13 @@ class_name LevelConfig
 
 @export_group("Item Spawning")
 
+## Permitted items that can spawn on this level (rarity-based system)
+## Populate with Item resources (e.g., DebugItem.new(), AlmondWater.new())
+## ItemSpawner uses this list + rarity + corruption to determine spawns
+var permitted_items: Array[Item] = []
+
 ## Item spawn rules: [{"item_scene": path, "weight": float}]
+## DEPRECATED: Use permitted_items instead for new rarity-based system
 @export var item_spawn_table: Array[Dictionary] = []
 
 ## Item density (0.0 = rare, 1.0 = common)
@@ -309,6 +315,15 @@ func get_random_item() -> String:
 			return entry.get("item_scene", "")
 
 	return ""
+
+## Add an item to the permitted items list
+func add_permitted_item(item: Item) -> void:
+	"""Add an item that can spawn on this level
+
+	Args:
+		item: Item resource (e.g., DebugItem.new())
+	"""
+	permitted_items.append(item)
 
 ## Get a random exit destination level ID
 func get_random_exit_destination() -> int:

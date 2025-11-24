@@ -102,6 +102,9 @@ entity density: very low"""
 	# ========================================================================
 	item_density = 0.05  # Sparse items
 
+	# Permitted items for Level 0 (rarity-based spawning)
+	add_permitted_item(DebugItem.new())  # DEBUG rarity - always spawns for testing
+
 	# Starting items for Level 0 (basic survival gear)
 	starting_items = [
 		# "flashlight",  # Future: items

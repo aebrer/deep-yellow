@@ -25,7 +25,7 @@ Design Intent:
 const ITEM_ID = "debug_item"
 const ITEM_NAME = "DEBUG_ITEM"
 const POOL = Item.PoolType.NULL
-const RARITY_TYPE = Item.Rarity.COMMON
+const RARITY_TYPE = ItemRarity.Tier.DEBUG  # Always spawns for testing
 
 # Mana bonus per level
 const MANA_PER_LEVEL = 5

@@ -14,6 +14,9 @@ const CELL_SIZE := Vector3(2.0, 1.0, 2.0)  # X, Y (height), Z - doubled for visi
 # GridMap reference
 @onready var grid_map: GridMap = $GridMap
 
+# Item rendering
+var item_renderer: ItemRenderer = null
+
 # Grid data (same as 2D version)
 var grid_size: Vector2i = GRID_SIZE
 var walkable_cells: Dictionary = {}  # Vector2i -> bool (using Dictionary for O(1) erase instead of O(n))
@@ -49,6 +52,10 @@ func _ready() -> void:
 	# Default is 8, higher values reduce update overhead during chunk population
 	# Trade-off: More draw calls per octant (acceptable for modern renderers)
 	grid_map.cell_octant_size = 16
+
+	# Create item renderer
+	item_renderer = ItemRenderer.new()
+	add_child(item_renderer)
 
 	print("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
 
@@ -294,6 +301,10 @@ func load_chunk(chunk: Chunk) -> void:
 	# 	load_time
 	# ])  # Too verbose (profiling was useful for optimization, less needed now)
 
+	# Render items in chunk
+	if item_renderer:
+		item_renderer.render_chunk_items(chunk)
+
 func unload_chunk(chunk: Chunk) -> void:
 	"""Unload a chunk from GridMap
 
@@ -320,6 +331,10 @@ func unload_chunk(chunk: Chunk) -> void:
 
 			# Remove from walkable cells
 			walkable_cells.erase(world_tile_pos)
+
+	# Unload item billboards
+	if item_renderer:
+		item_renderer.unload_chunk_items(chunk)
 
 	Log.grid("Unloaded chunk %s from GridMap" % chunk.position)
 

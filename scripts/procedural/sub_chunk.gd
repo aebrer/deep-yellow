@@ -24,6 +24,7 @@ var world_position: Vector2i  # Absolute tile position in world
 var tile_data: Array[Array] = []  # 16×16 tile types (layer 0)
 var ceiling_data: Array[Array] = []  # 16×16 ceiling tiles (layer 1)
 var entities: Array[int] = []  # Entity IDs spawned in this sub-chunk
+var world_items: Array[Dictionary] = []  # Serialized WorldItem data (persists across chunk load/unload)
 
 # ============================================================================
 # INITIALIZATION
@@ -136,12 +137,53 @@ func _is_in_bounds(pos: Vector2i) -> bool:
 	return pos.x >= 0 and pos.x < SIZE and pos.y >= 0 and pos.y < SIZE
 
 # ============================================================================
+# WORLD ITEM MANAGEMENT
+# ============================================================================
+
+func add_world_item(world_item_data: Dictionary) -> void:
+	"""Add serialized world item data to this sub-chunk
+
+	Args:
+		world_item_data: Serialized WorldItem (from WorldItem.to_dict())
+	"""
+	world_items.append(world_item_data)
+
+func remove_world_item(world_position: Vector2i) -> bool:
+	"""Remove world item at position (when picked up)
+
+	Args:
+		world_position: World tile coordinates
+
+	Returns:
+		true if item was found and removed
+	"""
+	for i in range(world_items.size()):
+		var item_data = world_items[i]
+		var pos_data = item_data.get("world_position", {"x": 0, "y": 0})
+		var item_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+
+		if item_pos == world_position:
+			world_items.remove_at(i)
+			return true
+
+	return false
+
+func get_world_items_in_subchunk() -> Array[Dictionary]:
+	"""Get all world items in this sub-chunk
+
+	Returns:
+		Array of serialized WorldItem data
+	"""
+	return world_items.duplicate()
+
+# ============================================================================
 # DEBUG
 # ============================================================================
 
 func _to_string() -> String:
-	return "SubChunk(local=%s, world=%s, walkable=%d)" % [
+	return "SubChunk(local=%s, world=%s, walkable=%d, items=%d)" % [
 		local_position,
 		world_position,
-		get_walkable_count()
+		get_walkable_count(),
+		world_items.size()
 	]
