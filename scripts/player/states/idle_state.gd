@@ -172,8 +172,11 @@ func _update_action_preview() -> void:
 		# Show movement action
 		preview_action = MovementAction.new(forward_direction)
 
-	# Emit preview signal with typed array
-	var actions: Array[Action] = [preview_action]
+	# Add look mode hint
+	var look_mode_hint = ControlHintAction.new("👁", "Look Mode", "[LT/RMB]")
+
+	# Emit preview signal with typed array (main action + look mode hint)
+	var actions: Array[Action] = [preview_action, look_mode_hint]
 	player.action_preview_changed.emit(actions)
 
 func _get_item_at_position(grid_pos: Vector2i) -> Dictionary:

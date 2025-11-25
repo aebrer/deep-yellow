@@ -407,7 +407,7 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 			entity_id = "level_0_ceiling"
 			# CRITICAL: Y=2.98, NOT Y=3 or Y=4! Ceiling positioned just below wall tops for tactical camera.
 			# Walls top at Y=3, ceiling at Y=2.98 allows tactical camera to see maze layout from above.
-			# Matches grid_mesh_library.tres ceiling collision height.
+			# Matches MeshLibrary ceiling collision height.
 			world_pos.y = 2.98
 
 	# Load and instantiate examination tile scene
