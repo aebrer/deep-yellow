@@ -197,7 +197,7 @@ func _is_sub_chunk_in_bounds(pos: Vector2i) -> bool:
 		   pos.y >= 0 and pos.y < SUB_CHUNKS_PER_SIDE
 
 # ============================================================================
-# DEBUG
+# UTILITY
 # ============================================================================
 
 func _to_string() -> String:

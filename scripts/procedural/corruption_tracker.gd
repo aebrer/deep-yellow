@@ -29,12 +29,6 @@ func increase_corruption(level_id: int, amount: float, max_value: float) -> void
 
 	corruption_by_level[level_id] = new_value
 
-	# Log.grid("Level %d corruption: %.2f (+%.2f)" % [
-	# 	level_id,
-	# 	new_value,
-	# 	amount
-	# ])  # Too verbose (fires every new chunk)
-
 func get_corruption(level_id: int) -> float:
 	"""Get current corruption value for a level
 
@@ -94,7 +88,7 @@ func reset_all() -> void:
 	Log.system("All corruption reset (new run)")
 
 # ============================================================================
-# DEBUG
+# UTILITY
 # ============================================================================
 
 func get_all_corruption_levels() -> Dictionary:

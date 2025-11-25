@@ -182,13 +182,6 @@ func _update_chunks_around_player() -> void:
 			var distance := player_chunk.distance_to(chunk_pos)
 			chunks_to_queue.append({"key": chunk_key, "distance": distance})
 
-	# Log if we found chunks to queue
-	# if not chunks_to_queue.is_empty():
-	# 	Log.grid("Found %d new chunks to queue around player chunk %s" % [
-	# 		chunks_to_queue.size(),
-	# 		player_chunk
-	# 	])  # Too verbose
-
 	# Sort by distance (nearest first - CRITICAL for performance!)
 	chunks_to_queue.sort_custom(func(a, b): return a.distance < b.distance)
 
@@ -197,7 +190,6 @@ func _update_chunks_around_player() -> void:
 	var chunks_to_add := chunks_to_queue.size()
 	if initial_load_complete and chunks_to_add > 1:
 		chunks_to_add = 1
-		# Log.grid("Limiting to 1 chunk per turn (post-initial load)")  # Too verbose
 
 	for i in range(chunks_to_add):
 		generating_chunks.append(chunks_to_queue[i].key)
@@ -229,11 +221,6 @@ func _check_player_chunk_change() -> void:
 
 			corruption_tracker.increase_corruption(player_level, corruption_amount, 0.0)
 
-			# Log.grid("Entered new chunk %s (visited: %d, corruption: %.2f)" % [
-			# 	player_chunk,
-			# 	visited_chunks.size(),
-			# 	corruption_tracker.get_corruption(player_level)
-			# ])  # Too verbose (fires every new chunk)
 
 func _process_generation_queue() -> void:
 	"""Send chunks to worker thread for generation"""
@@ -400,9 +387,6 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# Only warn once per session
 		if loaded_chunks.size() == 1:
 			push_warning("[ChunkManager] Grid3D not found in scene tree - procedural generation disabled")
-
-	# Log chunk generation
-	# Log.grid("Generated chunk %s on Level %d" % [chunk_pos, level_id])  # Too verbose (per-chunk)
 
 	# Log first few chunks and progress milestones to System for visibility
 	if loaded_chunks.size() <= 5 or loaded_chunks.size() % 25 == 0:
@@ -723,7 +707,7 @@ func start_new_run(new_seed: int = -1) -> void:
 # ============================================================================
 
 # ============================================================================
-# DEBUG
+# UTILITY
 # ============================================================================
 
 func get_loaded_chunk_count() -> int:

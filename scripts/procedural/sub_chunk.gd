@@ -177,7 +177,7 @@ func get_world_items_in_subchunk() -> Array[Dictionary]:
 	return world_items.duplicate()
 
 # ============================================================================
-# DEBUG
+# UTILITY
 # ============================================================================
 
 func _to_string() -> String:

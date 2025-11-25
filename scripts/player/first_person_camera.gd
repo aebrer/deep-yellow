@@ -73,7 +73,6 @@ func _process(delta: float) -> void:
 	if abs(right_stick_y) > rotation_deadzone:
 		v_pivot.rotation_degrees.x -= right_stick_y * rotation_speed * delta
 		v_pivot.rotation_degrees.x = clamp(v_pivot.rotation_degrees.x, pitch_min, pitch_max)
-		# Log.camera("FP Camera pitch updated: %.2f (stick_y=%.2f)" % [v_pivot.rotation_degrees.x, right_stick_y])  # Too verbose
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
@@ -335,12 +334,6 @@ func _raycast_gridmap() -> Dictionary:
 	if not result.is_empty():
 		var hit_pos: Vector3 = result.get("position")
 		var hit_normal: Vector3 = result.get("normal")
-		# Log.system("📍 Raycast HIT: origin=%.1f,%.1f,%.1f dir=%.2f,%.2f,%.2f → hit=%.1f,%.1f,%.1f normal=%s" % [
-		# 	ray_origin.x, ray_origin.y, ray_origin.z,
-		# 	ray_direction.x, ray_direction.y, ray_direction.z,
-		# 	hit_pos.x, hit_pos.y, hit_pos.z,
-		# 	hit_normal
-		# ])  # Too verbose
 		pass
 	else:
 		# Check what tiles exist at this grid position
@@ -355,19 +348,7 @@ func _raycast_gridmap() -> Dictionary:
 					var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
 					var floor_item = grid_3d.grid_map.get_cell_item(floor_cell)
 					var ceiling_item = grid_3d.grid_map.get_cell_item(ceiling_cell)
-					# Log.system("📍 Raycast MISS: origin=%.1f,%.1f,%.1f dir=%.2f,%.2f,%.2f | Grid(%d,%d): floor=%d ceiling=%d" % [
-					# 	ray_origin.x, ray_origin.y, ray_origin.z,
-					# 	ray_direction.x, ray_direction.y, ray_direction.z,
-					# 	grid_pos.x, grid_pos.y,
-					# 	floor_item, ceiling_item
-					# ])  # Too verbose
 					pass
-				# else:
-				# 	Log.system("📍 Raycast MISS (no Grid3D)")  # Too verbose
-			# else:
-			# 	Log.system("📍 Raycast MISS (no Game node)")  # Too verbose
-		# else:
-		# 	Log.system("📍 Raycast MISS (no Player)")  # Too verbose
 
 	return result
 
@@ -384,29 +365,22 @@ func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_pos: Vector3, hi
 	# Calculate dot product with up vector to classify surface
 	var dot_up = hit_normal.dot(Vector3.UP)
 
-	# DEBUG: Always log ceiling detection attempts
-	# Log.system("🔍 Tile detection at (%d,%d): Y=0 item=%d, hit_y=%.2f, dot_up=%.2f, normal=%s" % [grid_pos.x, grid_pos.y, cell_item, hit_pos.y, dot_up, hit_normal])  # Too verbose
-
 	# Ceiling: normal points DOWN (dot product with UP is negative)
 	# Check for ceiling tile at Y=1 layer
 	var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
 	var ceiling_item: int = grid_3d.grid_map.get_cell_item(ceiling_cell)
 
 	if ceiling_item == grid_3d.TileType.CEILING and dot_up < -THRESHOLD:
-		# Log.system("→ ✓ Detected as CEILING (normal points down, tile exists)")  # Too verbose
 		return "ceiling"
 
 	# Floor: normal points UP
 	if cell_item == grid_3d.TileType.FLOOR and dot_up > THRESHOLD:
-		# Log.system("→ Detected as FLOOR")  # Too verbose
 		return "floor"
 
 	# Wall: horizontal normal (not up, not down)
 	if cell_item == grid_3d.TileType.WALL or abs(dot_up) < THRESHOLD:
-		# Log.system("→ Detected as WALL")  # Too verbose
 		return "wall"
 
-	# Log.system("→ No tile type detected")  # Too verbose
 	return ""
 
 func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cache_key: String) -> Examinable:
@@ -417,7 +391,6 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 		var oldest_tile: ExaminableEnvironmentTile = examination_tile_cache[oldest_key]
 		oldest_tile.queue_free()
 		examination_tile_cache.erase(oldest_key)
-		# Log.trace(Log.Category.SYSTEM, "Evicted oldest examination tile from cache")  # Too verbose
 
 	# Determine entity ID and world position based on tile type
 	var entity_id := ""
@@ -455,8 +428,6 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 
 	# Add to cache
 	examination_tile_cache[cache_key] = tile
-
-	# Log.trace(Log.Category.SYSTEM, "Created on-demand examination tile: %s at %s" % [tile_type, grid_pos])  # Too verbose
 
 	return tile.examinable
 

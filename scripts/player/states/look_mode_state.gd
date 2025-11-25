@@ -160,13 +160,11 @@ func process_frame(_delta: float) -> void:
 				KnowledgeDB.examine_entity(new_target.entity_id)
 
 			if examination_panel:
-				# Log.system("Showing examination panel")  # Too verbose
 				examination_panel.show_panel(new_target)
 			else:
 				Log.warn(Log.Category.STATE, "Cannot show panel - examination_panel is null")
 		else:
 			# Looking at nothing
-			# Log.trace(Log.Category.STATE, "Looking at nothing")  # Too verbose
 			if examination_panel:
 				examination_panel.hide_panel()
 

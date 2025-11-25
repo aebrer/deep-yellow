@@ -81,7 +81,7 @@ func create_seeded_rng(chunk: Chunk, world_seed: int) -> RandomNumberGenerator:
 	return rng
 
 # ============================================================================
-# DEBUG
+# UTILITY
 # ============================================================================
 
 func _to_string() -> String:

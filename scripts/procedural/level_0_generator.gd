@@ -116,12 +116,6 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 
 	var time_after_init := Time.get_ticks_usec()
 
-	# Log.grid("[MazeGen] Chunk %s: strategy=%s seed=%d" % [
-	# 	chunk.position,
-	# 	["ROOM_FOCUSED", "MAZE_FOCUSED", "HYBRID"][strategy],
-	# 	chunk_seed
-	# ])  # Too verbose
-
 	# Generate maze based on strategy
 	match strategy:
 		Strategy.ROOM_FOCUSED:
@@ -158,16 +152,6 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	var gen_time := (time_after_generation - time_after_init) / 1000.0
 	var floor_pct_time := (time_after_floor_pct - time_after_generation) / 1000.0
 	var apply_time := (time_after_apply - time_after_floor_pct) / 1000.0
-
-	# Log.grid("Generated Level 0 chunk at %s (walkable: %d tiles, %.1fms) [init: %.1fms, gen: %.1fms, floor%%: %.1fms, apply: %.1fms]" % [
-	# 	chunk.position,
-	# 	chunk.get_walkable_count(),
-	# 	total_time,
-	# 	init_time,
-	# 	gen_time,
-	# 	floor_pct_time,
-	# 	apply_time
-	# ])  # Too verbose (profiling was useful for optimization, less needed now that threading eliminated frame impact)
 
 # ============================================================================
 # ROOM GENERATION

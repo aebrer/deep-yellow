@@ -293,14 +293,6 @@ func load_chunk(chunk: Chunk) -> void:
 
 	var load_time := (Time.get_ticks_usec() - load_start) / 1000.0
 
-	# Log.grid("Loaded chunk %s into GridMap (walls: %d, floors: %d, total walkable: %d) [%.1fms]" % [
-	# 	chunk.position,
-	# 	wall_count,
-	# 	floor_count,
-	# 	walkable_cells.size(),
-	# 	load_time
-	# ])  # Too verbose (profiling was useful for optimization, less needed now)
-
 	# Render items in chunk
 	if item_renderer:
 		item_renderer.render_chunk_items(chunk)
