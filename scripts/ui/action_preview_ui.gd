@@ -209,14 +209,8 @@ func _on_input_device_changed(device: InputManager.InputDevice) -> void:
 func _on_pause_toggled(paused: bool) -> void:
 	"""Handle pause state changes"""
 	is_paused = paused
-
-	if paused:
-		# Show pause message
-		_show_pause_message()
-	else:
-		# When unpausing, hide the pause message
-		# The game will call show_preview() again with current actions
-		hide_preview()
+	# Note: game.gd handles showing/hiding the preview content on pause
+	# We just track state here for header updates via _update_header()
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
