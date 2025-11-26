@@ -9,7 +9,7 @@ extends Control
 # CONSTANTS
 # ============================================================================
 
-## Resolution scale threshold for high-res mode (minimap scale > 3 means 4K+)
+## Resolution scale threshold for high-res mode (minimap scale >= 3 means 4K+)
 const HIGH_RES_SCALE_THRESHOLD := 3
 
 ## Font sizes for normal resolution
@@ -164,7 +164,7 @@ func hide_preview() -> void:
 
 func set_resolution_scale(scale_factor: int) -> void:
 	"""Update UI scaling based on resolution (called by minimap when scale changes)"""
-	var new_high_res = scale_factor > HIGH_RES_SCALE_THRESHOLD
+	var new_high_res = scale_factor >= HIGH_RES_SCALE_THRESHOLD
 	if new_high_res == is_high_res:
 		return  # No change
 
