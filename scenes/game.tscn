@@ -72,7 +72,7 @@ mouse_filter = 0
 stretch = true
 
 [node name="SubViewport" type="SubViewport" parent="MarginContainer/HBoxContainer/LeftSide/ViewportPanel/MarginContainer/SubViewportContainer"]
-handle_input_locally = false
+handle_input_locally = true
 size = Vector2i(640, 480)
 render_target_update_mode = 4
 
