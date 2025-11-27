@@ -26,6 +26,7 @@ EntityRegistry="*res://scripts/autoload/entity_registry.gd"
 Pathfinding="*res://scripts/autoload/pathfinding_manager.gd"
 ChunkManager="*res://scripts/procedural/chunk_manager.gd"
 PauseManager="*res://scripts/autoload/pause_manager.gd"
+UIScaleManager="*res://scripts/autoload/ui_scale_manager.gd"
 
 [display]
 

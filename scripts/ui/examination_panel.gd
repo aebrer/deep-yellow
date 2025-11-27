@@ -2,20 +2,37 @@ class_name ExaminationPanel
 extends Control
 ## Examination text panel - lives in main viewport (always clean text)
 
-# Node references
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+## Base font sizes (scaled by UIScaleManager)
+const FONT_SIZE_HEADER := 16
+const FONT_SIZE_ENTITY_NAME := 18
+const FONT_SIZE_INFO := 14
+const FONT_SIZE_DESCRIPTION := 14
+
+## Scroll settings
+const SCROLL_SPEED: float = 50.0
+
+# ============================================================================
+# NODE REFERENCES
+# ============================================================================
+
 var panel: PanelContainer
 var scroll_container: ScrollContainer
+var header_label: Label
 var entity_name_label: Label
 var object_class_label: Label
 var threat_level_label: Label
 var description_label: RichTextLabel
 
-# State
+# ============================================================================
+# STATE
+# ============================================================================
+
 var current_target: Examinable = null
 var _is_portrait_mode: bool = false
-
-# Scroll settings
-const SCROLL_SPEED: float = 50.0
 
 func _ready() -> void:
 	# Fill screen for positioning
@@ -30,6 +47,10 @@ func _ready() -> void:
 	# Connect to pause manager to update position when pausing (portrait mode only)
 	if PauseManager:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
+
+	# Connect to UIScaleManager for resolution-based font scaling
+	if UIScaleManager:
+		UIScaleManager.scale_changed.connect(_on_scale_changed)
 
 func _build_panel() -> void:
 	"""Build examination panel (left third of screen)"""
@@ -79,11 +100,11 @@ func _build_panel() -> void:
 	scroll_container.add_child(vbox)
 
 	# Header
-	var header = Label.new()
-	header.text = "OBJECT EXAMINATION REPORT"
-	header.add_theme_font_size_override("font_size", 16)
-	header.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-	vbox.add_child(header)
+	header_label = Label.new()
+	header_label.text = "OBJECT EXAMINATION REPORT"
+	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+	header_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	vbox.add_child(header_label)
 
 	# Separator
 	var separator1 = HSeparator.new()
@@ -94,7 +115,7 @@ func _build_panel() -> void:
 	entity_name_label = Label.new()
 	entity_name_label.text = "Entity: Unknown"
 	entity_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	entity_name_label.add_theme_font_size_override("font_size", 18)
+	entity_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
 	entity_name_label.add_theme_color_override("font_color", Color.WHITE)
 	vbox.add_child(entity_name_label)
 
@@ -102,14 +123,14 @@ func _build_panel() -> void:
 	object_class_label = Label.new()
 	object_class_label.text = "Class: Unknown"
 	object_class_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	object_class_label.add_theme_font_size_override("font_size", 14)
+	object_class_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	vbox.add_child(object_class_label)
 
 	# Threat level
 	threat_level_label = Label.new()
 	threat_level_label.text = "Threat: Unknown"
 	threat_level_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	threat_level_label.add_theme_font_size_override("font_size", 14)
+	threat_level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	vbox.add_child(threat_level_label)
 
 	# Separator
@@ -124,7 +145,7 @@ func _build_panel() -> void:
 	description_label.fit_content = true
 	description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	description_label.add_theme_font_size_override("normal_font_size", 14)
+	description_label.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
 	description_label.add_theme_color_override("default_color", Color(0.9, 0.9, 0.9))
 	vbox.add_child(description_label)
 
@@ -262,3 +283,30 @@ func _set_threat_colors(threat: int) -> void:
 		_: color = Color.GRAY
 
 	threat_level_label.add_theme_color_override("font_color", color)
+
+# ============================================================================
+# UI SCALING
+# ============================================================================
+
+func _get_font_size(base_size: int) -> int:
+	"""Get font size scaled by UIScaleManager"""
+	if UIScaleManager:
+		return UIScaleManager.get_scaled_font_size(base_size)
+	return base_size
+
+func _update_all_font_sizes() -> void:
+	"""Update all font sizes after scale change"""
+	if header_label:
+		header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+	if entity_name_label:
+		entity_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
+	if object_class_label:
+		object_class_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if threat_level_label:
+		threat_level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if description_label:
+		description_label.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
+
+func _on_scale_changed(_scale: float) -> void:
+	"""Handle UI scale changes from UIScaleManager"""
+	_update_all_font_sizes()

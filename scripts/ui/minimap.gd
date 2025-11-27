@@ -189,10 +189,12 @@ func _update_texture_scale() -> void:
 	# Update pivot for rotation (should stay centered)
 	map_texture_rect.pivot_offset = Vector2(half_size, half_size)
 
-	# Emit signal if scale changed (for high-res UI scaling)
+	# Update UIScaleManager if scale changed (for high-res UI scaling)
 	if scale_factor != current_scale_factor:
 		current_scale_factor = scale_factor
-		resolution_scale_changed.emit(scale_factor)
+		if UIScaleManager:
+			UIScaleManager.set_resolution_scale(scale_factor)
+		resolution_scale_changed.emit(scale_factor)  # Keep signal for any direct listeners
 
 	Log.system("Minimap scaled to %dx (%d pixels) for container %v" % [
 		scale_factor, new_size, container_size

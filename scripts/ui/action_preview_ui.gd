@@ -9,17 +9,11 @@ extends Control
 # CONSTANTS
 # ============================================================================
 
-## Resolution scale threshold for high-res mode (minimap scale >= 3 means 4K+)
-const HIGH_RES_SCALE_THRESHOLD := 3
-
-## Font sizes for normal resolution
+## Base font sizes (scaled by UIScaleManager)
 const FONT_SIZE_HEADER := 14
 const FONT_SIZE_ICON := 16
 const FONT_SIZE_TEXT := 14
 const FONT_SIZE_COST := 12
-
-## Font size multiplier for high-res mode
-const HIGH_RES_FONT_MULTIPLIER := 1.5
 
 # ============================================================================
 # NODE REFERENCES
@@ -40,7 +34,6 @@ var emoji_font: Font = null
 var current_actions: Array[Action] = []
 var current_input_device: InputManager.InputDevice = InputManager.InputDevice.MOUSE_KEYBOARD
 var is_paused: bool = false
-var is_high_res: bool = false  # True when minimap scale > HIGH_RES_SCALE_THRESHOLD
 
 # ============================================================================
 # LIFECYCLE
@@ -62,6 +55,10 @@ func _ready() -> void:
 	if PauseManager:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
 		is_paused = PauseManager.is_paused
+
+	# Connect to UIScaleManager for resolution-based font scaling
+	if UIScaleManager:
+		UIScaleManager.scale_changed.connect(_on_scale_changed)
 
 	# Hide by default (will show when actions provided)
 	panel.visible = false
@@ -162,21 +159,22 @@ func hide_preview() -> void:
 	panel.visible = false
 	current_actions.clear()
 
-func set_resolution_scale(scale_factor: int) -> void:
-	"""Update UI scaling based on resolution (called by minimap when scale changes)"""
-	var new_high_res = scale_factor >= HIGH_RES_SCALE_THRESHOLD
-	if new_high_res == is_high_res:
-		return  # No change
+# ============================================================================
+# INTERNAL HELPERS
+# ============================================================================
 
-	is_high_res = new_high_res
-	Log.system("ActionPreviewUI: High-res mode %s (scale=%d, threshold=%d)" % [
-		"enabled" if is_high_res else "disabled", scale_factor, HIGH_RES_SCALE_THRESHOLD
-	])
+func _get_font_size(base_size: int) -> int:
+	"""Get font size scaled by UIScaleManager"""
+	if UIScaleManager:
+		return UIScaleManager.get_scaled_font_size(base_size)
+	return base_size
 
-	# Update header font size immediately
+func _update_all_font_sizes() -> void:
+	"""Update all font sizes after scale change"""
+	# Update header
 	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 
-	# Update existing action entries if visible
+	# Update existing action entries
 	for entry in action_list.get_children():
 		if entry is HBoxContainer:
 			var children = entry.get_children()
@@ -186,32 +184,6 @@ func set_resolution_scale(scale_factor: int) -> void:
 				children[1].add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_TEXT))
 			if children.size() >= 3 and children[2] is Label:
 				children[2].add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_COST))
-
-# ============================================================================
-# INTERNAL HELPERS
-# ============================================================================
-
-func _get_font_size(base_size: int) -> int:
-	"""Get font size adjusted for resolution"""
-	if is_high_res:
-		return int(base_size * HIGH_RES_FONT_MULTIPLIER)
-	return base_size
-
-func _rebuild_action_list(player) -> void:
-	"""Rebuild action list with current font sizes (called after resolution change)"""
-	if current_actions.is_empty():
-		return
-
-	# Clear and rebuild
-	for child in action_list.get_children():
-		child.queue_free()
-
-	for action in current_actions:
-		var info = action.get_preview_info(player)
-		_add_action_entry(info)
-
-	# Also update header font size
-	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 
 func _add_action_entry(info: Dictionary) -> void:
 	"""Add an action entry to the list"""
@@ -292,6 +264,10 @@ func _on_pause_toggled(paused: bool) -> void:
 	is_paused = paused
 	# Note: game.gd handles showing/hiding the preview content on pause
 	# We just track state here for header updates via _update_header()
+
+func _on_scale_changed(_scale: float) -> void:
+	"""Handle UI scale changes from UIScaleManager"""
+	_update_all_font_sizes()
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
