@@ -467,3 +467,18 @@ func _clear_layout_switch_flag() -> void:
 	"""Clear layout switch guard flag (called deferred after layout complete)"""
 	_switching_layout = false
 	Log.system("Layout switch guard flag cleared")
+
+# ============================================================================
+# VIEWPORT HELPERS
+# ============================================================================
+
+func get_game_viewport_rect() -> Rect2:
+	"""Get the global rect of the game viewport container (SubViewportContainer)
+
+	Used by UI elements that need to center on the game viewport rather than
+	the full window. Returns global position and size of the SubViewportContainer.
+	"""
+	if viewport_container:
+		return viewport_container.get_global_rect()
+	# Fallback to full viewport if container not available
+	return get_viewport_rect()

@@ -30,7 +30,7 @@ const FONT_SIZE_INFO := 14
 # ============================================================================
 
 var panel: PanelContainer
-var scroll_container: ScrollContainer
+var content_vbox: VBoxContainer
 var slot_buttons: Array[Button] = []
 var cancel_button: Button = null
 
@@ -64,13 +64,9 @@ func _build_panel() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Capture mouse events
 	add_child(panel)
 
-	# Center panel using preset, then adjust for fixed size
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	panel.custom_minimum_size = Vector2(600, 500)
-	panel.position = Vector2(-300, -250)  # Offset from center
-	panel.size = Vector2(600, 500)
+	# Panel will be positioned by _update_panel_position
+	# Width fixed, height auto-sizes based on content (capped at max)
+	panel.custom_minimum_size = Vector2(400, 0)  # Min width only, height auto
 
 	# Style panel (SCP aesthetic)
 	var style = StyleBoxFlat.new()
@@ -86,22 +82,12 @@ func _build_panel() -> void:
 	style.content_margin_bottom = 16
 	panel.add_theme_stylebox_override("panel", style)
 
-	# ScrollContainer for overflow
-	scroll_container = ScrollContainer.new()
-	scroll_container.name = "ScrollContainer"
-	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll_container.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll_container.mouse_filter = Control.MOUSE_FILTER_PASS  # Allow mouse to reach buttons
-	panel.add_child(scroll_container)
-
 	# Content container (rebuilt each time we show)
-	var vbox = VBoxContainer.new()
-	vbox.name = "ContentVBox"
-	vbox.add_theme_constant_override("separation", 12)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll_container.add_child(vbox)
+	content_vbox = VBoxContainer.new()
+	content_vbox.name = "ContentVBox"
+	content_vbox.add_theme_constant_override("separation", 12)
+	content_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(content_vbox)
 
 func show_slot_selection(item: Item, pool: ItemPool, player: Player3D, position: Vector2i) -> void:
 	"""Display slot selection UI for picked up item
@@ -138,24 +124,45 @@ func show_slot_selection(item: Item, pool: ItemPool, player: Player3D, position:
 		PauseManager.toggle_pause()
 
 func _update_panel_position() -> void:
-	"""Update panel position to center it on screen"""
+	"""Update panel position to center it on game viewport (SubViewportContainer)"""
 	if not panel:
 		return
 
-	# Get viewport size
-	var viewport_size = get_viewport_rect().size
+	# Get game viewport rect (SubViewportContainer bounds)
+	var game_ref = get_node_or_null("/root/Game")
+	var viewport_rect: Rect2
+	if game_ref and game_ref.has_method("get_game_viewport_rect"):
+		viewport_rect = game_ref.get_game_viewport_rect()
+	else:
+		# Fallback to full viewport
+		viewport_rect = get_viewport_rect()
 
-	# Center the panel
-	var panel_size = Vector2(600, 500)
-	panel.position = (viewport_size - panel_size) / 2.0
-	panel.size = panel_size
+	# Let panel auto-size, then center it
+	# Reset size to let it calculate natural size from content
+	panel.reset_size()
+
+	# Wait a frame for size to be calculated, then center
+	await get_tree().process_frame
+
+	# Get actual panel size (clamped to viewport if too large)
+	var max_height: float = viewport_rect.size.y * 0.8  # Max 80% of viewport height
+	var panel_size: Vector2 = panel.size
+	if panel_size.y > max_height:
+		panel_size.y = max_height
+		panel.size = panel_size
+
+	# Center the panel within the game viewport
+	var center_x: float = viewport_rect.position.x + (viewport_rect.size.x - panel_size.x) / 2.0
+	var center_y: float = viewport_rect.position.y + (viewport_rect.size.y - panel_size.y) / 2.0
+
+	panel.position = Vector2(center_x, center_y)
 
 func _rebuild_content() -> void:
 	"""Rebuild UI content for current item/pool"""
-	Log.system("_rebuild_content: clearing %d old children" % scroll_container.get_node("ContentVBox").get_child_count())
+	Log.system("_rebuild_content: clearing %d old children" % content_vbox.get_child_count())
 
 	# Clear old content - CRITICAL: Remove from group and destroy immediately
-	var vbox = scroll_container.get_node("ContentVBox")
+	var vbox = content_vbox
 	for child in vbox.get_children():
 		# Release focus from old buttons before deleting
 		if child is Button and child.has_focus():
@@ -229,9 +236,6 @@ func _rebuild_content() -> void:
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	cancel_button.add_to_group("hud_focusable")
 	vbox.add_child(cancel_button)
-
-	# Reset scroll
-	scroll_container.scroll_vertical = 0
 
 func _create_slot_button(slot_index: int) -> Button:
 	"""Create button for a specific slot

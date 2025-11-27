@@ -35,6 +35,9 @@ var current_actions: Array[Action] = []
 var current_input_device: InputManager.InputDevice = InputManager.InputDevice.MOUSE_KEYBOARD
 var is_paused: bool = false
 
+# Reference to game for viewport rect queries
+var game_ref: Control = null
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -42,6 +45,9 @@ var is_paused: bool = false
 func _ready() -> void:
 	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
 	emoji_font = load("res://assets/fonts/default_font.tres")
+
+	# Get reference to game for viewport rect queries
+	game_ref = get_node_or_null("/root/Game")
 
 	# Build UI programmatically
 	_build_ui()
@@ -60,6 +66,9 @@ func _ready() -> void:
 	if UIScaleManager:
 		UIScaleManager.scale_changed.connect(_on_scale_changed)
 
+	# Connect to window resize for repositioning
+	get_window().size_changed.connect(_update_panel_position)
+
 	# Hide by default (will show when actions provided)
 	panel.visible = false
 
@@ -69,21 +78,15 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Create panel (center top)
+	# Create panel (will be positioned by _update_panel_position)
 	panel = PanelContainer.new()
 	panel.name = "ActionPreviewPanel"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(panel)
 
-	# Position at center top (auto-sizes based on content)
-	panel.anchor_left = 0.5   # Center horizontally
-	panel.anchor_top = 0.0    # Top edge
-	panel.anchor_right = 0.5
-	panel.anchor_bottom = 0.0
-	panel.offset_left = -140   # 280px wide panel, centered (-280/2)
-	panel.offset_right = 140   # 280px wide panel, centered (+280/2)
-	panel.offset_top = 16      # 16px margin from top
-	# No offset_bottom - let content determine height
+	# Use absolute positioning (set by _update_panel_position)
+	# Panel width is 280px, positioned at center-top of game viewport
+	panel.custom_minimum_size = Vector2(280, 0)  # Width fixed, height auto
 	panel.grow_vertical = Control.GROW_DIRECTION_END  # Grow downward from top
 
 	# Style panel (consistent with examination UI)
@@ -139,9 +142,10 @@ func show_preview(actions: Array[Action], player) -> void:
 		hide_preview()
 		return
 
-	# Clear previous action list
+	# Clear previous action list (use free() not queue_free() for immediate removal)
+	# This ensures reset_size() calculates correctly without stale children
 	for child in action_list.get_children():
-		child.queue_free()
+		child.free()
 
 	# Add action entries
 	for action in actions:
@@ -150,6 +154,9 @@ func show_preview(actions: Array[Action], player) -> void:
 
 	# Update header with current input device
 	_update_header()
+
+	# Position panel centered on game viewport
+	_update_panel_position()
 
 	# Show panel
 	panel.visible = true
@@ -162,6 +169,30 @@ func hide_preview() -> void:
 # ============================================================================
 # INTERNAL HELPERS
 # ============================================================================
+
+func _update_panel_position() -> void:
+	"""Position panel at center-top of game viewport (not full window)"""
+	if not panel:
+		return
+
+	# Get game viewport rect (SubViewportContainer bounds)
+	var viewport_rect: Rect2
+	if game_ref and game_ref.has_method("get_game_viewport_rect"):
+		viewport_rect = game_ref.get_game_viewport_rect()
+	else:
+		# Fallback to full viewport
+		viewport_rect = get_viewport_rect()
+
+	# Let panel auto-size based on content
+	panel.reset_size()
+
+	# Calculate center-top position within game viewport
+	var panel_width: float = panel.size.x
+	var margin_top := 16.0
+	var center_x: float = viewport_rect.position.x + (viewport_rect.size.x - panel_width) / 2.0
+	var top_y: float = viewport_rect.position.y + margin_top
+
+	panel.position = Vector2(center_x, top_y)
 
 func _get_font_size(base_size: int) -> int:
 	"""Get font size scaled by UIScaleManager"""
@@ -240,9 +271,9 @@ func _update_header() -> void:
 
 func _show_pause_message() -> void:
 	"""Show pause message instead of action preview"""
-	# Clear action list
+	# Clear action list (use free() for immediate removal)
 	for child in action_list.get_children():
-		child.queue_free()
+		child.free()
 
 	# Update header to show pause state
 	header_label.text = "GAME PAUSED"
