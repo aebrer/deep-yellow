@@ -21,6 +21,7 @@ signal hud_focus_changed(focused_element: Control)
 var is_paused: bool = false
 var current_focus: Control = null
 var focusable_elements: Array[Control] = []
+var last_hud_focus: Control = null  # Remembers last focused HUD element for manual pause
 
 func _ready():
 	# Don't pause the entire tree - just the 3D viewport
@@ -88,9 +89,11 @@ func _enter_hud_mode():
 	for i in range(min(3, focusable_elements.size())):
 		Log.system("  - Element %d: %s" % [i, focusable_elements[i].name])
 
-	# NOTE: Focus is player-determined, not auto-grabbed by PauseManager
-	# Individual UI panels (CoreInventory, ItemSlotSelectionPanel) handle their own focus
-	# Auto-grabbing focus here caused race conditions with panel focus management
+	# Auto-grab focus for controller users on manual pause (not popup-triggered)
+	# Popups (LevelUpPanel, ItemSlotSelectionPanel) handle their own focus
+	if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
+		if not _is_popup_visible():
+			_grab_hud_focus()
 
 	Log.system("Entered HUD interaction mode (paused)")
 
@@ -98,6 +101,12 @@ func _exit_hud_mode():
 	"""Exit HUD interaction mode, return to camera control."""
 	# Capture mouse for camera control
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+	# Save current focus as last HUD focus before releasing
+	# This captures focus changes made via Godot's native navigation (focus_neighbor_*)
+	var focused = get_viewport().gui_get_focus_owner()
+	if focused:
+		_update_last_hud_focus(focused)
 
 	# Clear focus
 	if current_focus:
@@ -166,6 +175,9 @@ func set_hud_focus(element: Control):
 	Log.system("PauseManager: Element has focus = %s" % element.has_focus())
 	emit_signal("hud_focus_changed", element)
 
+	# Remember this as last HUD focus (if it's not a popup button)
+	_update_last_hud_focus(element)
+
 func navigate_hud(direction: Vector2i):
 	"""Navigate HUD with controller (up/down/left/right)."""
 	if not is_paused or focusable_elements.is_empty():
@@ -180,3 +192,52 @@ func navigate_hud(direction: Vector2i):
 		current_index += direction.y
 		current_index = clamp(current_index, 0, focusable_elements.size() - 1)
 		set_hud_focus(focusable_elements[current_index])
+
+func _is_popup_visible() -> bool:
+	"""Check if any popup panel is currently visible (LevelUpPanel, ItemSlotSelectionPanel)."""
+	# Check for LevelUpPanel
+	for node in get_tree().get_nodes_in_group("hud_focusable"):
+		var parent = node.get_parent()
+		while parent:
+			if parent.get_class() == "Control":
+				# Check if this is a popup panel by class_name
+				var script = parent.get_script()
+				if script:
+					var script_path = script.resource_path
+					if "level_up_panel" in script_path or "item_slot_selection_panel" in script_path:
+						if parent.visible:
+							return true
+			parent = parent.get_parent()
+	return false
+
+func _grab_hud_focus():
+	"""Grab focus on last HUD element or first available (for manual controller pause)."""
+	if focusable_elements.is_empty():
+		return
+
+	# Try to restore last HUD focus if it's still valid and visible
+	if last_hud_focus and is_instance_valid(last_hud_focus) and last_hud_focus.visible:
+		if last_hud_focus in focusable_elements:
+			set_hud_focus(last_hud_focus)
+			Log.system("PauseManager: Restored focus to last HUD element: %s" % last_hud_focus.name)
+			return
+
+	# Otherwise focus first element
+	set_hud_focus(focusable_elements[0])
+	Log.system("PauseManager: Focused first HUD element: %s" % focusable_elements[0].name)
+
+func _update_last_hud_focus(element: Control):
+	"""Update last_hud_focus if this is a HUD element (not a popup button)."""
+	# Check if this element belongs to a popup
+	var parent = element.get_parent()
+	while parent:
+		var script = parent.get_script()
+		if script:
+			var script_path = script.resource_path
+			if "level_up_panel" in script_path or "item_slot_selection_panel" in script_path:
+				# This is a popup button, don't remember it
+				return
+		parent = parent.get_parent()
+
+	# It's a regular HUD element, remember it
+	last_hud_focus = element

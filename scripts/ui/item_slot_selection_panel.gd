@@ -363,8 +363,12 @@ func _on_pause_toggled(is_paused: bool) -> void:
 			cancel_button.focus_mode = Control.FOCUS_ALL
 			cancel_button.mouse_filter = Control.MOUSE_FILTER_STOP
 
-		# NOTE: Focus is player-determined, not auto-grabbed
-		# Player navigates with mouse or gamepad to select option
+		# Only grab focus if using controller (mouse users don't need focus indicator)
+		if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
+			if slot_buttons.size() > 0:
+				slot_buttons[0].grab_focus()
+			elif cancel_button:
+				cancel_button.grab_focus()
 
 		# Enable input acceptance after panel is fully set up
 		_accepting_input = true

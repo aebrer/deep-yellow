@@ -392,9 +392,10 @@ func _on_pause_toggled(is_paused: bool) -> void:
 		# Set up focus neighbors for stick navigation
 		_setup_focus_neighbors()
 
-		# Grab focus on first button for controller support
-		if perk_buttons.size() > 0:
-			perk_buttons[0].grab_focus()
+		# Only grab focus if using controller (mouse users don't need focus indicator)
+		if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
+			if perk_buttons.size() > 0:
+				perk_buttons[0].grab_focus()
 
 		_accepting_input = true
 	else:
