@@ -393,11 +393,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		# A button to activate focused button
 		if event.button_index == JOY_BUTTON_A and event.pressed:
 			var focused = get_viewport().gui_get_focus_owner()
-			# CRITICAL: Only activate if focused button is in our current slot_buttons array
+			# CRITICAL: Only activate if focused button is in our panel
 			# This prevents activating old buttons that are being destroyed
-			if focused and focused is Button and focused in slot_buttons:
-				focused.pressed.emit()
-				get_viewport().set_input_as_handled()
+			if focused and focused is Button:
+				if focused in slot_buttons or focused == cancel_button:
+					focused.pressed.emit()
+					get_viewport().set_input_as_handled()
 			return
 
 		# B button to cancel (industry standard)
