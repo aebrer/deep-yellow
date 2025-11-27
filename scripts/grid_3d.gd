@@ -384,6 +384,26 @@ func grid_to_world(grid_pos: Vector2i) -> Vector3:
 	var cell_3d = Vector3i(grid_pos.x, 0, grid_pos.y)
 	return grid_map.map_to_local(cell_3d)
 
+func grid_to_world_centered(grid_pos: Vector2i, height: float = 0.0) -> Vector3:
+	"""Convert 2D grid coordinates to 3D world position (centered in cell)
+
+	Uses manual centering calculation for pixel-perfect alignment.
+	This is the canonical centering method used by items and indicators.
+
+	Args:
+		grid_pos: Grid coordinates (x, y)
+		height: Y position in world space (default 0.0)
+
+	Returns:
+		Vector3 position centered in the grid cell at specified height
+	"""
+	var cell_size = grid_map.cell_size
+	return Vector3(
+		grid_pos.x * cell_size.x + cell_size.x / 2.0,
+		height,
+		grid_pos.y * cell_size.z + cell_size.z / 2.0
+	)
+
 func world_to_grid(world_pos: Vector3) -> Vector2i:
 	"""Convert 3D world position to 2D grid coordinates"""
 	var cell_3d = grid_map.local_to_map(world_pos)

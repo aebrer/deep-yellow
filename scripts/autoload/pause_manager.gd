@@ -26,6 +26,14 @@ func _ready():
 	# Don't pause the entire tree - just the 3D viewport
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+func _input(event):
+	# MMB (middle mouse button) toggles pause - check in _input before scene tree consumes it
+	# This is useful on web where ESC in fullscreen exits fullscreen first
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
+		toggle_pause()
+		get_viewport().set_input_as_handled()
+		return
+
 func _unhandled_input(event):
 	# ESC (keyboard via ui_cancel) or START (controller via pause action) toggles pause
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
@@ -64,21 +72,14 @@ func toggle_pause():
 		_exit_hud_mode()
 
 func _enter_hud_mode():
-	"""Pause gameplay viewport, enable HUD interaction."""
-	# Pause the 3D viewport (inside SubViewport)
-	# Search for SubViewport dynamically (works in both portrait and landscape layouts)
-	var subviewport = _find_subviewport()
-	if subviewport:
-		var game_3d = subviewport.get_node_or_null("Game3D")
-		if game_3d:
-			Log.system("PauseManager: Found game_3d node '%s', disabling..." % game_3d.name)
-			game_3d.process_mode = Node.PROCESS_MODE_DISABLED
-		else:
-			Log.warn(Log.Category.SYSTEM, "PauseManager: Game3D node not found in SubViewport!")
-	else:
-		Log.warn(Log.Category.SYSTEM, "PauseManager: SubViewport not found!")
+	"""Enable HUD interaction mode (turn-based games don't pause processing)."""
+	# For turn-based games, we DON'T disable Game3D processing
+	# The game world only advances on player actions, so "pause" just means:
+	# - Mouse visible for UI interaction
+	# - HUD elements focusable
+	# - State machine keeps running so inventory actions can execute turns
 
-	# Show mouse cursor
+	# Show mouse cursor for HUD interaction
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	# Register focusable HUD elements
@@ -94,19 +95,7 @@ func _enter_hud_mode():
 	Log.system("Entered HUD interaction mode (paused)")
 
 func _exit_hud_mode():
-	"""Resume gameplay viewport, disable HUD interaction."""
-	# Resume the 3D viewport (inside SubViewport)
-	var subviewport = _find_subviewport()
-	if subviewport:
-		var game_3d = subviewport.get_node_or_null("Game3D")
-		if game_3d:
-			Log.system("PauseManager: Found game_3d node '%s' for resume, enabling..." % game_3d.name)
-			game_3d.process_mode = Node.PROCESS_MODE_INHERIT
-		else:
-			Log.warn(Log.Category.SYSTEM, "PauseManager: Game3D node not found in SubViewport on resume!")
-	else:
-		Log.warn(Log.Category.SYSTEM, "PauseManager: SubViewport not found on resume!")
-
+	"""Exit HUD interaction mode, return to camera control."""
 	# Capture mouse for camera control
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 

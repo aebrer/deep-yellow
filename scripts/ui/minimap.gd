@@ -13,6 +13,9 @@ extends Control
 ## - Transform rotation: Rotates TextureRect node, not pixels
 ## - Full renders every turn: ~65k tile queries, but direct GridMap access is fast
 
+## Emitted when minimap scale factor changes (for high-res UI scaling)
+signal resolution_scale_changed(scale_factor: int)
+
 # ============================================================================
 # CONSTANTS
 # ============================================================================
@@ -64,6 +67,9 @@ var last_camera_rotation: float = 0.0
 ## Dirty flag - needs content redraw
 var content_dirty: bool = true
 
+## Current scale factor (for resolution-based UI scaling)
+var current_scale_factor: int = 0
+
 ## Last player position for incremental rendering
 var last_player_pos: Vector2i = Vector2i(-99999, -99999)
 
@@ -85,6 +91,13 @@ func _ready() -> void:
 	# Clear cache when initial chunks finish loading
 	if ChunkManager:
 		ChunkManager.initial_load_completed.connect(_on_initial_load_completed)
+
+	# Connect to container size changes for dynamic scaling
+	var container = map_texture_rect.get_parent()
+	if container:
+		container.resized.connect(_on_container_resized)
+		# Set initial scale (deferred to ensure container has size)
+		call_deferred("_update_texture_scale")
 
 	Log.system("Minimap initialized (%dx%d)" % [MAP_SIZE, MAP_SIZE])
 	Log.system("Minimap TextureRect: %s" % map_texture_rect)
@@ -143,6 +156,53 @@ func _on_initial_load_completed() -> void:
 	"""Called when ChunkManager finishes initial chunk loading"""
 	content_dirty = true
 	Log.system("Minimap ready after initial chunk load")
+
+func _update_texture_scale() -> void:
+	"""Dynamically scale texture by largest integer that fits container (pixel-perfect scaling)"""
+	var container = map_texture_rect.get_parent()
+	if not container:
+		Log.warn(Log.Category.SYSTEM, "Minimap: No container found for MapTextureRect")
+		return
+
+	var container_size: Vector2 = container.size
+
+	# Avoid division by zero on initial frame
+	if container_size.x <= 0 or container_size.y <= 0:
+		Log.warn(Log.Category.SYSTEM, "Minimap: Container size is zero or negative: %v" % container_size)
+		return
+
+	# Find largest integer scale that fits, then add 2
+	# Image is 256×256, we want pixel-perfect integer multiples
+	# +2 ensures minimap is always 2 scale levels larger than what fits
+	var max_scale_x := int(floor(container_size.x / MAP_SIZE))
+	var max_scale_y := int(floor(container_size.y / MAP_SIZE))
+	var scale_factor: int = min(max_scale_x, max_scale_y) + 2
+
+	# Update TextureRect size to match
+	var new_size: int = MAP_SIZE * scale_factor
+	var half_size: float = new_size / 2.0
+	map_texture_rect.offset_left = -half_size
+	map_texture_rect.offset_top = -half_size
+	map_texture_rect.offset_right = half_size
+	map_texture_rect.offset_bottom = half_size
+
+	# Update pivot for rotation (should stay centered)
+	map_texture_rect.pivot_offset = Vector2(half_size, half_size)
+
+	# Update UIScaleManager if scale changed (for high-res UI scaling)
+	if scale_factor != current_scale_factor:
+		current_scale_factor = scale_factor
+		if UIScaleManager:
+			UIScaleManager.set_resolution_scale(scale_factor)
+		resolution_scale_changed.emit(scale_factor)  # Keep signal for any direct listeners
+
+	Log.system("Minimap scaled to %dx (%d pixels) for container %v" % [
+		scale_factor, new_size, container_size
+	])
+
+func _on_container_resized() -> void:
+	"""Called when parent container changes size"""
+	_update_texture_scale()
 
 # ============================================================================
 # RENDERING

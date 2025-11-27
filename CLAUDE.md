@@ -252,7 +252,7 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - LMB → Confirm actions (move forward, wait in look mode)
 - RMB → Look mode (first-person examination)
 - Mouse movement → Camera controls (tactical + look mode)
-- ESC → Toggle pause status
+- ESC or MMB → Toggle pause status (MMB recommended on web due to fullscreen ESC issues)
 - Mouse hover over HUD → Navigate HUD when paused
 - Mouse wheel -> zoom level
 

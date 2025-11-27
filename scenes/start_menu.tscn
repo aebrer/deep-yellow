@@ -59,7 +59,7 @@ text = "CLICK TO START"
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "Controller: RS aim camera, RT to move, LT to look, START to pause
-Mouse+Keyboard: Click to move, RMB to look, ESC to pause"
+Mouse+Keyboard: Click to move, RMB to look, ESC or MMB to pause"
 horizontal_alignment = 1
 
 [node name="WebNotice" type="Label" parent="CenterContainer"]

@@ -5,12 +5,32 @@ extends Control
 ## Displays preview of actions that will execute when player presses RT/Left Click
 ## Updates in real-time based on player state and active input device
 
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+## Base font sizes (scaled by UIScaleManager)
+const FONT_SIZE_HEADER := 14
+const FONT_SIZE_ICON := 16
+const FONT_SIZE_TEXT := 14
+const FONT_SIZE_COST := 12
+
+# ============================================================================
+# NODE REFERENCES
+# ============================================================================
+
 # Node references (created programmatically)
 var panel: PanelContainer
 var header_label: Label  # Shows input prompt: "[RT]" or "[Left Click]"
 var action_list: VBoxContainer  # Shows list of actions that will execute
 
-# State
+# Font with emoji fallback (loaded once, used for all labels)
+var emoji_font: Font = null
+
+# ============================================================================
+# STATE
+# ============================================================================
+
 var current_actions: Array[Action] = []
 var current_input_device: InputManager.InputDevice = InputManager.InputDevice.MOUSE_KEYBOARD
 var is_paused: bool = false
@@ -20,7 +40,8 @@ var is_paused: bool = false
 # ============================================================================
 
 func _ready() -> void:
-	Log.system("ActionPreviewUI _ready() called")
+	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
+	emoji_font = load("res://assets/fonts/default_font.tres")
 
 	# Build UI programmatically
 	_build_ui()
@@ -35,10 +56,12 @@ func _ready() -> void:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
 		is_paused = PauseManager.is_paused
 
+	# Connect to UIScaleManager for resolution-based font scaling
+	if UIScaleManager:
+		UIScaleManager.scale_changed.connect(_on_scale_changed)
+
 	# Hide by default (will show when actions provided)
 	panel.visible = false
-
-	Log.system("ActionPreviewUI initialization complete")
 
 func _build_ui() -> void:
 	"""Build action preview UI programmatically"""
@@ -86,8 +109,10 @@ func _build_ui() -> void:
 	# Header showing input prompt
 	header_label = Label.new()
 	header_label.text = "[Left Click] Next Turn"
-	header_label.add_theme_font_size_override("font_size", 14)
+	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	if emoji_font:
+		header_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(header_label)
 
 	# Separator
@@ -138,28 +163,54 @@ func hide_preview() -> void:
 # INTERNAL HELPERS
 # ============================================================================
 
+func _get_font_size(base_size: int) -> int:
+	"""Get font size scaled by UIScaleManager"""
+	if UIScaleManager:
+		return UIScaleManager.get_scaled_font_size(base_size)
+	return base_size
+
+func _update_all_font_sizes() -> void:
+	"""Update all font sizes after scale change"""
+	# Update header
+	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+
+	# Update existing action entries
+	for entry in action_list.get_children():
+		if entry is HBoxContainer:
+			var children = entry.get_children()
+			if children.size() >= 1 and children[0] is Label:
+				children[0].add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ICON))
+			if children.size() >= 2 and children[1] is Label:
+				children[1].add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_TEXT))
+			if children.size() >= 3 and children[2] is Label:
+				children[2].add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_COST))
+
 func _add_action_entry(info: Dictionary) -> void:
 	"""Add an action entry to the list"""
 	var entry = HBoxContainer.new()
 	entry.add_theme_constant_override("separation", 4)
 
-	# Icon
+	# Icon (uses emoji font for emoji/symbol support)
 	var icon_label = Label.new()
 	icon_label.text = info.get("icon", "?")
-	icon_label.add_theme_font_size_override("font_size", 16)
+	icon_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ICON))
 	icon_label.add_theme_color_override("font_color", Color.WHITE)
+	if emoji_font:
+		icon_label.add_theme_font_override("font", emoji_font)
 	entry.add_child(icon_label)
 
-	# Action name + target
+	# Action name + target (uses emoji font for arrow symbols like →)
 	var text_label = Label.new()
 	var target = info.get("target", "")
 	if target != "":
 		text_label.text = "%s %s" % [info.get("name", "Unknown"), target]
 	else:
 		text_label.text = info.get("name", "Unknown")
-	text_label.add_theme_font_size_override("font_size", 14)
+	text_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_TEXT))
 	text_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if emoji_font:
+		text_label.add_theme_font_override("font", emoji_font)
 	entry.add_child(text_label)
 
 	# Cost (if any)
@@ -167,8 +218,10 @@ func _add_action_entry(info: Dictionary) -> void:
 	if cost != "":
 		var cost_label = Label.new()
 		cost_label.text = cost
-		cost_label.add_theme_font_size_override("font_size", 12)
+		cost_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_COST))
 		cost_label.add_theme_color_override("font_color", Color.YELLOW)
+		if emoji_font:
+			cost_label.add_theme_font_override("font", emoji_font)
 		entry.add_child(cost_label)
 
 	action_list.add_child(entry)
@@ -209,14 +262,12 @@ func _on_input_device_changed(device: InputManager.InputDevice) -> void:
 func _on_pause_toggled(paused: bool) -> void:
 	"""Handle pause state changes"""
 	is_paused = paused
+	# Note: game.gd handles showing/hiding the preview content on pause
+	# We just track state here for header updates via _update_header()
 
-	if paused:
-		# Show pause message
-		_show_pause_message()
-	else:
-		# When unpausing, hide the pause message
-		# The game will call show_preview() again with current actions
-		hide_preview()
+func _on_scale_changed(_scale: float) -> void:
+	"""Handle UI scale changes from UIScaleManager"""
+	_update_all_font_sizes()
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)

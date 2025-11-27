@@ -482,23 +482,19 @@ func _toggle_item(pool_type: Item.PoolType, slot_index: int) -> void:
 	if not player:
 		return
 
-	# Create toggle action
+	# Create and validate toggle action
 	var action = ToggleItemAction.new(pool_type, slot_index)
 
 	if not action.can_execute(player):
 		Log.warn(Log.Category.SYSTEM, "Cannot toggle item at slot %d" % slot_index)
 		return
 
-	# Set as pending action (like movement)
+	# Queue action for proper state machine execution
 	player.pending_action = action
 	player.return_state = "IdleState"
-	player.suppress_input_next_frame = true  # Prevent UI button from also triggering movement
-
-	# Unpause to allow execution
-	if PauseManager:
-		PauseManager.toggle_pause()
 
 	# Transition to pre-turn state to execute the action
+	# Game3D processing is enabled while "paused" for turn-based games
 	if player.state_machine:
 		player.state_machine.change_state("PreTurnState")
 
@@ -519,7 +515,7 @@ func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target
 		_cancel_reorder()
 		return
 
-	# Create reorder action
+	# Create and validate reorder action
 	var action = ReorderItemAction.new(reordering_pool_type, reordering_slot_index, target_slot_index)
 
 	if not action.can_execute(player):
@@ -527,19 +523,15 @@ func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target
 		_cancel_reorder()
 		return
 
-	# Set as pending action (like movement)
+	# Queue action for proper state machine execution
 	player.pending_action = action
 	player.return_state = "IdleState"
-	player.suppress_input_next_frame = true  # Prevent UI button from also triggering movement
 
 	# Cancel reorder UI state
 	_cancel_reorder()
 
-	# Unpause to allow execution
-	if PauseManager:
-		PauseManager.toggle_pause()
-
 	# Transition to pre-turn state to execute the action
+	# Game3D processing is enabled while "paused" for turn-based games
 	if player.state_machine:
 		player.state_machine.change_state("PreTurnState")
 

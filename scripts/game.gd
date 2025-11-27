@@ -51,6 +51,12 @@ func _ready() -> void:
 
 	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Initializing game with HUD layout")
 
+	# Register theme with UIScaleManager for automatic font scaling
+	# The theme is set on this root Control node (game.gd extends Control)
+	if UIScaleManager and theme:
+		UIScaleManager.set_theme(theme)
+		Log.system("Game theme registered with UIScaleManager")
+
 	# Get player reference from 3D scene
 	player = game_3d.get_node_or_null("Player3D")
 
@@ -176,8 +182,14 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 
 func _on_player_action_preview_changed(actions: Array[Action]) -> void:
 	"""Forward action preview to UI (text overlay - always clean)"""
-	if action_preview_ui:
-		action_preview_ui.show_preview(actions, player)
+	if not action_preview_ui:
+		return
+
+	# When paused, ignore player state previews - pause hints are shown instead
+	if PauseManager and PauseManager.is_paused:
+		return
+
+	action_preview_ui.show_preview(actions, player)
 
 func _on_player_turn_completed() -> void:
 	"""Update minimap when player completes a turn"""
@@ -205,16 +217,19 @@ func _on_inventory_reorder_state_changed(is_reordering: bool) -> void:
 		hints.append(ControlHintAction.new("🖱️", "Hover / Stick", "navigate inventory"))
 		hints.append(ControlHintAction.new("🖱️", "LMB / A", "toggle item ON/OFF"))
 		hints.append(ControlHintAction.new("🖱️", "RMB / X", "reorder item"))
-		hints.append(ControlHintAction.new("⏸️", "START / ESC", "unpause"))
+		hints.append(ControlHintAction.new("⏸️", "START / ESC / MMB", "unpause"))
 
 	action_preview_ui.show_preview(hints, player)
 
 func _on_pause_toggled(is_paused: bool) -> void:
-	"""Handle pause state changes - hide action preview when unpausing"""
+	"""Handle pause state changes - show/hide action preview"""
 	if not action_preview_ui:
 		return
 
-	if not is_paused:
+	if is_paused:
+		# When pausing, show the pause mode hints
+		_on_inventory_reorder_state_changed(false)
+	else:
 		# When unpausing, hide the action preview
 		# The player state will re-emit action_preview_changed when appropriate
 		action_preview_ui.hide_preview()

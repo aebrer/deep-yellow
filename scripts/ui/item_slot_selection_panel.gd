@@ -10,13 +10,25 @@ extends Control
 ##
 ## Uses PauseManager pattern for consistent pause/unpause behavior
 
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
 enum ActionType {
 	EQUIP_EMPTY,      ## Equip to empty slot
 	COMBINE_LEVEL_UP, ## Combine with existing item (level up)
 	OVERWRITE         ## Replace existing item
 }
 
-# Node references
+## Base font sizes (scaled by UIScaleManager)
+const FONT_SIZE_HEADER := 20
+const FONT_SIZE_ITEM_NAME := 16
+const FONT_SIZE_INFO := 14
+
+# ============================================================================
+# NODE REFERENCES
+# ============================================================================
+
 var panel: PanelContainer
 var scroll_container: ScrollContainer
 var slot_buttons: Array[Button] = []
@@ -166,7 +178,7 @@ func _rebuild_content() -> void:
 	var header = Label.new()
 	header.text = "ITEM ACQUISITION"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_theme_font_size_override("font_size", 20)
+	header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	vbox.add_child(header)
 
@@ -174,7 +186,7 @@ func _rebuild_content() -> void:
 	var item_name_label = Label.new()
 	item_name_label.text = "Item: %s (Level %d)" % [current_item.item_name, current_item.level]
 	item_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	item_name_label.add_theme_font_size_override("font_size", 16)
+	item_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ITEM_NAME))
 	item_name_label.add_theme_color_override("font_color", ItemRarity.get_color(current_item.rarity))
 	vbox.add_child(item_name_label)
 
@@ -182,7 +194,7 @@ func _rebuild_content() -> void:
 	var pool_label = Label.new()
 	pool_label.text = "Pool: %s" % Item.PoolType.keys()[current_pool.pool_type]
 	pool_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pool_label.add_theme_font_size_override("font_size", 14)
+	pool_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	pool_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(pool_label)
 
@@ -195,7 +207,7 @@ func _rebuild_content() -> void:
 	var instructions = Label.new()
 	instructions.text = "Select a slot to equip this item:"
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instructions.add_theme_font_size_override("font_size", 14)
+	instructions.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	instructions.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	vbox.add_child(instructions)
 
@@ -213,7 +225,7 @@ func _rebuild_content() -> void:
 	# Cancel button
 	cancel_button = Button.new()
 	cancel_button.text = "Leave on Ground (Cancel)"
-	cancel_button.add_theme_font_size_override("font_size", 14)
+	cancel_button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	cancel_button.add_to_group("hud_focusable")
 	vbox.add_child(cancel_button)
@@ -259,7 +271,7 @@ func _create_slot_button(slot_index: int) -> Button:
 		button.add_theme_color_override("font_color", Color.ORANGE_RED)
 		button.pressed.connect(func(): _on_slot_selected(slot_index, ActionType.OVERWRITE))
 
-	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Create transparent normal state (no background when not focused)
@@ -413,4 +425,14 @@ func _process(_delta: float) -> void:
 		if focused and focused is Button and focused in slot_buttons:
 			focused.pressed.emit()
 			return
+
+# ============================================================================
+# UI SCALING
+# ============================================================================
+
+func _get_font_size(base_size: int) -> int:
+	"""Get font size scaled by UIScaleManager"""
+	if UIScaleManager:
+		return UIScaleManager.get_scaled_font_size(base_size)
+	return base_size
 

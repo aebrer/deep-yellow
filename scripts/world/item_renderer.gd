@@ -144,13 +144,11 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art friendly
 
-	# Position at world coordinates (convert tile to 3D, accounting for cell size)
-	# Center the item in the cell (same as player positioning)
-	var cell_size = grid_3d.grid_map.cell_size if grid_3d else Vector3(2.0, 1.0, 2.0)
-	var world_3d = Vector3(
-		world_pos.x * cell_size.x + cell_size.x / 2.0,
+	# Position at world coordinates (centered in cell)
+	var world_3d = grid_3d.grid_to_world_centered(world_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
+		world_pos.x * 2.0 + 1.0,  # Fallback if no grid
 		BILLBOARD_HEIGHT,
-		world_pos.y * cell_size.z + cell_size.z / 2.0
+		world_pos.y * 2.0 + 1.0
 	)
 	sprite.position = world_3d
 

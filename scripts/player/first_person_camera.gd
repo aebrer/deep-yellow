@@ -33,6 +33,10 @@ var tactical_camera: TacticalCamera = null
 # State
 var active: bool = false  # Controlled by LookModeState
 
+# Mouse motion accumulator (fixes Firefox drift at integer zoom levels)
+var mouse_motion_accumulator := Vector2.ZERO
+const MOTION_SAMPLE_THRESHOLD := 0.001  # Ignore micro-drift accumulation
+
 # On-demand examination tile cache
 const MAX_CACHED_TILES := 20  # Limit memory usage
 var examination_tile_cache: Dictionary = {}  # Vector2i(grid_pos) -> ExaminableEnvironmentTile
@@ -60,6 +64,18 @@ func _process(delta: float) -> void:
 	if not active:
 		return
 
+	# Apply accumulated mouse motion (from _unhandled_input)
+	# Averaging across events filters Firefox's systematic rounding drift
+	if mouse_motion_accumulator.length_squared() > MOTION_SAMPLE_THRESHOLD:
+		h_pivot.rotation_degrees.y -= mouse_motion_accumulator.x * mouse_sensitivity
+		h_pivot.rotation_degrees.y = fmod(h_pivot.rotation_degrees.y, 360.0)
+
+		v_pivot.rotation_degrees.x -= mouse_motion_accumulator.y * mouse_sensitivity
+		v_pivot.rotation_degrees.x = clamp(v_pivot.rotation_degrees.x, pitch_min, pitch_max)
+
+	# Reset accumulator after applying
+	mouse_motion_accumulator = Vector2.ZERO
+
 	# Handle right stick camera controls (SAME AS TACTICAL CAMERA!)
 	var right_stick_x = Input.get_joy_axis(0, JOY_AXIS_RIGHT_X)
 	var right_stick_y = Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
@@ -80,14 +96,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Mouse camera control (SAME AS TACTICAL CAMERA!)
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		# Mouse X = horizontal rotation (yaw)
-		h_pivot.rotation_degrees.y -= event.relative.x * mouse_sensitivity
-		h_pivot.rotation_degrees.y = fmod(h_pivot.rotation_degrees.y, 360.0)
-
-		# Mouse Y = vertical rotation (pitch)
-		v_pivot.rotation_degrees.x -= event.relative.y * mouse_sensitivity
-		v_pivot.rotation_degrees.x = clamp(v_pivot.rotation_degrees.x, pitch_min, pitch_max)
-
+		# Accumulate motion events across frame (applied in _process)
+		# This filters Firefox's systematic rounding drift at integer zoom levels
+		# https://github.com/w3c/pointerlock/issues/23
+		mouse_motion_accumulator += event.screen_relative
 		get_viewport().set_input_as_handled()
 
 	# FOV zoom (optional - LB/RB or mouse wheel)
