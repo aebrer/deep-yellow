@@ -2,27 +2,32 @@
 
 **Project**: Backrooms Power Crawl - Turn-based Roguelike in Godot 4.x
 **Developer**: Drew Brereton (aebrer) - Python/generative art background, new to game dev
-**Last Updated**: 2025-11-24 (Added "Trust User Instincts" rule - user hunches are often RIGHT!)
+**Last Updated**: 2025-12-07 (Updated for CachyOS native environment - headless Godot testing now possible!)
 
 ---
 
-## ⚠️ CRITICAL: YOU ARE ON WSL2 - DO NOT RUN TESTS
+## 🐧 ENVIRONMENT: CachyOS Native Linux
 
-**NEVER attempt to run Godot or test the game yourself!**
-- You are running on WSL2 (Windows Subsystem for Linux)
-- Godot GUI/game cannot run in this environment
-- **THE USER RUNS ALL TESTS** - they have the Windows Godot editor
-- Your job: implement, explain, prepare for testing
-- User's job: actually run and validate
+**Development Environment:**
+- Running on native CachyOS Linux (not WSL2!)
+- Godot 4.5.1 installed and working headless
+- User still runs full GUI testing, but Claude can run headless validation
 
 **What this means**:
-- ❌ DO NOT use `godot` command to test anything
-- ❌ DO NOT run the game or try to validate it works
+- ✅ You CAN run `godot --headless --quit` to validate project loads without errors
+- ✅ You CAN run `godot --headless --script test_script.gd` for script validation
+- ✅ You CAN check that autoloads initialize correctly
+- ⚠️ User still handles all visual/interactive testing (GUI, controller, gameplay)
 - ✅ DO implement the code changes
 - ✅ DO explain what should happen when tested
-- ✅ DO wait for user to confirm "it works" or report issues
+- ✅ DO wait for user to confirm "it works" or report issues for interactive features
 
-When ready for testing, say: "This is ready for you to test. When you run it, you should see [expected behavior]."
+**When ready for testing**, say: "This is ready for you to test. When you run it, you should see [expected behavior]."
+
+**Headless validation command**:
+```bash
+godot --headless --quit 2>&1  # Validates project loads, autoloads init, no script errors
+```
 
 ---
 
@@ -282,7 +287,7 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 
 ### Design Documents
 
-- **`/home/andrew/projects/backrooms_power_crawl/docs/DESIGN.md`**
+- **`/home/drew/projects/backrooms_power_crawl/docs/DESIGN.md`**
   - Core game concept and vision
   - Inspirations: Caves of Qud, Vampire Survivors, SCP/Backrooms
   - Mission types (Horde vs Hunt)
@@ -290,7 +295,7 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
   - Control scheme and design philosophy
   - Open questions and decisions still being made
 
-- **`/home/andrew/projects/backrooms_power_crawl/docs/ARCHITECTURE.md`**
+- **`/home/drew/projects/backrooms_power_crawl/docs/ARCHITECTURE.md`**
   - Technical architecture and patterns
   - **Top section (✅ Implemented)**: Current working systems
   - **Bottom section (🔮 Planned)**: Future systems design
@@ -298,7 +303,7 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
   - Code examples and API documentation
   - Update this when implementing new systems
 
-- **`/home/andrew/projects/backrooms_power_crawl/README.md`**
+- **`/home/drew/projects/backrooms_power_crawl/README.md`**
   - Project overview and setup
   - High-level feature list
   - Development philosophy
@@ -761,7 +766,7 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 
 ### Project Structure
 ```
-/home/andrew/projects/backrooms_power_crawl/
+/home/drew/projects/backrooms_power_crawl/
 ├── docs/              # Design and architecture docs (READ THESE!)
 ├── scenes/            # .tscn files
 ├── scripts/           # .gd files
@@ -868,7 +873,7 @@ gh api \
 
 ### Python Virtual Environment
 
-**Location**: `/home/andrew/projects/backrooms_power_crawl/venv/`
+**Location**: `/home/drew/projects/backrooms_power_crawl/venv/`
 
 The project includes a Python virtual environment for running maintenance scripts and tools. This venv is used by Claude instances for automation tasks.
 
@@ -890,7 +895,7 @@ source venv/bin/activate
 
 **Purpose**: Maintenance scripts for managing Godot resource files and other automation tasks that Claude instances may need to run.
 
-**Location**: `/home/andrew/projects/backrooms_power_crawl/_claude_scripts/`
+**Location**: `/home/drew/projects/backrooms_power_crawl/_claude_scripts/`
 
 These scripts are part of the project's tooling infrastructure and should be committed to version control.
 
@@ -1065,7 +1070,7 @@ IF YOU CATCH YOURSELF DOING WORK, YOU'RE FAILING.
      - Cairo for vector graphics
      - ModernGL/PyOpenGL for shader-based generation
      - **Whatever generative art technique produces the best result**
-   - **Runs in project venv**: `/home/andrew/projects/backrooms_power_crawl/venv/`
+   - **Runs in project venv**: `/home/drew/projects/backrooms_power_crawl/venv/`
    - **CRITICAL REQUIREMENTS**:
      - **MUST BE TILEABLE/SEAMLESS**: Texture must repeat seamlessly when tiled in a grid
      - **Use modulo wrapping for ALL pixel operations**: `img_array[y % SIZE, x % SIZE] = value`
@@ -1076,7 +1081,7 @@ IF YOU CATCH YOURSELF DOING WORK, YOU'RE FAILING.
    - **AUTOMATION**:
      1. Agent creates `generate.py`
      2. Installs any dependencies in venv
-     3. Runs script: `cd /home/andrew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
+     3. Runs script: `cd /home/drew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
      4. Verifies `output.png` exists and meets requirements
    - **THIS IS SIMPLE**: Pure Python, direct PNG output, agent chooses the best technique
 
@@ -1204,7 +1209,7 @@ _claude_scripts/textures/
 **Running the Generator**:
 ```bash
 # From project root, activate venv and run script:
-cd /home/andrew/projects/backrooms_power_crawl
+cd /home/drew/projects/backrooms_power_crawl
 source venv/bin/activate
 cd _claude_scripts/textures/backrooms_wallpaper
 python generate.py  # Outputs tileable PNG
