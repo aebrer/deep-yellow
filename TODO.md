@@ -297,6 +297,18 @@ These questions should be answered BEFORE implementing the relevant phase:
   - Option B: Entities respawn each time chunk loads (infinite enemies)
   - **Recommendation**: Option A (reward clearing areas)
 
+### Examination & Clearance System (Cross-Cutting)
+- [ ] **Examinable integration for entities**: Entities need Examinable component (like items have)
+  - All entities, items, and environmental things are examinable
+  - Description data revealed progressively based on player's Clearance LVL
+  - **BEFORE IMPLEMENTING**: Spawn sub-agents to investigate existing Examinable system
+    - How does Item.get_description(clearance_level) work?
+    - How does ItemRenderer add Examinable to item billboards?
+    - How does KnowledgeDB store/retrieve entity data?
+    - How does Look Mode raycast to Examinable nodes?
+  - Must follow EXACT same patterns already in place
+  - **Testing**: Look at debug enemy, see progressively revealed info at higher clearance
+
 ### AI System (Phase 4)
 - [ ] **AI turn budget**: How many entities can act per turn?
   - Option A: All entities in loaded chunks act each turn

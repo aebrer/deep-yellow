@@ -17,6 +17,9 @@ const CELL_SIZE := Vector3(2.0, 1.0, 2.0)  # X, Y (height), Z - doubled for visi
 # Item rendering
 var item_renderer: ItemRenderer = null
 
+# Entity rendering
+var entity_renderer: EntityRenderer = null
+
 # Grid data (same as 2D version)
 var grid_size: Vector2i = GRID_SIZE
 var walkable_cells: Dictionary = {}  # Vector2i -> bool (using Dictionary for O(1) erase instead of O(n))
@@ -56,6 +59,10 @@ func _ready() -> void:
 	# Create item renderer
 	item_renderer = ItemRenderer.new()
 	add_child(item_renderer)
+
+	# Create entity renderer
+	entity_renderer = EntityRenderer.new()
+	add_child(entity_renderer)
 
 	print("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
 
@@ -239,9 +246,12 @@ func load_chunk(chunk: Chunk) -> void:
 
 	var load_time := (Time.get_ticks_usec() - load_start) / 1000.0
 
-	# Render items in chunk
+	# Render items in chunk (items are already in chunk data from _on_chunk_completed)
 	if item_renderer:
 		item_renderer.render_chunk_items(chunk)
+
+	# NOTE: Entity rendering is handled by ChunkManager AFTER entity spawning
+	# because entities need is_walkable() which requires GridMap to be populated first
 
 func unload_chunk(chunk: Chunk) -> void:
 	"""Unload a chunk from GridMap
@@ -273,6 +283,10 @@ func unload_chunk(chunk: Chunk) -> void:
 	# Unload item billboards
 	if item_renderer:
 		item_renderer.unload_chunk_items(chunk)
+
+	# Unload entity billboards
+	if entity_renderer:
+		entity_renderer.unload_chunk_entities(chunk)
 
 	Log.grid("Unloaded chunk %s from GridMap" % chunk.position)
 
@@ -444,13 +458,11 @@ func _is_position_blocked_by_entity(pos: Vector2i) -> bool:
 	"""Check if any entity is occupying this grid position
 
 	Returns true if blocked, false if clear.
+	Uses EntityRenderer to check entity positions (data-driven, like items).
 	"""
-	var entities = get_tree().get_nodes_in_group("entities")
-	for entity in entities:
-		if entity.has_method("get") and entity.get("grid_position"):
-			if entity.grid_position == pos:
-				return true  # Position is blocked
-	return false  # Position is clear
+	if entity_renderer:
+		return entity_renderer.has_entity_at(pos)
+	return false  # No renderer = no entities = not blocked
 
 func is_in_bounds(pos: Vector2i) -> bool:
 	"""Check if position is within grid bounds

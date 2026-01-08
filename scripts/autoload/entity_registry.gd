@@ -74,6 +74,20 @@ func _load_entities() -> void:
 	ceiling.threat_level = 0
 	_entities["level_0_ceiling"] = ceiling
 
+	# Debug Enemy (testing entity)
+	var debug_enemy = EntityInfo.new()
+	debug_enemy.entity_id = "debug_enemy"
+	debug_enemy.entity_name = "Debug Enemy"
+	debug_enemy.visual_description = "A magenta cube floating at eye level. It doesn't move or react to your presence. Seems to exist purely for testing purposes."
+	debug_enemy.clearance_info[0] = ""  # No additional info at clearance 0
+	debug_enemy.clearance_info[1] = "Designation: TEST_ENTITY_001. Created for combat system validation."
+	debug_enemy.clearance_info[2] = "HP: 1100 (extremely high for testing). Does not attack. Does not move. Classification: Punching Bag."
+	debug_enemy.clearance_info[3] = "Entity spawns once per chunk. Position determined by walkable tile search from chunk center."
+	debug_enemy.clearance_info[4] = "--- SYSTEM DATA ---\nclass_name: DebugEnemy\nstats.body = 100\nstats.bonus_hp = 1000.0\nprocess_turn(): pass  # Does nothing"
+	debug_enemy.object_class = "Debug"
+	debug_enemy.threat_level = 0
+	_entities["debug_enemy"] = debug_enemy
+
 	Log.system("Loaded %d entities (including grid tiles)" % _entities.size())
 
 # ============================================================================

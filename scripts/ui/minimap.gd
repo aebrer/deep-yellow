@@ -366,16 +366,19 @@ func _draw_discovered_items(player_pos: Vector2i) -> void:
 			map_image.set_pixelv(screen_pos, COLOR_ITEM)
 
 func _draw_entities(player_pos: Vector2i) -> void:
-	"""Draw entities as magenta pixels on minimap"""
-	# Get all entities from "entities" group
-	var entities = get_tree().get_nodes_in_group("entities")
+	"""Draw entities as magenta pixels on minimap
+
+	Uses EntityRenderer to get entity positions (data-driven, like items).
+	"""
+	# Get EntityRenderer from Grid3D
+	if not grid or not grid.entity_renderer:
+		return
+
+	# Get all entity positions from renderer
+	var entity_positions = grid.entity_renderer.get_all_entity_positions()
 
 	# Draw each entity as a magenta pixel
-	for entity in entities:
-		if not entity.has_method("get") or not entity.get("grid_position"):
-			continue  # Skip if entity doesn't have grid_position
-
-		var entity_pos: Vector2i = entity.grid_position
+	for entity_pos in entity_positions:
 		var screen_pos := _world_to_screen(entity_pos, player_pos)
 
 		if _is_valid_screen_pos(screen_pos):

@@ -23,8 +23,8 @@ var world_position: Vector2i  # Absolute tile position in world
 # Data
 var tile_data: Array[Array] = []  # 16×16 tile types (layer 0)
 var ceiling_data: Array[Array] = []  # 16×16 ceiling tiles (layer 1)
-var entities: Array[int] = []  # Entity IDs spawned in this sub-chunk
 var world_items: Array[Dictionary] = []  # Serialized WorldItem data (persists across chunk load/unload)
+var world_entities: Array[Dictionary] = []  # Serialized WorldEntity data (persists across chunk load/unload)
 
 # ============================================================================
 # INITIALIZATION
@@ -177,13 +177,75 @@ func get_world_items_in_subchunk() -> Array[Dictionary]:
 	return world_items.duplicate()
 
 # ============================================================================
+# WORLD ENTITY MANAGEMENT
+# ============================================================================
+
+func add_world_entity(world_entity_data: Dictionary) -> void:
+	"""Add serialized world entity data to this sub-chunk
+
+	Args:
+		world_entity_data: Serialized WorldEntity (from WorldEntity.to_dict())
+	"""
+	world_entities.append(world_entity_data)
+
+func remove_world_entity(world_position: Vector2i) -> bool:
+	"""Remove world entity at position (when killed)
+
+	Args:
+		world_position: World tile coordinates
+
+	Returns:
+		true if entity was found and removed
+	"""
+	for i in range(world_entities.size()):
+		var entity_data = world_entities[i]
+		var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
+		var entity_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+
+		if entity_pos == world_position:
+			world_entities.remove_at(i)
+			return true
+
+	return false
+
+func update_world_entity(world_position: Vector2i, updated_data: Dictionary) -> bool:
+	"""Update entity data at position (e.g., after taking damage)
+
+	Args:
+		world_position: World tile coordinates
+		updated_data: New entity data to store
+
+	Returns:
+		true if entity was found and updated
+	"""
+	for i in range(world_entities.size()):
+		var entity_data = world_entities[i]
+		var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
+		var entity_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+
+		if entity_pos == world_position:
+			world_entities[i] = updated_data
+			return true
+
+	return false
+
+func get_world_entities_in_subchunk() -> Array[Dictionary]:
+	"""Get all world entities in this sub-chunk
+
+	Returns:
+		Array of serialized WorldEntity data
+	"""
+	return world_entities.duplicate()
+
+# ============================================================================
 # UTILITY
 # ============================================================================
 
 func _to_string() -> String:
-	return "SubChunk(local=%s, world=%s, walkable=%d, items=%d)" % [
+	return "SubChunk(local=%s, world=%s, walkable=%d, items=%d, entities=%d)" % [
 		local_position,
 		world_position,
 		get_walkable_count(),
-		world_items.size()
+		world_items.size(),
+		world_entities.size()
 	]

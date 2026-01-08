@@ -168,7 +168,7 @@ func _get_item_exp(rarity: String) -> int:
 
 func _get_entity_exp() -> int:
 	"""Get EXP reward for examining an entity"""
-	return 1000
+	return 50
 
 func _get_item_by_id(item_id: String) -> Item:
 	"""Look up Item resource by item_id from current level config

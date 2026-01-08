@@ -63,6 +63,9 @@ func _ready() -> void:
 	if stats:
 		stats.entity_died.connect(_on_entity_died)
 
+	# Update 3D position to match grid position
+	update_visual_position()
+
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Entity ready: %s at %s" % [entity_name, grid_position])
 
 # ============================================================================

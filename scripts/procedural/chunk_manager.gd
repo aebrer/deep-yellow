@@ -358,8 +358,8 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 	else:
 		Log.warn(Log.Category.SYSTEM, "Item spawning skipped: conditions not met")
 
-	# DEBUG: Spawn debug enemy (one per chunk for combat testing)
-	_spawn_debug_enemy_in_chunk(chunk, chunk_key)
+	# NOTE: Debug enemy spawning moved to _load_chunk_to_grid()
+	# because it uses grid.is_walkable() which queries GridMap
 
 	# Emit progress during initial load
 	if not initial_load_complete:
@@ -379,7 +379,16 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		_find_grid_3d()
 
 	if grid_3d:
+		# First load terrain into GridMap (needed for is_walkable)
 		grid_3d.load_chunk(chunk)
+
+		# Spawn entities AFTER GridMap is populated (is_walkable needs GridMap)
+		# but BEFORE entity rendering (entities need to be in chunk data)
+		_spawn_debug_enemy_in_chunk(chunk, chunk_key)
+
+		# Now render entities (after they've been added to chunk data)
+		if grid_3d.entity_renderer:
+			grid_3d.entity_renderer.render_chunk_entities(chunk)
 	else:
 		# Only warn once per session
 		if loaded_chunks.size() == 1:
@@ -401,7 +410,7 @@ func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 # DEBUG ENEMY SPAWNING
 # ============================================================================
 
-func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
+func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
 	"""Spawn a debug enemy in the center of the chunk for combat testing
 
 	Debug enemy:
@@ -409,16 +418,13 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	- Has tons of HP (1000+) for testing
 	- Does NOT move or attack
 	- Just a stationary punching bag
+
+	Now uses WorldEntity data pattern (like items) instead of Node3D instances.
+	EntityRenderer creates billboards when chunk loads.
 	"""
-	# Wait for grid to exist
+	# Wait for grid to exist (needed for is_walkable check)
 	if not grid_3d:
 		Log.warn(Log.Category.ENTITY, "Cannot spawn debug enemy - no grid_3d reference")
-		return
-
-	# Load debug enemy scene
-	var debug_enemy_scene = load("res://scenes/debug_enemy.tscn")
-	if not debug_enemy_scene:
-		Log.warn(Log.Category.ENTITY, "Failed to load debug_enemy.tscn")
 		return
 
 	# Find a walkable spawn position near chunk center
@@ -458,14 +464,24 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 		Log.warn(Log.Category.ENTITY, "Could not find walkable spawn for debug enemy in chunk %s (tried 30 tile radius)" % chunk.position)
 		return
 
-	# Instantiate debug enemy
-	var debug_enemy: DebugEnemy = debug_enemy_scene.instantiate()
-	debug_enemy.grid_position = spawn_pos
-	debug_enemy.grid = grid_3d  # Set grid reference
+	# Create WorldEntity data (like WorldItem pattern)
+	var entity_data = {
+		"entity_type": "debug_enemy",
+		"world_position": {"x": spawn_pos.x, "y": spawn_pos.y},
+		"current_hp": 1100.0,  # High HP for testing (100 BODY = 100 HP + 1000 bonus)
+		"max_hp": 1100.0,
+		"is_dead": false,
+		"spawn_turn": 0
+	}
 
-	# Add to scene tree (deferred to ensure main thread)
-	grid_3d.call_deferred("add_child", debug_enemy)
-	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned DebugEnemy at %s in chunk %s" % [spawn_pos, chunk.position])
+	# Find the subchunk containing this position and add entity data
+	var local_pos = spawn_pos - chunk_world_pos
+	var subchunk_x = local_pos.x / SubChunk.SIZE
+	var subchunk_y = local_pos.y / SubChunk.SIZE
+	var subchunk = chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
+	if subchunk:
+		subchunk.add_world_entity(entity_data)
+		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned DebugEnemy data at %s in chunk %s" % [spawn_pos, chunk.position])
 
 # ============================================================================
 # ITEM DISCOVERY

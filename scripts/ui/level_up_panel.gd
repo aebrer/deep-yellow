@@ -103,6 +103,10 @@ var new_level: int = 0
 var available_perks: Array[PerkType] = []
 var _accepting_input: bool = false
 
+## Queue of pending level-ups (for when player gains multiple levels at once)
+## Each entry is a Dictionary: {"player": Player3D, "level": int}
+var _pending_levelups: Array[Dictionary] = []
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -154,12 +158,25 @@ func _build_panel() -> void:
 func show_level_up(player: Player3D, level: int) -> void:
 	"""Display level-up perk selection UI
 
+	If a level-up dialog is already showing, queue this one for later.
+
 	Args:
 		player: Player reference
 		level: New level reached
 	"""
-	Log.system("show_level_up: Level %d" % level)
+	Log.system("show_level_up: Level %d (visible=%s, queue_size=%d)" % [level, visible, _pending_levelups.size()])
 
+	# If already showing, queue this level-up for later
+	if visible:
+		_pending_levelups.append({"player": player, "level": level})
+		Log.system("Queued level-up for Level %d (queue size: %d)" % [level, _pending_levelups.size()])
+		return
+
+	# Show immediately
+	_show_level_up_immediate(player, level)
+
+func _show_level_up_immediate(player: Player3D, level: int) -> void:
+	"""Actually display the level-up UI (called when not already showing)"""
 	player_ref = player
 	new_level = level
 
@@ -228,13 +245,13 @@ func _update_panel_position() -> void:
 
 func _rebuild_content() -> void:
 	"""Rebuild UI content for current level-up"""
-	# Clear old content
+	# Clear old content (use queue_free to avoid freeing locked objects)
 	for child in content_vbox.get_children():
 		if child is Button and child.has_focus():
 			child.release_focus()
 		if child.is_in_group("hud_focusable"):
 			child.remove_from_group("hud_focusable")
-		child.free()
+		child.queue_free()
 	perk_buttons.clear()
 
 	# Header
@@ -374,8 +391,22 @@ func _modify_corruption(percent_change: float) -> void:
 	Log.player("Corruption changed: %.2f → %.2f (%+.1f%%)" % [current_corruption, new_corruption, percent_change * 100])
 
 func _close_panel() -> void:
-	"""Hide panel and unpause game"""
+	"""Hide panel and either show next queued level-up or unpause game"""
 	visible = false
+
+	# Check for queued level-ups
+	if _pending_levelups.size() > 0:
+		var next_levelup = _pending_levelups.pop_front()
+		Log.system("Processing queued level-up: Level %d (%d remaining)" % [
+			next_levelup["level"],
+			_pending_levelups.size()
+		])
+		# Defer showing next level-up to allow current button to finish its callback
+		# This prevents "Object is locked" errors from freeing buttons mid-signal
+		call_deferred("_show_level_up_immediate", next_levelup["player"], next_levelup["level"])
+		return
+
+	# No more queued level-ups, unpause game
 	if PauseManager:
 		PauseManager.toggle_pause()
 
