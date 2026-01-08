@@ -32,6 +32,7 @@ const COLOR_TRAIL_END := Color(0.9, 0.0, 1.0, 1.0)  # Bright purple
 const COLOR_CHUNK_BOUNDARY := Color("#404040")  # Subtle gray
 const COLOR_UNLOADED := Color("#000000")  # Black
 const COLOR_ITEM := Color("#ffff00")  # Bright yellow (discovered items)
+const COLOR_ENTITY := Color("#ff00ff")  # Magenta (entities/enemies)
 
 # ============================================================================
 # NODES
@@ -270,6 +271,9 @@ func _update_dynamic_elements(player_pos: Vector2i) -> void:
 	# Draw discovered items
 	_draw_discovered_items(player_pos)
 
+	# Draw entities
+	_draw_entities(player_pos)
+
 	# Draw player position (centered)
 	var player_screen := _world_to_screen(player_pos, player_pos)
 	if _is_valid_screen_pos(player_screen):
@@ -360,6 +364,27 @@ func _draw_discovered_items(player_pos: Vector2i) -> void:
 
 		if _is_valid_screen_pos(screen_pos):
 			map_image.set_pixelv(screen_pos, COLOR_ITEM)
+
+func _draw_entities(player_pos: Vector2i) -> void:
+	"""Draw entities as magenta pixels on minimap"""
+	# Get all entities from "entities" group
+	var entities = get_tree().get_nodes_in_group("entities")
+
+	# Draw each entity as a magenta pixel
+	for entity in entities:
+		if not entity.has_method("get") or not entity.get("grid_position"):
+			continue  # Skip if entity doesn't have grid_position
+
+		var entity_pos: Vector2i = entity.grid_position
+		var screen_pos := _world_to_screen(entity_pos, player_pos)
+
+		if _is_valid_screen_pos(screen_pos):
+			# Draw 2x2 entity marker (slightly larger than items)
+			for dy in range(0, 2):
+				for dx in range(0, 2):
+					var pixel := screen_pos + Vector2i(dx, dy)
+					if _is_valid_screen_pos(pixel):
+						map_image.set_pixelv(pixel, COLOR_ENTITY)
 
 # ============================================================================
 # HELPERS
