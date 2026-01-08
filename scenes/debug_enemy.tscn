@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://d3vm5yxkr8sxe"]
+
+[ext_resource type="Script" path="res://scripts/entities/debug_enemy.gd" id="1_1a2b3"]
+
+[node name="DebugEnemy" type="Node3D"]
+script = ExtResource("1_1a2b3")
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+billboard = 1
+shaded = true
+alpha_cut = 2
+texture_filter = 0
