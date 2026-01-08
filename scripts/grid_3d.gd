@@ -414,22 +414,43 @@ func world_to_grid(world_pos: Vector3) -> Vector2i:
 # ============================================================================
 
 func is_walkable(pos: Vector2i) -> bool:
-	"""Check if grid position is walkable
+	"""Check if grid position is walkable (floor tile + no entity blocking)
 
 	For procedural generation (infinite world), queries GridMap directly.
 	For static levels, checks bounds first.
+	Also checks for entities blocking the position.
 	"""
 	# For procedural generation: infinite world, no bounds checking
 	if use_procedural_generation:
 		var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-		return cell_item == TileType.FLOOR
+		if cell_item != TileType.FLOOR:
+			return false
+
+		# Check for entities blocking this position
+		return not _is_position_blocked_by_entity(pos)
 
 	# For static levels: check bounds first
 	if not is_in_bounds(pos):
 		return false
 
 	var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-	return cell_item == TileType.FLOOR
+	if cell_item != TileType.FLOOR:
+		return false
+
+	# Check for entities blocking this position
+	return not _is_position_blocked_by_entity(pos)
+
+func _is_position_blocked_by_entity(pos: Vector2i) -> bool:
+	"""Check if any entity is occupying this grid position
+
+	Returns true if blocked, false if clear.
+	"""
+	var entities = get_tree().get_nodes_in_group("entities")
+	for entity in entities:
+		if entity.has_method("get") and entity.get("grid_position"):
+			if entity.grid_position == pos:
+				return true  # Position is blocked
+	return false  # Position is clear
 
 func is_in_bounds(pos: Vector2i) -> bool:
 	"""Check if position is within grid bounds

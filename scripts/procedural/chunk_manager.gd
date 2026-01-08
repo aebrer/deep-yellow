@@ -410,6 +410,11 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	- Does NOT move or attack
 	- Just a stationary punching bag
 	"""
+	# Wait for grid to exist
+	if not grid_3d:
+		Log.warn(Log.Category.ENTITY, "Cannot spawn debug enemy - no grid_3d reference")
+		return
+
 	# Load debug enemy scene
 	var debug_enemy_scene = load("res://scenes/debug_enemy.tscn")
 	if not debug_enemy_scene:
@@ -420,30 +425,37 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	var chunk_world_pos = chunk.position * CHUNK_SIZE  # Chunk origin in world tiles
 	var chunk_center = chunk_world_pos + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
 
-	# Try to find walkable position near center (spiral search)
+	# Use same spiral search pattern as player spawning (reusing Grid.is_walkable)
 	var spawn_pos: Vector2i = chunk_center
 	var found_walkable = false
 
-	for radius in range(0, 20):  # Search outward up to 20 tiles
-		for dy in range(-radius, radius + 1):
+	# First check if center is walkable
+	if grid_3d.is_walkable(chunk_center):
+		spawn_pos = chunk_center
+		found_walkable = true
+	else:
+		# Spiral search outward from center (same pattern as player spawn)
+		for radius in range(1, 30):  # Search up to 30 tiles out
 			for dx in range(-radius, radius + 1):
-				if abs(dx) + abs(dy) != radius and radius > 0:
-					continue  # Only check tiles at this exact radius
+				for dy in range(-radius, radius + 1):
+					# Only check tiles at this exact radius (Manhattan distance)
+					if abs(dx) + abs(dy) != radius:
+						continue
 
-				var test_pos = chunk_center + Vector2i(dx, dy)
+					var test_pos = chunk_center + Vector2i(dx, dy)
 
-				# Check if walkable by getting tile from chunk data
-				if _is_tile_walkable_in_chunk(test_pos, chunk):
-					spawn_pos = test_pos
-					found_walkable = true
+					# Use Grid.is_walkable (same as player) - this checks GridMap properly
+					if grid_3d.is_walkable(test_pos):
+						spawn_pos = test_pos
+						found_walkable = true
+						break
+				if found_walkable:
 					break
 			if found_walkable:
 				break
-		if found_walkable:
-			break
 
 	if not found_walkable:
-		Log.warn(Log.Category.ENTITY, "Could not find walkable spawn for debug enemy in chunk %s" % chunk.position)
+		Log.warn(Log.Category.ENTITY, "Could not find walkable spawn for debug enemy in chunk %s (tried 30 tile radius)" % chunk.position)
 		return
 
 	# Instantiate debug enemy
@@ -452,41 +464,8 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	debug_enemy.grid = grid_3d  # Set grid reference
 
 	# Add to scene tree (deferred to ensure main thread)
-	if grid_3d:
-		grid_3d.call_deferred("add_child", debug_enemy)
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned DebugEnemy at %s in chunk %s" % [spawn_pos, chunk.position])
-
-func _is_tile_walkable_in_chunk(world_pos: Vector2i, chunk: Chunk) -> bool:
-	"""Check if a tile is walkable within the given chunk
-
-	Returns true if tile is floor (ID 0), false if wall or out of bounds.
-	"""
-	var chunk_world_pos = chunk.position * CHUNK_SIZE
-	var local_pos = world_pos - chunk_world_pos
-
-	# Check if position is within chunk bounds
-	if local_pos.x < 0 or local_pos.x >= CHUNK_SIZE or local_pos.y < 0 or local_pos.y >= CHUNK_SIZE:
-		return false
-
-	# Find subchunk containing this position
-	var subchunk_x = local_pos.x / SubChunk.SIZE
-	var subchunk_y = local_pos.y / SubChunk.SIZE
-	var subchunk = chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
-
-	if not subchunk:
-		return false
-
-	# Get tile within subchunk
-	var subchunk_local_x = local_pos.x % SubChunk.SIZE
-	var subchunk_local_y = local_pos.y % SubChunk.SIZE
-
-	# tile_data is [y][x] format
-	if subchunk_local_y >= 0 and subchunk_local_y < subchunk.tile_data.size():
-		if subchunk_local_x >= 0 and subchunk_local_x < subchunk.tile_data[0].size():
-			var tile_id = subchunk.tile_data[subchunk_local_y][subchunk_local_x]
-			return tile_id == 0  # 0 = floor, walkable
-
-	return false
+	grid_3d.call_deferred("add_child", debug_enemy)
+	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned DebugEnemy at %s in chunk %s" % [spawn_pos, chunk.position])
 
 # ============================================================================
 # ITEM DISCOVERY
