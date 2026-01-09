@@ -30,6 +30,9 @@ var entity_billboards: Dictionary = {}  # Vector2i -> Sprite3D
 ## Maps world tile position to WorldEntity data (for state sync)
 var entity_data_cache: Dictionary = {}  # Vector2i -> Dictionary
 
+## Currently highlighted entity positions (for attack preview)
+var _highlighted_positions: Array[Vector2i] = []
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -50,6 +53,9 @@ const ENTITY_COLORS = {
 
 ## Default entity color
 const DEFAULT_ENTITY_COLOR = Color(1.0, 0.0, 0.0)  # Red
+
+## Highlight color for attack targets (red glow)
+const ATTACK_TARGET_HIGHLIGHT = Color(1.0, 0.4, 0.4)  # Bright red tint
 
 # ============================================================================
 # CHUNK LOADING
@@ -146,12 +152,17 @@ func _create_billboard(entity_data: Dictionary, world_pos: Vector2i) -> Sprite3D
 	)
 	sprite.position = world_3d
 
-	# Create placeholder colored square (until we have real sprites)
+	# Create placeholder white square and use modulate for color
+	# This allows us to change modulate for highlighting effects
 	var color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
 	var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	image.fill(color)
+	image.fill(Color.WHITE)
 	sprite.texture = ImageTexture.create_from_image(image)
 	sprite.pixel_size = BILLBOARD_SIZE / 16.0
+	sprite.modulate = color  # Base color via modulate (can be changed for highlights)
+
+	# Store original color for highlight restoration
+	sprite.set_meta("base_color", color)
 
 	# Store entity position for collision queries
 	sprite.set_meta("grid_position", world_pos)
@@ -290,6 +301,45 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Removed entity billboard at %s" % world_pos)
 	return true
+
+# ============================================================================
+# ATTACK TARGET HIGHLIGHTING
+# ============================================================================
+
+func highlight_attack_targets(target_positions: Array) -> void:
+	"""Highlight entities that will be attacked next turn.
+
+	Clears previous highlights and applies new ones.
+	Used by action preview to show what WILL happen.
+
+	Args:
+		target_positions: Array of Vector2i positions to highlight
+	"""
+	# Clear previous highlights first
+	clear_attack_highlights()
+
+	# Apply new highlights
+	for pos in target_positions:
+		if not pos is Vector2i:
+			continue
+
+		var world_pos = pos as Vector2i
+		if entity_billboards.has(world_pos):
+			var sprite = entity_billboards[world_pos] as Sprite3D
+			if sprite:
+				sprite.modulate = ATTACK_TARGET_HIGHLIGHT
+				_highlighted_positions.append(world_pos)
+
+func clear_attack_highlights() -> void:
+	"""Clear all attack target highlights, restoring original colors."""
+	for world_pos in _highlighted_positions:
+		if entity_billboards.has(world_pos):
+			var sprite = entity_billboards[world_pos] as Sprite3D
+			if sprite:
+				var base_color = sprite.get_meta("base_color", Color.WHITE)
+				sprite.modulate = base_color  # Restore original color
+
+	_highlighted_positions.clear()
 
 # ============================================================================
 # CLEANUP

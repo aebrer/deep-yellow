@@ -103,6 +103,9 @@ func exit() -> void:
 	# Clear current target
 	current_target = null
 
+	# Clear attack highlights when leaving look mode
+	_clear_attack_highlights()
+
 # ============================================================================
 # INPUT HANDLING
 # ============================================================================
@@ -209,9 +212,16 @@ func _update_action_preview() -> void:
 	player.action_preview_changed.emit(actions)
 
 func _add_attack_previews(actions: Array[Action], destination: Vector2i) -> void:
-	"""Add attack preview actions for attacks that will fire this turn from destination."""
+	"""Add attack preview actions for attacks that will fire this turn from destination.
+
+	Also highlights entities that will be attacked (red glow on billboards).
+	"""
 	if not player or not player.attack_executor:
+		_clear_attack_highlights()
 		return
+
+	# Collect all targets from all attacks for highlighting
+	var all_targets: Array[Vector2i] = []
 
 	var attack_types = [_AttackTypes.Type.BODY, _AttackTypes.Type.MIND, _AttackTypes.Type.NULL]
 
@@ -243,7 +253,12 @@ func _add_attack_previews(actions: Array[Action], destination: Vector2i) -> void
 			actions.append(mana_blocked)
 			continue
 
-		# Only show attacks that have targets - no targets = don't clutter UI
+		# Collect targets for highlighting (attack will fire)
+		for target_pos in targets:
+			if target_pos is Vector2i and not all_targets.has(target_pos):
+				all_targets.append(target_pos)
+
+		# Only show in UI if there are targets - no targets = don't clutter UI
 		if targets.is_empty():
 			continue
 
@@ -255,6 +270,19 @@ func _add_attack_previews(actions: Array[Action], destination: Vector2i) -> void
 			preview.get("mana_cost", 0.0)
 		)
 		actions.append(attack_preview)
+
+	# Highlight all targets that will be attacked
+	_update_attack_highlights(all_targets)
+
+func _update_attack_highlights(targets: Array[Vector2i]) -> void:
+	"""Update attack target highlights on entity billboards."""
+	if player and player.grid and player.grid.entity_renderer:
+		player.grid.entity_renderer.highlight_attack_targets(targets)
+
+func _clear_attack_highlights() -> void:
+	"""Clear attack target highlights."""
+	if player and player.grid and player.grid.entity_renderer:
+		player.grid.entity_renderer.clear_attack_highlights()
 
 func _add_cooldown_previews(actions: Array[Action]) -> void:
 	"""Add cooldown displays for attacks not ready to fire."""
