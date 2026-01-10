@@ -127,10 +127,12 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				add_child(health_bar)
 				entity_health_bars[world_pos] = health_bar
 
-				# Connect to WorldEntity signals
+				# Connect to WorldEntity signals (only if not already connected)
 				entity.hp_changed.connect(_on_entity_hp_changed.bind(world_pos))
-				entity.died.connect(_on_entity_died_signal)
-				entity.moved.connect(_on_entity_moved)
+				if not entity.died.is_connected(_on_entity_died_signal):
+					entity.died.connect(_on_entity_died_signal)
+				if not entity.moved.is_connected(_on_entity_moved):
+					entity.moved.connect(_on_entity_moved)
 
 				# Check if entity is already damaged
 				var hp_percent = entity.get_hp_percentage()
@@ -225,10 +227,12 @@ func add_entity_billboard(entity: WorldEntity) -> void:
 		entity_health_bars[world_pos] = health_bar
 		health_bar.visible = false  # Hidden at full HP
 
-		# Connect to WorldEntity signals
+		# Connect to WorldEntity signals (only if not already connected)
 		entity.hp_changed.connect(_on_entity_hp_changed.bind(world_pos))
-		entity.died.connect(_on_entity_died_signal)
-		entity.moved.connect(_on_entity_moved)
+		if not entity.died.is_connected(_on_entity_died_signal):
+			entity.died.connect(_on_entity_died_signal)
+		if not entity.moved.is_connected(_on_entity_moved):
+			entity.moved.connect(_on_entity_moved)
 
 		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Added billboard for spawned entity at %s" % world_pos)
 
@@ -240,7 +244,9 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		new_pos: New world tile position
 	"""
 	if not entity_billboards.has(old_pos):
-		Log.warn(Log.Category.ENTITY, "Entity moved from %s but no billboard found" % old_pos)
+		# This is normal for entities in unloaded chunks - they still process AI
+		# but don't have billboards. Only warn at TRACE level.
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity moved from %s but no billboard (chunk unloaded?)" % old_pos)
 		return
 
 	# Get billboard and health bar
@@ -518,16 +524,66 @@ func _on_entity_died_signal(entity: WorldEntity) -> void:
 	Args:
 		entity: WorldEntity that died
 	"""
-	var world_pos = entity.world_position
+	# Find entity in cache by reference (not position - position can be stale)
+	var cache_pos = _find_entity_in_cache(entity)
+	if cache_pos == Vector2i(-999999, -999999):
+		# Entity not in cache - either already removed or in unloaded chunk
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity died but not in cache (already processed?): %s" % entity.entity_type)
+		return
 
-	# Spawn death skull emoji (2x size of hit emoji)
-	_spawn_death_emoji(world_pos)
+	# Spawn death skull emoji at current position
+	_spawn_death_emoji(cache_pos)
 
 	# Emit our death signal for EXP rewards etc.
 	entity_died.emit(entity)
 
-	# Delay removal slightly so VFX is visible
-	_remove_entity_delayed(world_pos, HIT_EMOJI_DURATION)
+	# Remove billboard immediately (not delayed) to prevent ghost billboards
+	# The death VFX (skull emoji) floats independently, so billboard can go now
+	_remove_entity_immediately(cache_pos)
+	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Entity died and removed at %s" % cache_pos)
+
+func _remove_entity_immediately(world_pos: Vector2i) -> void:
+	"""Remove entity billboard immediately (no delay)
+
+	Args:
+		world_pos: Position to remove
+	"""
+	if not entity_billboards.has(world_pos):
+		return
+
+	# Remove billboard
+	var billboard = entity_billboards[world_pos]
+	if is_instance_valid(billboard):
+		billboard.queue_free()
+	entity_billboards.erase(world_pos)
+	entity_cache.erase(world_pos)
+
+	# Remove health bar
+	if entity_health_bars.has(world_pos):
+		var health_bar = entity_health_bars[world_pos]
+		if is_instance_valid(health_bar):
+			health_bar.queue_free()
+		entity_health_bars.erase(world_pos)
+
+func _find_entity_in_cache(entity: WorldEntity) -> Vector2i:
+	"""Find entity's position in cache (handles moved entities)
+
+	Args:
+		entity: WorldEntity to find
+
+	Returns:
+		Cache position, or Vector2i(-999999, -999999) if not found
+	"""
+	# First try the entity's current position
+	if entity_cache.get(entity.world_position) == entity:
+		return entity.world_position
+
+	# Search cache for this entity (in case of stale position)
+	for pos in entity_cache.keys():
+		if entity_cache[pos] == entity:
+			return pos
+
+	return Vector2i(-999999, -999999)  # Not found sentinel
 
 # ============================================================================
 # VFX SPAWNING (called by AttackExecutor)
@@ -559,18 +615,21 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 		true if entity was found and removed
 	"""
 	if not entity_billboards.has(world_pos):
+		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "remove_entity_at(%s): No billboard found (already removed?)" % world_pos)
 		return false
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
-	billboard.queue_free()
+	if is_instance_valid(billboard):
+		billboard.queue_free()
 	entity_billboards.erase(world_pos)
 	entity_cache.erase(world_pos)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
 		var health_bar = entity_health_bars[world_pos]
-		health_bar.queue_free()
+		if is_instance_valid(health_bar):
+			health_bar.queue_free()
 		entity_health_bars.erase(world_pos)
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Removed entity billboard at %s" % world_pos)
@@ -779,16 +838,6 @@ func _spawn_death_emoji(world_pos: Vector2i) -> void:
 
 	tween.chain().tween_callback(label.queue_free)
 
-func _remove_entity_delayed(world_pos: Vector2i, delay: float) -> void:
-	"""Remove entity after a delay (allows VFX to play on death).
-
-	Args:
-		world_pos: Position of entity to remove
-		delay: Delay in seconds before removal
-	"""
-	# Create a timer to delay removal
-	var timer = get_tree().create_timer(delay)
-	timer.timeout.connect(func(): remove_entity_at(world_pos))
 
 # ============================================================================
 # CLEANUP

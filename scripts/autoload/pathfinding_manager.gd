@@ -87,20 +87,26 @@ func _add_point(pos: Vector2i) -> void:
 	pos_to_id[pos] = point_id
 	id_to_pos[point_id] = pos
 
-## Connect a point to its walkable neighbors (4-directional)
+## Connect a point to its walkable neighbors (8-directional)
 func _connect_neighbors(pos: Vector2i, point_id: int) -> void:
-	"""Connect a point to its 4-directional neighbors"""
+	"""Connect a point to its 8-directional neighbors (diagonals have same cost)"""
 	var neighbors := [
-		pos + Vector2i(0, -1),  # North
-		pos + Vector2i(0, 1),   # South
-		pos + Vector2i(-1, 0),  # West
-		pos + Vector2i(1, 0)    # East
+		# Cardinals
+		pos + Vector2i(0, -1),   # North
+		pos + Vector2i(0, 1),    # South
+		pos + Vector2i(-1, 0),   # West
+		pos + Vector2i(1, 0),    # East
+		# Diagonals
+		pos + Vector2i(-1, -1),  # Northwest
+		pos + Vector2i(1, -1),   # Northeast
+		pos + Vector2i(-1, 1),   # Southwest
+		pos + Vector2i(1, 1)     # Southeast
 	]
 
 	for neighbor_pos in neighbors:
 		if pos_to_id.has(neighbor_pos):
 			var neighbor_id: int = pos_to_id[neighbor_pos]
-			# Bidirectional connection with cost 1.0 (uniform grid)
+			# Bidirectional connection with cost 1.0 (uniform - diagonals same as cardinals)
 			if not astar.are_points_connected(point_id, neighbor_id):
 				astar.connect_points(point_id, neighbor_id, true)
 
@@ -281,3 +287,96 @@ func get_point_count() -> int:
 func has_point(pos: Vector2i) -> bool:
 	"""Check if a position is walkable and in the graph"""
 	return pos_to_id.has(pos)
+
+# ============================================================================
+# INCREMENTAL GRAPH UPDATES (for chunk load/unload)
+# ============================================================================
+
+func add_chunk(chunk: Chunk) -> void:
+	"""Add walkable tiles from a chunk to the navigation graph
+
+	Called when a chunk finishes loading. Adds all floor tiles and connects
+	them to existing neighbors (including tiles from adjacent chunks).
+
+	Args:
+		chunk: The chunk that was just loaded
+	"""
+	if not grid:
+		Log.warn(Log.Category.GRID, "PathfindingManager: No grid reference, cannot add chunk")
+		return
+
+	var start_time := Time.get_ticks_msec()
+	var added_count := 0
+
+	# Add all walkable tiles from this chunk
+	for subchunk in chunk.sub_chunks:
+		for y in range(subchunk.SIZE):
+			for x in range(subchunk.SIZE):
+				var tile_type = subchunk.get_tile(Vector2i(x, y))
+				if tile_type == subchunk.TileType.FLOOR:
+					# Calculate world position
+					var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
+					if not pos_to_id.has(world_pos):
+						_add_point(world_pos)
+						added_count += 1
+
+	# Connect all new points to their neighbors (including cross-chunk connections)
+	# This must happen AFTER all points are added
+	for subchunk in chunk.sub_chunks:
+		for y in range(subchunk.SIZE):
+			for x in range(subchunk.SIZE):
+				var tile_type = subchunk.get_tile(Vector2i(x, y))
+				if tile_type == subchunk.TileType.FLOOR:
+					var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
+					if pos_to_id.has(world_pos):
+						_connect_neighbors(world_pos, pos_to_id[world_pos])
+
+	var build_time := Time.get_ticks_msec() - start_time
+	if added_count > 0:
+		Log.msg(Log.Category.GRID, Log.Level.DEBUG, "PathfindingManager: Added %d points from chunk %s in %dms (total: %d)" % [
+			added_count, chunk.position, build_time, astar.get_point_count()
+		])
+
+func remove_chunk(chunk: Chunk) -> void:
+	"""Remove all tiles from a chunk from the navigation graph
+
+	Called when a chunk is about to be unloaded. Removes points and their
+	connections. Adjacent chunks remain connected to each other.
+
+	Args:
+		chunk: The chunk being unloaded
+	"""
+	var start_time := Time.get_ticks_msec()
+	var removed_count := 0
+
+	# Collect all point IDs to remove (can't modify dict while iterating)
+	var points_to_remove: Array[int] = []
+
+	for subchunk in chunk.sub_chunks:
+		for y in range(subchunk.SIZE):
+			for x in range(subchunk.SIZE):
+				var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
+				if pos_to_id.has(world_pos):
+					points_to_remove.append(pos_to_id[world_pos])
+					removed_count += 1
+
+	# Remove points (AStar2D automatically removes connections)
+	for point_id in points_to_remove:
+		var pos = id_to_pos[point_id]
+		astar.remove_point(point_id)
+		pos_to_id.erase(pos)
+		id_to_pos.erase(point_id)
+
+	var build_time := Time.get_ticks_msec() - start_time
+	if removed_count > 0:
+		Log.msg(Log.Category.GRID, Log.Level.DEBUG, "PathfindingManager: Removed %d points from chunk %s in %dms (total: %d)" % [
+			removed_count, chunk.position, build_time, astar.get_point_count()
+		])
+
+func set_grid_reference(grid_ref: Node) -> void:
+	"""Set the grid reference for walkability queries
+
+	Args:
+		grid_ref: Reference to Grid3D
+	"""
+	grid = grid_ref

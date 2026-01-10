@@ -390,6 +390,13 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# First load terrain into GridMap (needed for is_walkable)
 		grid_3d.load_chunk(chunk)
 
+		# Add chunk to pathfinding graph (after terrain is loaded)
+		# Note: autoload is named "Pathfinding" in project.godot
+		var pathfinder = get_node_or_null("/root/Pathfinding")
+		if pathfinder:
+			pathfinder.set_grid_reference(grid_3d)
+			pathfinder.add_chunk(chunk)
+
 		# Spawn entities AFTER GridMap is populated (is_walkable needs GridMap)
 		# but BEFORE entity rendering (entities need to be in chunk data)
 		_spawn_entities_in_chunk(chunk, chunk_key)
@@ -676,6 +683,12 @@ func _unload_distant_chunks() -> void:
 func _unload_chunk(chunk_key: Vector3i) -> void:
 	"""Unload a chunk from memory"""
 	var chunk: Chunk = loaded_chunks[chunk_key]
+
+	# Remove from pathfinding graph BEFORE unloading (so paths don't use stale data)
+	# Note: autoload is named "Pathfinding" in project.godot
+	var pathfinder = get_node_or_null("/root/Pathfinding")
+	if pathfinder:
+		pathfinder.remove_chunk(chunk)
 
 	# Remove from Grid3D render (use cached reference)
 	if grid_3d:
