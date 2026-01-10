@@ -488,3 +488,82 @@ func get_random_walkable_position() -> Vector2i:
 		var center_y: int = grid_size.y / 2
 		return Vector2i(center_x, center_y)
 	return walkable_cells.keys().pick_random()
+
+# ============================================================================
+# LINE OF SIGHT
+# ============================================================================
+
+func has_line_of_sight(from_pos: Vector2i, to_pos: Vector2i) -> bool:
+	"""Check if there's a clear line of sight between two positions.
+
+	Uses Bresenham's line algorithm to check all tiles between positions.
+	A wall (non-FLOOR tile) blocks line of sight.
+	Entities do NOT block line of sight (attacks can pass through enemies).
+
+	Args:
+		from_pos: Starting grid position (e.g., player position)
+		to_pos: Target grid position (e.g., enemy position)
+
+	Returns:
+		true if clear line of sight, false if blocked by wall
+	"""
+	# Same position = always has LOS
+	if from_pos == to_pos:
+		return true
+
+	# Use Bresenham's line algorithm to get all tiles on the line
+	var line_tiles = _get_line_tiles(from_pos, to_pos)
+
+	# Check each tile (excluding start and end positions)
+	for i in range(1, line_tiles.size() - 1):
+		var tile_pos = line_tiles[i]
+		if _is_tile_blocking_los(tile_pos):
+			return false
+
+	return true
+
+
+func _get_line_tiles(from_pos: Vector2i, to_pos: Vector2i) -> Array[Vector2i]:
+	"""Get all tile positions on a line between two points using Bresenham's algorithm.
+
+	Returns array of positions from start to end (inclusive).
+	"""
+	var tiles: Array[Vector2i] = []
+
+	var x0 = from_pos.x
+	var y0 = from_pos.y
+	var x1 = to_pos.x
+	var y1 = to_pos.y
+
+	var dx = abs(x1 - x0)
+	var dy = -abs(y1 - y0)
+	var sx = 1 if x0 < x1 else -1
+	var sy = 1 if y0 < y1 else -1
+	var err = dx + dy
+
+	while true:
+		tiles.append(Vector2i(x0, y0))
+
+		if x0 == x1 and y0 == y1:
+			break
+
+		var e2 = 2 * err
+		if e2 >= dy:
+			err += dy
+			x0 += sx
+		if e2 <= dx:
+			err += dx
+			y0 += sy
+
+	return tiles
+
+
+func _is_tile_blocking_los(pos: Vector2i) -> bool:
+	"""Check if a tile blocks line of sight (walls block, floor doesn't).
+
+	This is different from is_walkable() because:
+	- Entities don't block LOS (attacks pass through enemies to hit all)
+	- Only terrain/walls block LOS
+	"""
+	var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
+	return cell_item != TileType.FLOOR

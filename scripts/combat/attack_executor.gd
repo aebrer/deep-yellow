@@ -6,6 +6,14 @@ The AttackExecutor:
 2. Each turn, ticks cooldowns and checks which attacks are ready
 3. For ready attacks: builds attack from pool items → finds targets → executes
 
+CRITICAL: This is an AUTO-BATTLER. Player has NO agency over attack direction.
+- Attacks automatically find and target enemies
+- Camera direction is NEVER used for targeting
+- Cone attacks aim toward the nearest enemy, then hit all enemies in that cone
+- SINGLE attacks hit the nearest enemy in range
+- AOE attacks hit all enemies in range
+The player's camera position is purely cosmetic and irrelevant to combat mechanics.
+
 Items provide modifiers via get_attack_modifiers() method.
 Modifiers are aggregated: ADD first, then MULTIPLY.
 
@@ -259,6 +267,12 @@ func _find_targets(player, attack) -> Array[Vector2i]:
 	if candidates.is_empty():
 		return []
 
+	# Filter by line of sight (walls block attacks, enemies don't)
+	candidates = _filter_by_line_of_sight(player.grid, player.grid_position, candidates)
+
+	if candidates.is_empty():
+		return []
+
 	match attack.area:
 		_AttackTypes.Area.SINGLE:
 			# Return nearest only
@@ -281,30 +295,47 @@ func _find_targets(player, attack) -> Array[Vector2i]:
 			return [candidates[0]]
 
 func _filter_cone_targets(player, candidates: Array[Vector2i]) -> Array[Vector2i]:
-	"""Filter candidates to those within a cone in player's facing direction.
+	"""Filter candidates to those within a cone aimed at the nearest enemy.
 
-	Cone is ~90 degrees wide (45 degrees each side of facing).
+	Auto-battler behavior: cone automatically aims toward the nearest enemy,
+	then includes all enemies within 45 degrees of that direction.
+	Player camera direction is irrelevant - attacks target automatically.
 	"""
+	if candidates.is_empty():
+		return []
+
+	# Find nearest enemy to determine cone direction
+	var nearest_pos = candidates[0]
+	var nearest_dist = player.grid_position.distance_to(nearest_pos)
+	for pos in candidates:
+		var dist = player.grid_position.distance_to(pos)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest_pos = pos
+
+	# Cone aims toward the nearest enemy
+	var cone_delta = nearest_pos - player.grid_position
+	if cone_delta == Vector2i.ZERO:
+		return [nearest_pos]  # Edge case: enemy on same tile
+
+	var cone_angle = atan2(cone_delta.y, cone_delta.x)
+
+	# Include all enemies within 45 degrees of the cone direction
 	var in_cone: Array[Vector2i] = []
-	var facing = player.get_camera_forward_grid_direction()
-
-	# Convert facing to angle (in radians)
-	var facing_angle = atan2(facing.y, facing.x)
-
 	for pos in candidates:
 		var delta = pos - player.grid_position
 		if delta == Vector2i.ZERO:
+			in_cone.append(pos)
 			continue
 
-		# Angle to this target
 		var target_angle = atan2(delta.y, delta.x)
 
 		# Angular difference (handle wraparound)
-		var angle_diff = abs(target_angle - facing_angle)
+		var angle_diff = abs(target_angle - cone_angle)
 		if angle_diff > PI:
 			angle_diff = TAU - angle_diff
 
-		# Include if within ~45 degrees of facing (90 degree cone)
+		# Include if within ~45 degrees of cone direction (90 degree cone)
 		if angle_diff <= PI / 4.0:
 			in_cone.append(pos)
 
@@ -332,6 +363,12 @@ func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Ve
 	if candidates.is_empty():
 		return []
 
+	# Filter by line of sight (walls block attacks, enemies don't)
+	candidates = _filter_by_line_of_sight(player.grid, from_pos, candidates)
+
+	if candidates.is_empty():
+		return []
+
 	match attack.area:
 		_AttackTypes.Area.SINGLE:
 			# Return nearest only
@@ -354,31 +391,73 @@ func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Ve
 			return [candidates[0]]
 
 func _filter_cone_targets_from_position(player, candidates: Array[Vector2i], from_pos: Vector2i) -> Array[Vector2i]:
-	"""Filter candidates to those within a cone in player's facing direction from a position."""
+	"""Filter candidates to those within a cone aimed at nearest enemy from a position.
+
+	Auto-battler behavior: cone automatically aims toward the nearest enemy,
+	NOT based on camera direction. Player has no agency over attack direction.
+	"""
+	if candidates.is_empty():
+		return []
+
+	# Find nearest enemy to determine cone direction
+	var nearest_pos = candidates[0]
+	var nearest_dist = from_pos.distance_to(nearest_pos)
+	for pos in candidates:
+		var dist = from_pos.distance_to(pos)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest_pos = pos
+
+	# Cone aims toward the nearest enemy
+	var cone_delta = nearest_pos - from_pos
+	if cone_delta == Vector2i.ZERO:
+		return [nearest_pos]  # Edge case: enemy on same tile
+
+	var cone_angle = atan2(cone_delta.y, cone_delta.x)
+
+	# Include all enemies within 45 degrees of the cone direction
 	var in_cone: Array[Vector2i] = []
-	var facing = player.get_camera_forward_grid_direction()
-
-	# Convert facing to angle (in radians)
-	var facing_angle = atan2(facing.y, facing.x)
-
 	for pos in candidates:
 		var delta = pos - from_pos
 		if delta == Vector2i.ZERO:
+			in_cone.append(pos)
 			continue
 
-		# Angle to this target
 		var target_angle = atan2(delta.y, delta.x)
 
 		# Angular difference (handle wraparound)
-		var angle_diff = abs(target_angle - facing_angle)
+		var angle_diff = abs(target_angle - cone_angle)
 		if angle_diff > PI:
 			angle_diff = TAU - angle_diff
 
-		# Include if within ~45 degrees of facing (90 degree cone)
+		# Include if within ~45 degrees of cone direction (90 degree cone)
 		if angle_diff <= PI / 4.0:
 			in_cone.append(pos)
 
 	return in_cone
+
+
+func _filter_by_line_of_sight(grid, from_pos: Vector2i, candidates: Array[Vector2i]) -> Array[Vector2i]:
+	"""Filter target candidates to only those with clear line of sight.
+
+	Walls block attacks (no shooting through walls).
+	Enemies do NOT block attacks (AOE can hit multiple enemies in a row).
+
+	Args:
+		grid: Grid3D reference for LOS checks
+		from_pos: Position attacking from (player position)
+		candidates: Array of potential target positions
+
+	Returns:
+		Filtered array containing only targets with clear LOS
+	"""
+	var visible: Array[Vector2i] = []
+
+	for target_pos in candidates:
+		if grid.has_line_of_sight(from_pos, target_pos):
+			visible.append(target_pos)
+
+	return visible
 
 # ============================================================================
 # PREVIEW (for UI)

@@ -410,78 +410,86 @@ func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 # DEBUG ENEMY SPAWNING
 # ============================================================================
 
-func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
-	"""Spawn a debug enemy in the center of the chunk for combat testing
+const DEBUG_ENEMIES_PER_CHUNK = 20  # Number of debug enemies to spawn per chunk
 
-	Debug enemy:
-	- Spawns once per chunk (guaranteed)
-	- Has tons of HP (1000+) for testing
+func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
+	"""Spawn multiple debug enemies throughout the chunk for combat testing.
+
+	Debug enemies:
+	- Spawns ~20 per chunk (scattered randomly)
+	- Has moderate HP for testing
 	- Does NOT move or attack
-	- Just a stationary punching bag
+	- Stationary punching bags for testing attack systems
 
 	Now uses WorldEntity data pattern (like items) instead of Node3D instances.
 	EntityRenderer creates billboards when chunk loads.
 	"""
-	# Wait for grid to exist (needed for is_walkable check)
 	if not grid_3d:
 		Log.warn(Log.Category.ENTITY, "Cannot spawn debug enemy - no grid_3d reference")
 		return
 
-	# Find a walkable spawn position near chunk center
 	var chunk_world_pos = chunk.position * CHUNK_SIZE  # Chunk origin in world tiles
-	var chunk_center = chunk_world_pos + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
+	var spawned_count = 0
+	var occupied_positions: Array[Vector2i] = []
 
-	# Use same spiral search pattern as player spawning (reusing Grid.is_walkable)
-	var spawn_pos: Vector2i = chunk_center
-	var found_walkable = false
+	# Try to spawn DEBUG_ENEMIES_PER_CHUNK enemies scattered throughout chunk
+	for _i in range(DEBUG_ENEMIES_PER_CHUNK):
+		var spawn_pos = _find_random_walkable_in_chunk(chunk_world_pos, occupied_positions)
+		if spawn_pos == Vector2i(-99999, -99999):
+			continue  # Couldn't find a position
 
-	# First check if center is walkable
-	if grid_3d.is_walkable(chunk_center):
-		spawn_pos = chunk_center
-		found_walkable = true
-	else:
-		# Spiral search outward from center (same pattern as player spawn)
-		for radius in range(1, 30):  # Search up to 30 tiles out
-			for dx in range(-radius, radius + 1):
-				for dy in range(-radius, radius + 1):
-					# Only check tiles at this exact radius (Manhattan distance)
-					if abs(dx) + abs(dy) != radius:
-						continue
+		occupied_positions.append(spawn_pos)
 
-					var test_pos = chunk_center + Vector2i(dx, dy)
+		# Create WorldEntity data
+		var entity_data = {
+			"entity_type": "debug_enemy",
+			"world_position": {"x": spawn_pos.x, "y": spawn_pos.y},
+			"current_hp": 50.0,  # Lower HP for faster testing (was 1100)
+			"max_hp": 50.0,
+			"is_dead": false,
+			"spawn_turn": 0
+		}
 
-					# Use Grid.is_walkable (same as player) - this checks GridMap properly
-					if grid_3d.is_walkable(test_pos):
-						spawn_pos = test_pos
-						found_walkable = true
-						break
-				if found_walkable:
-					break
-			if found_walkable:
-				break
+		# Find the subchunk containing this position and add entity data
+		var local_pos = spawn_pos - chunk_world_pos
+		var subchunk_x = local_pos.x / SubChunk.SIZE
+		var subchunk_y = local_pos.y / SubChunk.SIZE
+		var subchunk = chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
+		if subchunk:
+			subchunk.add_world_entity(entity_data)
+			spawned_count += 1
 
-	if not found_walkable:
-		Log.warn(Log.Category.ENTITY, "Could not find walkable spawn for debug enemy in chunk %s (tried 30 tile radius)" % chunk.position)
-		return
+	if spawned_count > 0:
+		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d DebugEnemies in chunk %s" % [spawned_count, chunk.position])
 
-	# Create WorldEntity data (like WorldItem pattern)
-	var entity_data = {
-		"entity_type": "debug_enemy",
-		"world_position": {"x": spawn_pos.x, "y": spawn_pos.y},
-		"current_hp": 1100.0,  # High HP for testing (100 BODY = 100 HP + 1000 bonus)
-		"max_hp": 1100.0,
-		"is_dead": false,
-		"spawn_turn": 0
-	}
 
-	# Find the subchunk containing this position and add entity data
-	var local_pos = spawn_pos - chunk_world_pos
-	var subchunk_x = local_pos.x / SubChunk.SIZE
-	var subchunk_y = local_pos.y / SubChunk.SIZE
-	var subchunk = chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
-	if subchunk:
-		subchunk.add_world_entity(entity_data)
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned DebugEnemy data at %s in chunk %s" % [spawn_pos, chunk.position])
+func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[Vector2i]) -> Vector2i:
+	"""Find a random walkable position in the chunk that isn't already occupied.
+
+	Args:
+		chunk_world_pos: World position of chunk origin
+		occupied: Positions already used for spawning
+
+	Returns:
+		Walkable position, or Vector2i(-99999, -99999) if none found
+	"""
+	const MAX_ATTEMPTS = 50
+
+	for _attempt in range(MAX_ATTEMPTS):
+		# Random position within chunk
+		var local_x = randi_range(2, CHUNK_SIZE - 3)  # Avoid edges
+		var local_y = randi_range(2, CHUNK_SIZE - 3)
+		var test_pos = chunk_world_pos + Vector2i(local_x, local_y)
+
+		# Skip if already occupied
+		if test_pos in occupied:
+			continue
+
+		# Check if walkable
+		if grid_3d.is_walkable(test_pos):
+			return test_pos
+
+	return Vector2i(-99999, -99999)  # Failed to find position
 
 # ============================================================================
 # ITEM DISCOVERY
