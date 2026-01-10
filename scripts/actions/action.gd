@@ -47,7 +47,7 @@ func get_preview_info(_player) -> Dictionary:
 # ============================================================================
 
 ## Get ItemPool from player by pool type
-## Used by actions that need to access specific pools (BODY, MIND, NULL, LIGHT)
+## Used by actions that need to access specific pools (BODY, MIND, NULL)
 static func _get_pool_by_type(player, pool_type: int) -> ItemPool:
 	"""Get the appropriate ItemPool from player based on pool type
 
@@ -65,8 +65,6 @@ static func _get_pool_by_type(player, pool_type: int) -> ItemPool:
 			return player.mind_pool
 		Item.PoolType.NULL:
 			return player.null_pool
-		Item.PoolType.LIGHT:
-			return player.light_pool
 	return null
 
 ## Remove item billboard from world after pickup

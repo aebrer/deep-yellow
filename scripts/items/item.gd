@@ -1,7 +1,7 @@
 class_name Item extends Resource
 """Base class for all items in the game.
 
-Items can be equipped in one of four pools (BODY, MIND, NULL, LIGHT).
+Items can be equipped in one of three pools (BODY, MIND, NULL).
 Each item has a level that increases when duplicates are picked up.
 Item properties scale with level (defined in subclasses).
 
@@ -16,7 +16,6 @@ Design:
 - BODY items → +N BODY
 - MIND items → +N MIND
 - NULL items → +N NULL
-- LIGHT items → no stat bonus
 """
 
 # ============================================================================
@@ -26,8 +25,7 @@ Design:
 enum PoolType {
 	BODY,   # Physical attacks, damage, defense
 	MIND,   # Perception, knowledge, mental abilities
-	NULL,   # Anomalous effects (requires NULL stat > 0)
-	LIGHT   # Light generation (single slot)
+	NULL    # Anomalous effects (requires NULL stat > 0)
 }
 
 # ============================================================================
@@ -177,8 +175,6 @@ func _apply_stat_bonus(player: Player3D) -> void:
 		PoolType.NULL:
 			player.stats.null_stat += level
 			Log.system("Applied +%d NULL from %s" % [level, item_name])
-		PoolType.LIGHT:
-			pass  # No stat bonus for LIGHT items
 
 func _remove_stat_bonus(player: Player3D) -> void:
 	"""Remove base stat bonus when item is unequipped."""
@@ -195,8 +191,6 @@ func _remove_stat_bonus(player: Player3D) -> void:
 		PoolType.NULL:
 			player.stats.null_stat -= level
 			Log.system("Removed +%d NULL from %s" % [level, item_name])
-		PoolType.LIGHT:
-			pass  # No stat bonus for LIGHT items
 
 # ============================================================================
 # ATTACK MODIFIERS

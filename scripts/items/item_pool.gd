@@ -1,7 +1,7 @@
 class_name ItemPool extends RefCounted
-"""Manages a collection of item slots for a specific pool (BODY/MIND/NULL/LIGHT).
+"""Manages a collection of item slots for a specific pool (BODY/MIND/NULL).
 
-Each pool has a fixed number of slots (3 for BODY/MIND/NULL, 1 for LIGHT).
+Each pool has a fixed number of slots (3 per pool).
 Items execute in top-to-bottom order each turn.
 
 Responsibilities:
@@ -44,8 +44,8 @@ func _init(type: Item.PoolType, slots: int):
 	"""Initialize pool with type and slot count.
 
 	Args:
-		type: BODY, MIND, NULL, or LIGHT
-		slots: Number of slots (3 for BODY/MIND/NULL, 1 for LIGHT)
+		type: BODY, MIND, or NULL
+		slots: Number of slots (3 per pool)
 	"""
 	pool_type = type
 	max_slots = slots

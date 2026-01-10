@@ -36,7 +36,7 @@ func _execute_turn() -> void:
 	player.pending_action.execute(player)
 	player.pending_action = null
 
-	# Execute all item pools (BODY → MIND → NULL → LIGHT)
+	# Execute all item pools (BODY → MIND → NULL)
 	player.execute_item_pools()
 
 	# Process enemy turns

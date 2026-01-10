@@ -43,8 +43,6 @@ var entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
 ## Maps world tile position to health bar Node3D
 var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
 
-## Currently highlighted entity positions (for attack preview)
-var _highlighted_positions: Array[Vector2i] = []
 
 # ============================================================================
 # SIGNALS
@@ -59,24 +57,33 @@ signal entity_died(entity: WorldEntity)
 # ============================================================================
 
 ## Billboard size (world units)
-const BILLBOARD_SIZE = 0.5
+const BILLBOARD_SIZE = 1.0
 
 ## Billboard height above floor (world units)
 ## Matches player Y position (1.0) so entities float at same height
 const BILLBOARD_HEIGHT = 1.0
 
-## Entity type colors (until we have sprites)
+## Entity type colors (fallback when no texture)
 const ENTITY_COLORS = {
 	"debug_enemy": Color(1.0, 0.0, 1.0),       # Magenta
 	"bacteria_spawn": Color(0.5, 1.0, 0.5),    # Light green
 	"bacteria_brood_mother": Color(0.0, 0.8, 0.0),  # Dark green
 }
 
+## Entity textures (loaded on demand)
+const ENTITY_TEXTURES = {
+	"bacteria_spawn": "res://assets/textures/entities/bacteria_spawn.png",
+	"bacteria_brood_mother": "res://assets/textures/entities/bacteria_brood_mother.png",
+}
+
+## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
+const ENTITY_SCALE_OVERRIDES = {
+	"bacteria_brood_mother": 2.0,  # Boss-sized
+}
+
 ## Default entity color
 const DEFAULT_ENTITY_COLOR = Color(1.0, 0.0, 0.0)  # Red
 
-## Highlight color for attack targets (red glow)
-const ATTACK_TARGET_HIGHLIGHT = Color(1.0, 0.4, 0.4)  # Bright red tint
 
 ## Hit emoji VFX configuration
 const HIT_EMOJI_RISE_HEIGHT = 1.2  # World units to rise (more visible travel)
@@ -316,17 +323,26 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	)
 	sprite.position = world_3d
 
-	# Create placeholder white square and use modulate for color
-	# This allows us to change modulate for highlighting effects
-	var color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
-	var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	image.fill(Color.WHITE)
-	sprite.texture = ImageTexture.create_from_image(image)
-	sprite.pixel_size = BILLBOARD_SIZE / 16.0
-	sprite.modulate = color  # Base color via modulate (can be changed for highlights)
+	# Get scale override for this entity type (default 1.0)
+	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+	var final_size = BILLBOARD_SIZE * scale_mult
 
-	# Store original color for highlight restoration
-	sprite.set_meta("base_color", color)
+	# Load texture if available, otherwise use colored square fallback
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		# Use actual sprite texture
+		var texture = load(texture_path) as Texture2D
+		if texture:
+			sprite.texture = texture
+			sprite.pixel_size = final_size / texture.get_width()
+			sprite.modulate = Color.WHITE  # Don't tint the texture
+			sprite.set_meta("base_color", Color.WHITE)
+		else:
+			# Texture load failed, use colored square fallback
+			_apply_fallback_texture(sprite, entity_type, scale_mult)
+	else:
+		# No texture defined, use colored square fallback
+		_apply_fallback_texture(sprite, entity_type, scale_mult)
 
 	# Store entity position for collision queries
 	sprite.set_meta("grid_position", world_pos)
@@ -345,14 +361,30 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	examinable.entity_type = Examinable.EntityType.ENTITY_HOSTILE  # Default to hostile for enemies
 	exam_body.add_child(examinable)
 
-	# Add collision shape to StaticBody3D
+	# Add collision shape to StaticBody3D (scaled to match billboard)
 	var collision_shape = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(BILLBOARD_SIZE, BILLBOARD_SIZE, 0.1)
+	box.size = Vector3(final_size, final_size, 0.1)
 	collision_shape.shape = box
 	exam_body.add_child(collision_shape)
 
 	return sprite
+
+func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: float = 1.0) -> void:
+	"""Apply colored square fallback texture when no sprite texture is available.
+
+	Args:
+		sprite: Sprite3D to apply texture to
+		entity_type: Entity type for color lookup
+		scale_mult: Scale multiplier (default 1.0)
+	"""
+	var color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
+	var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	sprite.texture = ImageTexture.create_from_image(image)
+	sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / 16.0
+	sprite.modulate = color  # Base color via modulate
+	sprite.set_meta("base_color", color)
 
 func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
 	"""Create a health bar using a shader for proper fill behavior.
@@ -586,20 +618,26 @@ func _find_entity_in_cache(entity: WorldEntity) -> Vector2i:
 	return Vector2i(-999999, -999999)  # Not found sentinel
 
 # ============================================================================
-# VFX SPAWNING (called by AttackExecutor)
+# VFX SPAWNING (called by AttackExecutor and EntityAI)
 # ============================================================================
 
 func spawn_hit_vfx(world_pos: Vector2i, emoji: String, damage: float) -> void:
-	"""Spawn floating hit VFX at entity position
+	"""Spawn floating hit VFX at world position
 
-	Called by AttackExecutor when damage is dealt. Does NOT modify entity state.
+	Called by AttackExecutor when player attacks an entity, or by EntityAI
+	when entities attack the player. Does NOT modify entity state.
 
 	Args:
 		world_pos: World tile position
 		emoji: Emoji to display
 		damage: Damage amount to show
 	"""
-	_spawn_hit_emoji(world_pos, emoji, damage)
+	# Check if target is an entity billboard
+	if entity_billboards.has(world_pos):
+		_spawn_hit_emoji(world_pos, emoji, damage)
+	else:
+		# Target isn't an entity (likely the player) - spawn VFX at world position
+		_spawn_hit_emoji_at_world_pos(world_pos, emoji, damage)
 
 # ============================================================================
 # BILLBOARD REMOVAL
@@ -634,45 +672,6 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Removed entity billboard at %s" % world_pos)
 	return true
-
-# ============================================================================
-# ATTACK TARGET HIGHLIGHTING
-# ============================================================================
-
-func highlight_attack_targets(target_positions: Array) -> void:
-	"""Highlight entities that will be attacked next turn.
-
-	Clears previous highlights and applies new ones.
-	Used by action preview to show what WILL happen.
-
-	Args:
-		target_positions: Array of Vector2i positions to highlight
-	"""
-	# Clear previous highlights first
-	clear_attack_highlights()
-
-	# Apply new highlights
-	for pos in target_positions:
-		if not pos is Vector2i:
-			continue
-
-		var world_pos = pos as Vector2i
-		if entity_billboards.has(world_pos):
-			var sprite = entity_billboards[world_pos] as Sprite3D
-			if sprite:
-				sprite.modulate = ATTACK_TARGET_HIGHLIGHT
-				_highlighted_positions.append(world_pos)
-
-func clear_attack_highlights() -> void:
-	"""Clear all attack target highlights, restoring original colors."""
-	for world_pos in _highlighted_positions:
-		if entity_billboards.has(world_pos):
-			var sprite = entity_billboards[world_pos] as Sprite3D
-			if sprite:
-				var base_color = sprite.get_meta("base_color", Color.WHITE)
-				sprite.modulate = base_color  # Restore original color
-
-	_highlighted_positions.clear()
 
 # ============================================================================
 # HIT VFX
@@ -751,6 +750,90 @@ func _spawn_hit_emoji(world_pos: Vector2i, emoji: String, damage: float = 0.0) -
 		randf_range(-HIT_EMOJI_JITTER, HIT_EMOJI_JITTER)
 	)
 	var start_pos = sprite.position + Vector3(0, 0.3, 0) + jitter
+	label.position = start_pos
+
+	add_child(label)
+
+	# Animate rise and fade
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_QUAD)
+
+	# Rise upward
+	var end_pos = start_pos + Vector3(0, HIT_EMOJI_RISE_HEIGHT, 0)
+	tween.tween_property(label, "position", end_pos, HIT_EMOJI_DURATION)
+
+	# Fade out
+	tween.tween_property(label, "modulate:a", 0.0, HIT_EMOJI_DURATION)
+
+	# Remove when done
+	tween.chain().tween_callback(label.queue_free)
+
+func _spawn_hit_emoji_at_world_pos(world_pos: Vector2i, emoji: String, damage: float = 0.0) -> void:
+	"""Spawn a floating emoji with damage number at a world position (not an entity).
+
+	Used for damage VFX on the player (who doesn't have an entity billboard).
+
+	Args:
+		world_pos: Grid position to spawn VFX at
+		emoji: Emoji character to display
+		damage: Damage amount to show (0 = don't show number)
+	"""
+	# Convert grid position to 3D world position
+	var world_3d: Vector3
+	if grid_3d:
+		world_3d = grid_3d.grid_to_world_centered(world_pos, 1.0)  # Player height
+	else:
+		world_3d = Vector3(world_pos.x * 2.0 + 1.0, 1.0, world_pos.y * 2.0 + 1.0)
+
+	# Calculate scaled font size
+	var base_size = HIT_EMOJI_BASE_SIZE
+	if UIScaleManager:
+		base_size = UIScaleManager.get_scaled_font_size(base_size)
+
+	# Scale with camera zoom
+	var tactical_camera: Node = null
+	var first_person_camera: Node = null
+	if grid_3d:
+		var game_3d = grid_3d.get_parent()
+		if game_3d:
+			var player = game_3d.get_node_or_null("Player3D")
+			if player:
+				tactical_camera = player.get_node_or_null("CameraRig")
+				first_person_camera = player.get_node_or_null("FirstPersonCamera")
+
+	# Determine scaling based on active camera
+	if first_person_camera and first_person_camera.get("camera") and first_person_camera.camera.current:
+		var fov = first_person_camera.camera.fov
+		var fov_ratio = clampf((fov - 60.0) / 30.0, 0.0, 1.0)
+		var zoom_scale = lerp(0.125, 0.1875, fov_ratio)
+		base_size = int(base_size * zoom_scale)
+	elif tactical_camera and "current_zoom" in tactical_camera:
+		var zoom = tactical_camera.current_zoom
+		var zoom_ratio = clampf((zoom - 8.0) / 17.0, 0.0, 1.0)
+		var zoom_scale = lerp(0.9, 2.7, zoom_ratio)
+		base_size = int(base_size * zoom_scale)
+
+	# Create floating emoji label with damage number
+	var label = Label3D.new()
+	if damage > 0:
+		label.text = "%s %.0f" % [emoji, damage]
+	else:
+		label.text = emoji
+	label.font = _EMOJI_FONT
+	label.font_size = base_size
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.modulate = Color.WHITE
+
+	# Position slightly above target with random jitter
+	var jitter = Vector3(
+		randf_range(-HIT_EMOJI_JITTER, HIT_EMOJI_JITTER),
+		0,
+		randf_range(-HIT_EMOJI_JITTER, HIT_EMOJI_JITTER)
+	)
+	var start_pos = world_3d + Vector3(0, 0.3, 0) + jitter
 	label.position = start_pos
 
 	add_child(label)

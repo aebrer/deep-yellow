@@ -13,7 +13,7 @@ This document outlines the implementation plan for the remaining core gameplay s
 The game currently has:
 - ✅ Turn-based movement system
 - ✅ Stats system (BODY, MIND, NULL)
-- ✅ Item system with pools (BODY, MIND, NULL, LIGHT)
+- ✅ Item system with pools (BODY, MIND, NULL)
 - ✅ Corruption tracking and escalation
 - ✅ Chunk streaming and generation
 - ✅ Level progression (EXP, Level, Clearance)

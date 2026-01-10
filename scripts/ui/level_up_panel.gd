@@ -43,14 +43,14 @@ const PERK_DATA: Dictionary = {
 		"color": Color.MEDIUM_PURPLE,
 	},
 	PerkType.HP_REGEN_PLUS_1: {
-		"name": "+1% HP Regen",
-		"description": "Regenerate 1% of max HP each turn",
+		"name": "+HP Regen",
+		"description": "Regenerate 0.3% of max HP each turn",
 		"icon": "❤️‍🩹",
 		"color": Color.LIGHT_CORAL,
 	},
 	PerkType.SANITY_REGEN_PLUS_1: {
-		"name": "+1% Sanity Regen",
-		"description": "Regenerate 1% of max Sanity each turn",
+		"name": "+Sanity Regen",
+		"description": "Regenerate 0.3% of max Sanity each turn",
 		"icon": "🧘",
 		"color": Color.LIGHT_BLUE,
 	},
@@ -397,10 +397,10 @@ func _apply_perk(perk_type: PerkType) -> void:
 			stats.current_mana = stats.max_mana
 
 		PerkType.HP_REGEN_PLUS_1:
-			stats.hp_regen_percent += 1.0
+			stats.hp_regen_percent += 0.3  # ~0.3% per perk (weak, stacks over time)
 
 		PerkType.SANITY_REGEN_PLUS_1:
-			stats.sanity_regen_percent += 1.0
+			stats.sanity_regen_percent += 0.3  # ~0.3% per perk
 
 		PerkType.MANA_REGEN_PLUS_1:
 			stats.mana_regen_percent += 1.0
