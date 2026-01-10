@@ -95,3 +95,10 @@ const BASE_ATTACK_NAMES = {
 	Type.MIND: "Whistle",
 	Type.NULL: "Anomaly Burst",
 }
+
+# Emojis for attack type icons (used in UI preview and hit VFX)
+const BASE_ATTACK_EMOJIS = {
+	Type.BODY: "👊",  # Punch/melee
+	Type.MIND: "📢",  # Whistle/psychic
+	Type.NULL: "✨",  # Anomaly/magic
+}

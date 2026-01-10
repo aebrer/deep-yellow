@@ -120,6 +120,10 @@ func _build_attack(player, pool: ItemPool, attack_type: int):
 				if mods.has("attack_name"):
 					attack.attack_name = mods["attack_name"]
 
+				# Attack emoji override (last one wins)
+				if mods.has("attack_emoji"):
+					attack.attack_emoji = mods["attack_emoji"]
+
 				# Area override (last one wins)
 				if mods.has("area"):
 					attack.area = mods["area"]
@@ -188,11 +192,10 @@ func _execute_attack(player, attack) -> bool:
 
 	# Apply damage to targets
 	for target_pos in targets:
-		var success = player.grid.entity_renderer.damage_entity_at(target_pos, attack.damage)
+		var success = player.grid.entity_renderer.damage_entity_at(target_pos, attack.damage, attack.attack_emoji)
 		if success:
 			var type_name = _AttackTypes.TYPE_NAMES.get(attack.attack_type, "UNKNOWN")
 			Log.player("%s (%s) hits %s for %.0f damage" % [attack.attack_name, type_name, target_pos, attack.damage])
-			# TODO: Visual feedback (damage numbers, effects)
 
 	# Apply special effects from items
 	for effect in attack.special_effects:
@@ -396,6 +399,7 @@ func get_attack_preview(player, attack_type: int, from_position: Vector2i = Vect
 		"cooldown_remaining": cooldown_after_tick,
 		"cooldown_total": attack.cooldown if attack else 1,
 		"attack_name": attack.attack_name if attack else _AttackTypes.BASE_ATTACK_NAMES[attack_type],
+		"attack_emoji": attack.attack_emoji if attack else _AttackTypes.BASE_ATTACK_EMOJIS[attack_type],
 		"damage": attack.damage if attack else 0,
 		"range": attack.range_tiles if attack else 0,
 		"targets": _find_targets_from_position(player, attack, check_pos) if attack else [],

@@ -258,9 +258,11 @@ func _add_attack_previews(actions: Array[Action], destination: Vector2i) -> void
 		if targets.is_empty():
 			continue
 
+		var attack_emoji = preview.get("attack_emoji", _AttackTypes.BASE_ATTACK_EMOJIS.get(attack_type, "⚔️"))
 		var attack_preview = AttackPreviewAction.new(
 			attack_type,
 			attack_name,
+			attack_emoji,
 			preview.get("damage", 0.0),
 			targets.size(),
 			preview.get("mana_cost", 0.0)

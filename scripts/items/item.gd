@@ -210,6 +210,7 @@ func get_attack_modifiers() -> Dictionary:
 
 	Possible keys:
 	- attack_name: String (override attack display name, e.g., "Brass Knuckles")
+	- attack_emoji: String (override attack emoji for UI and VFX, e.g., "🔥")
 	- damage_add: float (flat damage bonus)
 	- damage_multiply: float (damage multiplier, default 1.0)
 	- range_add: float (extra range in tiles)

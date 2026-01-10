@@ -23,6 +23,7 @@ const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
 
 var attack_type: int = 0  # _AttackTypes.Type.BODY (set in _init)
 var attack_name: String = ""  # Display name (can be overridden by items)
+var attack_emoji: String = ""  # Emoji for UI and VFX (can be overridden by items)
 var damage: float = 0.0
 var range_tiles: float = 1.0
 var cooldown: int = 1
@@ -44,6 +45,7 @@ func _init(type: int) -> void:
 
 	# Set defaults from base stats
 	attack_name = _AttackTypes.BASE_ATTACK_NAMES[type]
+	attack_emoji = _AttackTypes.BASE_ATTACK_EMOJIS[type]
 	damage = _AttackTypes.BASE_DAMAGE[type]
 	range_tiles = _AttackTypes.BASE_RANGE[type]
 	cooldown = _AttackTypes.BASE_COOLDOWN[type]

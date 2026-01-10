@@ -25,7 +25,7 @@ func execute(_player) -> void:
 
 func get_preview_info(_player) -> Dictionary:
 	# Show current mana vs needed
-	var target_str = "need %.0f MP (have %.0f)" % [mana_cost, current_mana]
+	var target_str = "need %.0f mana (have %.0f)" % [mana_cost, current_mana]
 
 	return {
 		"name": effect_name,

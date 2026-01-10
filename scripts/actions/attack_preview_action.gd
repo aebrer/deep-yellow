@@ -9,14 +9,16 @@ const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
 
 var attack_type: int  # AttackTypes.Type enum
 var attack_name: String
+var attack_emoji: String
 var damage: float
 var target_count: int
 var mana_cost: float
 
-func _init(type: int, name: String, dmg: float, targets: int, cost: float) -> void:
+func _init(type: int, name: String, emoji: String, dmg: float, targets: int, cost: float) -> void:
 	action_name = "AttackPreview"
 	attack_type = type
 	attack_name = name
+	attack_emoji = emoji
 	damage = dmg
 	target_count = targets
 	mana_cost = cost
@@ -28,15 +30,8 @@ func execute(_player) -> void:
 	pass  # No-op - this is display-only
 
 func get_preview_info(_player) -> Dictionary:
-	# Determine icon based on attack type (matching emoji style of other previews)
-	var icon = "⚔️"
-	match attack_type:
-		_AttackTypes.Type.BODY:
-			icon = "👊"  # Punch/melee
-		_AttackTypes.Type.MIND:
-			icon = "📢"  # Whistle/psychic
-		_AttackTypes.Type.NULL:
-			icon = "✨"  # Anomaly/magic
+	# Use attack emoji (may be customized by items)
+	var icon = attack_emoji if attack_emoji else "⚔️"
 
 	# Build target info: "X target(s) for Y dmg"
 	var target_str = "%d target%s for %.0f dmg" % [
@@ -48,7 +43,7 @@ func get_preview_info(_player) -> Dictionary:
 	# Cost display for NULL attacks
 	var cost_str = ""
 	if mana_cost > 0:
-		cost_str = "%.0f MP" % mana_cost
+		cost_str = "%.0f mana" % mana_cost
 
 	return {
 		"name": attack_name,
