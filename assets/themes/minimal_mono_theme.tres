@@ -1,6 +1,6 @@
 [gd_resource type="Theme" load_steps=3 format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/IBMPlexMono/IBMPlexMono-Regular.otf" id="1_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/default_font.tres" id="1_font"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0, 0, 0, 0.9)

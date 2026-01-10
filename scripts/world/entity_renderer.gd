@@ -18,6 +18,10 @@ class_name EntityRenderer extends Node3D
 # DEPENDENCIES
 # ============================================================================
 
+## Font with emoji fallback for floating VFX text
+## Uses default_font.tres which has NotoColorEmoji as fallback
+const _EMOJI_FONT = preload("res://assets/fonts/default_font.tres")
+
 @onready var grid_3d: Grid3D = get_parent()
 
 # ============================================================================
@@ -565,6 +569,7 @@ func _spawn_hit_emoji(world_pos: Vector2i, emoji: String, damage: float = 0.0) -
 		label.text = "%s %.0f" % [emoji, damage]
 	else:
 		label.text = emoji
+	label.font = _EMOJI_FONT  # Use font with emoji fallback for exports
 	label.font_size = base_size
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true  # Always render on top
@@ -640,6 +645,7 @@ func _spawn_death_emoji(world_pos: Vector2i) -> void:
 	# Create death emoji label
 	var label = Label3D.new()
 	label.text = "💀"
+	label.font = _EMOJI_FONT  # Use font with emoji fallback for exports
 	label.font_size = base_size
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true

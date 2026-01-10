@@ -34,6 +34,9 @@ var content_vbox: VBoxContainer
 var slot_buttons: Array[Button] = []
 var cancel_button: Button = null
 
+## Font with emoji fallback (project default doesn't auto-apply to programmatic Labels)
+var emoji_font: Font = null
+
 # State
 var current_item: Item = null
 var current_pool: ItemPool = null
@@ -43,6 +46,9 @@ var item_position: Vector2i = Vector2i.ZERO  ## World position of item being pic
 var _accepting_input: bool = false  ## Only accept button presses after panel fully set up
 
 func _ready() -> void:
+	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
+	emoji_font = load("res://assets/fonts/default_font.tres")
+
 	# Fill screen for centering
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block input when hidden
@@ -187,6 +193,8 @@ func _rebuild_content() -> void:
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	if emoji_font:
+		header.add_theme_font_override("font", emoji_font)
 	vbox.add_child(header)
 
 	# Item info
@@ -195,6 +203,8 @@ func _rebuild_content() -> void:
 	item_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	item_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ITEM_NAME))
 	item_name_label.add_theme_color_override("font_color", ItemRarity.get_color(current_item.rarity))
+	if emoji_font:
+		item_name_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(item_name_label)
 
 	# Pool type
@@ -203,6 +213,8 @@ func _rebuild_content() -> void:
 	pool_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pool_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	pool_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	if emoji_font:
+		pool_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(pool_label)
 
 	# Separator
@@ -216,6 +228,8 @@ func _rebuild_content() -> void:
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instructions.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	instructions.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	if emoji_font:
+		instructions.add_theme_font_override("font", emoji_font)
 	vbox.add_child(instructions)
 
 	# Slot buttons
@@ -233,6 +247,8 @@ func _rebuild_content() -> void:
 	cancel_button = Button.new()
 	cancel_button.text = "Leave on Ground (Cancel)"
 	cancel_button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if emoji_font:
+		cancel_button.add_theme_font_override("font", emoji_font)
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	cancel_button.add_to_group("hud_focusable")
 	vbox.add_child(cancel_button)
@@ -276,6 +292,8 @@ func _create_slot_button(slot_index: int) -> Button:
 		button.pressed.connect(func(): _on_slot_selected(slot_index, ActionType.OVERWRITE))
 
 	button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if emoji_font:
+		button.add_theme_font_override("font", emoji_font)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Create transparent normal state (no background when not focused)

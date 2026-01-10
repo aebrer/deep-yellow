@@ -97,6 +97,9 @@ var panel: PanelContainer
 var content_vbox: VBoxContainer
 var perk_buttons: Array[Button] = []
 
+## Font with emoji fallback (project default doesn't auto-apply to programmatic Labels)
+var emoji_font: Font = null
+
 # State
 var player_ref: Player3D = null
 var new_level: int = 0
@@ -112,6 +115,9 @@ var _pending_levelups: Array[Dictionary] = []
 # ============================================================================
 
 func _ready() -> void:
+	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
+	emoji_font = load("res://assets/fonts/default_font.tres")
+
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -286,6 +292,8 @@ func _rebuild_content() -> void:
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header.add_theme_color_override("font_color", Color.GOLD)
+	if emoji_font:
+		header.add_theme_font_override("font", emoji_font)
 	content_vbox.add_child(header)
 
 	# Level info
@@ -294,6 +302,8 @@ func _rebuild_content() -> void:
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_LEVEL))
 	level_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	if emoji_font:
+		level_label.add_theme_font_override("font", emoji_font)
 	content_vbox.add_child(level_label)
 
 	# Separator
@@ -307,6 +317,8 @@ func _rebuild_content() -> void:
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instructions.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_PERK_DESC))
 	instructions.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	if emoji_font:
+		instructions.add_theme_font_override("font", emoji_font)
 	content_vbox.add_child(instructions)
 
 	# Perk buttons
@@ -323,6 +335,8 @@ func _create_perk_button(perk_type: PerkType) -> Button:
 	button.text = "%s %s\n%s" % [data["icon"], data["name"], data["description"]]
 	button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_PERK_NAME))
 	button.add_theme_color_override("font_color", data["color"])
+	if emoji_font:
+		button.add_theme_font_override("font", emoji_font)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.pressed.connect(func(): _on_perk_selected(perk_type))
 

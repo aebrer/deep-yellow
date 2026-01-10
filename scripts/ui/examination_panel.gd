@@ -27,6 +27,9 @@ var object_class_label: Label
 var threat_level_label: Label
 var description_label: RichTextLabel
 
+## Font with emoji fallback (project default doesn't auto-apply to programmatic Labels)
+var emoji_font: Font = null
+
 # ============================================================================
 # STATE
 # ============================================================================
@@ -35,6 +38,9 @@ var current_target: Examinable = null
 var _is_portrait_mode: bool = false
 
 func _ready() -> void:
+	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
+	emoji_font = load("res://assets/fonts/default_font.tres")
+
 	# Fill screen for positioning
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -104,6 +110,8 @@ func _build_panel() -> void:
 	header_label.text = "OBJECT EXAMINATION REPORT"
 	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	if emoji_font:
+		header_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(header_label)
 
 	# Separator
@@ -117,6 +125,8 @@ func _build_panel() -> void:
 	entity_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	entity_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
 	entity_name_label.add_theme_color_override("font_color", Color.WHITE)
+	if emoji_font:
+		entity_name_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(entity_name_label)
 
 	# Object class
@@ -124,6 +134,8 @@ func _build_panel() -> void:
 	object_class_label.text = "Class: Unknown"
 	object_class_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	object_class_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if emoji_font:
+		object_class_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(object_class_label)
 
 	# Threat level
@@ -131,6 +143,8 @@ func _build_panel() -> void:
 	threat_level_label.text = "Threat: Unknown"
 	threat_level_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	threat_level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if emoji_font:
+		threat_level_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(threat_level_label)
 
 	# Separator
@@ -147,6 +161,8 @@ func _build_panel() -> void:
 	description_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	description_label.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
 	description_label.add_theme_color_override("default_color", Color(0.9, 0.9, 0.9))
+	if emoji_font:
+		description_label.add_theme_font_override("normal_font", emoji_font)
 	vbox.add_child(description_label)
 
 func _unhandled_input(event: InputEvent) -> void:
