@@ -1,7 +1,8 @@
 # Backrooms Power Crawl - Core Gameplay Implementation TODO
 
 **Created**: 2026-01-08
-**Status**: Planning Phase - Post-Vacation Development Push
+**Last Updated**: 2026-01-10
+**Status**: Phase 1 COMPLETE - Combat System Fully Functional
 
 This document outlines the implementation plan for the remaining core gameplay systems needed to make Backrooms Power Crawl a complete, playable game.
 
@@ -17,375 +18,218 @@ The game currently has:
 - ✅ Chunk streaming and generation
 - ✅ Level progression (EXP, Level, Clearance)
 - ✅ UI systems (HUD, inventory, examination)
+- ✅ **Auto-attack combat system** (NEW!)
+- ✅ **Debug enemy spawning** (NEW!)
+- ✅ **Combat visual feedback** (NEW!)
 
 What we need to add:
-- ❌ **Enemy entities** (Bacteria Brood Mother, Bacteria Spawn)
+- ❌ **Real enemy entities** (Bacteria Brood Mother, Bacteria Spawn with actual AI)
 - ❌ **Enemy AI system** (pathfinding, behavior trees, target acquisition)
-- ❌ **Attack/Combat system** (BODY, MIND, NULL attack types with range/area/frequency)
-- ❌ **Entity spawning** (corruption-based, per-chunk on load)
+- ❌ **Enemy attacks** (enemies attack player back)
 - ❌ **More items** (variety for Level 0)
 - ❌ **Staircase exit** (Level 0 → Level 1 transition)
 
 ---
 
-## 📋 Implementation Order & Dependencies
+## ✅ COMPLETED: Phase 1 - Combat System Foundation
 
-### Phase 1: Combat System Foundation + Debug Enemy
-**Goal**: AUTO-BATTLER COMBAT - Player moves, attacks happen automatically
+**Status**: FULLY IMPLEMENTED AND TESTED
 
-**CRITICAL DESIGN**: This is a **turn-based auto-battler** like Vampire Survivors!
-- Player does NOT manually attack
-- Player just moves and manages build
-- Attacks happen automatically based on equipped items
-- Fast-paced, dopamine-rich gameplay
+### 1. Debug Enemy System ✅
+- Debug enemies spawn in chunks for combat testing
+- 20 enemies per chunk (configurable via `DEBUG_ENEMIES_PER_CHUNK`)
+- 50 HP each (was 1100, reduced for faster iteration)
+- Stationary punching bags - don't move or attack
+- Uses WorldEntity data pattern (like items)
+- Rendered via EntityRenderer with billboard sprites
 
-1. **Debug Enemy First** ⭐ START HERE
-   - `scripts/entities/debug_enemy.gd` - Simple test enemy
-   - Spawns once per chunk (guaranteed)
-   - **Tons of HP** (1000+) so it doesn't die during testing
-   - Does NOT attack back (yet)
-   - Does NOT move (yet)
-   - Just stands there as a punching bag
-   - **Why first**: Need something to attack to test combat!
-   - **Testing**: Walk around, see debug enemies in every chunk
+### 2. Auto-Attack System ✅
+- `scripts/combat/attack_executor.gd` - Handles all attack execution
+- `scripts/combat/attack_types.gd` - Constants and enums for attack types
+- `scripts/combat/pool_attack.gd` - Attack instance with modifiers applied
+- Three attack types: BODY (punch), MIND (whistle), NULL (anomaly burst)
+- Auto-targeting: Finds nearest enemy in range automatically
+- Cooldown system: Each attack type has independent cooldown
+- **CRITICAL**: This is an AUTO-BATTLER - camera direction is NEVER used for targeting
 
-2. **Auto-Attack System Base Classes**
-   - `scripts/combat/attack.gd` - Base Attack class (like Action pattern)
-   - `scripts/combat/attack_executor.gd` - Handles attack resolution
-   - Attack properties: damage, range, area, frequency, attack_type (BODY/MIND/NULL)
-   - **AUTO-TARGETING**: Finds nearest enemy in range
-   - **FREQUENCY**: Attacks every N turns automatically
-   - **Why second**: Foundation for auto-battler combat
-   - **Testing**: Player auto-attacks debug enemies when in range
+### 3. Attack Types Implementation ✅
+- **BODY**: Range 1.5, damage 5, cooldown 1 turn, SINGLE target, scales with STRENGTH (+10%/pt)
+- **MIND**: Range 3.0, damage 3, cooldown 5 turns, AOE_AROUND, scales with PERCEPTION (+20%/pt)
+- **NULL**: Range 3.0, damage 5, cooldown 4 turns, CONE, scales with ANOMALY (+50%/pt), costs 5 mana
 
-3. **Attack Types Implementation**
-   - BODY attacks: short range (1-2 tiles), physical damage, high frequency (every 1-2 turns)
-   - MIND attacks: medium range (3-5 tiles), sanity damage, medium frequency (every 3-5 turns)
-   - NULL attacks: long range (5-10 tiles), anomalous damage, low frequency (every 5-10 turns)
-   - Area effects (single tile, 3x3, line, cone, etc.)
-   - **Why third**: Defines the combat design space before complex items
-   - **Testing**: Each attack type behaves distinctly, respects stat scaling
+### 4. Line-of-Sight System ✅
+- `Grid3D.has_line_of_sight()` - Bresenham's algorithm for LOS checks
+- Walls block attacks (can't shoot through walls)
+- Entities do NOT block attacks (AOE can hit multiple enemies in a row)
+- LOS filtering happens before area-type filtering
 
-4. **Player Auto-Attack Integration**
-   - Player automatically attacks each turn (in ExecutingTurnState or PostTurnState)
-   - No manual input required
-   - Item pools execute → attacks happen
-   - Visual feedback (projectiles, damage numbers, hit effects)
-   - **Why fourth**: Makes combat functional without manual control
-   - **Testing**: Walk near debug enemy, see automatic attacks, HP drops
+### 5. Cone Attack Auto-Targeting ✅
+- Cone attacks automatically aim toward nearest enemy
+- All enemies within 45° of that direction are hit
+- Camera direction is irrelevant (auto-battler design)
 
-5. **Attack Preview & Targeting Indicators**
-   - **Visual highlight**: Shader effect on targetable enemies (glow, outline, etc.)
-     - Show in IdleState (between turns when player can see what will happen)
-     - Enemies in range for next turn get highlighted
-   - **Action preview UI**: Update existing ActionPreviewUI system
-     - Show "Attack [Enemy Name]" when enemy in range
-     - Preview updates based on movement indicator position
-     - Example: "Move forward → Attack Bacteria Spawn"
-   - **Why fifth**: Player needs to understand what will happen before committing
-   - **Testing**: Can tell which enemies will be attacked before moving
+### 6. Attack Preview & Targeting ✅
+- Visual highlight on targetable enemies (red tint)
+- Action preview UI shows attack name, damage, target count
+- Preview updates based on movement indicator position
+- Shows "X targets for Y dmg" format
+- Mana cost displayed for NULL attacks
 
----
+### 7. Combat Visual Feedback ✅
+- Floating emoji VFX when attacks hit (👊, 📢, ✨)
+- Floating damage numbers alongside emoji
+- Death skull emoji (💀) on kill (2x size)
+- Health bars appear when entity damaged (shader-based)
+- Health bars hidden at full HP, visible when damaged
 
-### Phase 2: Entity Foundation (Still No AI)
-**Goal**: Entities exist in world, have stats, can take damage, but don't act yet
+### 8. EXP & Leveling System ✅
+- EXP awarded on enemy death (base 10 EXP per kill)
+- Clearance level multiplies EXP gains (+10% per clearance)
+- Level up triggers perk selection UI
+- EXP formula: BASE × ((level + 1) ^ 1.5)
+- Weighted perk selection (Clearance is rare)
 
-**IMPORTANT - Minimap Integration**:
-- Entities should appear on minimap (different color from player)
-- Architecture should support this from the start
-- May tie to specific items later (e.g., "Enemy Radar" item)
-- For now: Always show entities on minimap for testing
+### 9. Damage Scaling ✅
+- Banker's rounding (round half to even, like Python)
+- Stat scaling: damage *= (1.0 + stat_value * scaling_rate)
+- Item modifiers: ADD first, then MULTIPLY
+- Minimum cooldown of 1 turn enforced
 
-4. **Entity Base Class**
-   - `scripts/entities/entity.gd` - Base class extending Node3D
-   - Has StatBlock (reuse player's stat system)
-   - Has visual representation (billboard sprite like items)
-   - Position on grid, collision with player
-   - **Why fourth**: Reuses StatBlock, can test entity spawning/rendering
-   - **Testing**: Entities spawn in world, visible, have HP, take damage from player attacks
-
-5. **Entity Visual System**
-   - `scripts/entities/entity_renderer.gd` - Billboard sprites for entities
-   - Health bars (optional, shows on hover/damage)
-   - Death animations (fade out, particle effects)
-   - **Why fifth**: Immediate visual feedback for testing
-   - **Testing**: Can see entities, health changes are visible
-
-6. **Entity Templates for Level 0**
-   - `scripts/resources/bacteria_spawn_template.gd` - Weak enemy stats
-   - `scripts/resources/bacteria_brood_mother_template.gd` - Strong enemy stats
-   - Defines base stats, HP, damage resistance, loot drops
-   - **Why sixth**: Data-driven entity configuration
-   - **Testing**: Different entity types have different stat profiles
+### 10. Entity Renderer System ✅
+- `scripts/world/entity_renderer.gd` - Manages entity billboards
+- Integrates with chunk loading/unloading
+- Examination support (Examinable component)
+- Minimap integration (entities shown as dots)
 
 ---
 
-### Phase 3: Entity Spawning (Entities Exist But Still Don't Act)
-**Goal**: Entities spawn when chunks load, respecting corruption
+## 📋 Remaining Implementation Phases
 
-7. **Entity Spawner System**
-   - `scripts/world/entity_spawner.gd` - Like ItemSpawner but for entities
-   - Spawn probabilities increase with corruption
-   - Bacteria Spawn: common, increases with corruption (positive multiplier)
-   - Bacteria Brood Mother: rare, moderate increase with corruption
-   - **Why seventh**: Reuses ItemSpawner pattern, hooks into chunk loading
-   - **Testing**: Walk around, see entity density increase over time
+### Phase 2: Real Enemy AI (Priority: HIGH)
+**Goal**: Enemies move toward player and attack back
 
-8. **EntityRegistry Integration**
-   - Register entity templates in EntityRegistry autoload
-   - Provide entity info (descriptions) for examination system
-   - Clearance-based revelation for entity details
-   - **Why eighth**: Reuses existing knowledge/examination systems
-   - **Testing**: Can examine entities, see descriptions based on Clearance
+1. **AI Controller Base**
+   - `scripts/ai/ai_controller.gd` - Base AI decision tree
+   - Turn-based: AI acts after player turn completes
+   - Sense → Think → Act pattern
+   - **Dependencies**: None (uses existing entity system)
 
-9. **Chunk Loading Integration**
-   - Hook entity spawner into ChunkManager (like items)
-   - Spawn entities once per chunk on load
-   - Store entities per chunk for unloading/reloading
-   - **Why ninth**: Ensures entities persist with chunks
-   - **Testing**: Entities spawn when entering new chunks, persist when returning
+2. **Pathfinding Integration**
+   - Reuse existing PathfindingManager (A* algorithm)
+   - Move toward player each turn
+   - Stop when in attack range
+   - **Dependencies**: AI Controller
 
----
+3. **Enemy Attack System**
+   - Enemies use same attack system as player
+   - Bacteria Spawn: weak BODY attacks, high frequency
+   - Bacteria Brood Mother: strong BODY attacks, spawns minions
+   - **Dependencies**: AI Controller, Pathfinding
 
-### Phase 4: AI & Behavior (Entities Finally Act!)
-**Goal**: Entities move toward player and attack
+4. **Entity Templates**
+   - Data-driven entity definitions
+   - `assets/entities/bacteria_spawn.tres`
+   - `assets/entities/bacteria_brood_mother.tres`
+   - Stats, attack patterns, spawn weights
 
-10. **AI Base System**
-    - `scripts/ai/ai_controller.gd` - Base AI controller class
-    - Turn-based: AI acts on player turn completion
-    - Decision tree: sense → think → act
-    - **Why tenth**: Foundation for all entity behaviors
-    - **Testing**: Entities take turns, log their decisions
+### Phase 3: Entity Spawning System (Priority: MEDIUM)
+**Goal**: Replace debug enemies with proper spawning
 
-11. **Basic Pathfinding AI**
-    - Reuse PathfindingManager (A* to player position)
-    - Move toward player each turn
-    - Stop when in attack range
-    - **Why eleventh**: Reuses existing pathfinding, simple behavior
-    - **Testing**: Entities chase player, stop at attack range
+1. **EntitySpawner System**
+   - Like ItemSpawner but for entities
+   - Spawn probabilities based on corruption
+   - Per-level configuration
 
-12. **Attack Behavior**
-    - Entities use Attack system (reuse player's attack system)
-    - Auto-attack player when in range
-    - Bacteria Spawn: BODY attacks (weak, frequent)
-    - Bacteria Brood Mother: BODY attacks (strong, summons adds)
-    - **Why twelfth**: Reuses attack system, makes combat functional
-    - **Testing**: Entities attack player, player loses HP
+2. **Corruption-Based Scaling**
+   - Low corruption: 0-2 entities per chunk
+   - High corruption: 5-10 entities per chunk
+   - Entity HP/damage scales with corruption
 
-13. **Special Abilities**
-    - Bacteria Brood Mother: Spawn Bacteria Spawn as bonus action
-    - Frequency: every N turns
-    - Spawns near mother's position
-    - **Why thirteenth**: Adds variety, tests entity spawning from entities
-    - **Testing**: Brood Mother spawns minions during combat
+3. **Entity Persistence**
+   - Killed entities stay dead (per-chunk tracking)
+   - Entities persist with chunk save/load
 
----
+### Phase 4: Items & Variety (Priority: MEDIUM)
+**Goal**: More items to find, build diversity
 
-### Phase 5: Combat Polish & Balance
-**Goal**: Combat feels good, challenge is appropriate
+1. **Level 0 Item Roster** (10-15 items)
+   - BODY: Brass Knuckles, Pipe, Baseball Bat
+   - MIND: Journal, Map, Focus Crystal
+   - NULL: Void Shard, Strange Coin, Anomalous Object
 
-14. **Attack Visual Effects Architecture**
-    - **CRITICAL**: Design for per-item cosmetic customization
-    - Base attack types have default visuals:
-      - BODY: Melee slash/punch effects
-      - MIND: Psychic waves/pulses
-      - NULL: Anomalous distortions/glitches
-    - Items override with custom effects:
-      - Example: "Brass Knuckles" → yellow punch particles
-      - Example: "Psychic Crown" → purple mind wave
-      - Example: "Void Shard" → black hole distortion
-    - Effect components: projectile sprite, trail particles, impact particles, screen shake
-    - **Architecture**: AttackEffect resource (like Item) with visual properties
-    - Items specify: `attack_effect: AttackEffect` (defaults to base type if null)
-    - **Why fourteenth**: Cool visuals = dopamine = fun!
-    - **Testing**: Each item feels unique and satisfying to use
-    - **Note**: Sound engineering comes MUCH later (focus on visuals now)
+2. **Item Effect System**
+   - Attack modifiers (damage_add, range_add, cooldown_add)
+   - Attack emoji customization
+   - Special effects (lifesteal, multi-hit, etc.)
 
-15. **Damage Numbers & Feedback**
-    - Floating damage numbers (sprite-based or label)
-    - Screen shake on hit (optional)
-    - Sound effects (hit, death, attack)
-    - **Why fifteenth**: Polish makes testing more enjoyable
-    - **Testing**: Can tell what's happening in combat
-
-16. **Death & Respawn**
-    - Player death: game over screen, restart option
-    - Entity death: drop loot (items), award EXP
-    - **Why sixteenth**: Closes the gameplay loop
-    - **Testing**: Dying matters, killing enemies is rewarding
-
----
-
-### Phase 6: Items & Variety
-**Goal**: More items to find, build variety
-
-17. **Level 0 Item Roster**
-    - BODY items: Brass Knuckles, Pipe, Baseball Bat, etc.
-    - MIND items: Journals, Maps, Mental Focus items
-    - NULL items: Anomalous artifacts, strange objects
-    - LIGHT items: Flashlights, glowsticks, torches
-    - **Quantity goal**: 10-15 items total (3-4 per pool)
-    - **Why seventeenth**: Variety comes after core systems work
-    - **Testing**: Multiple build paths, item synergies emerge
-
-18. **Item Effects Implementation**
-    - Active abilities (press button to activate)
-    - Passive effects (stat bonuses, auras)
-    - On-turn effects (regeneration, periodic damage)
-    - **Why eighteenth**: Makes items interesting, not just stat sticks
-    - **Testing**: Items feel unique, create build diversity
-
----
-
-### Phase 7: Level Exit & Progression
+### Phase 5: Level Exit & Progression (Priority: LOW)
 **Goal**: Can progress to Level 1
 
-19. **Staircase Entity**
-    - Rare spawn, appears in explored chunks
-    - Interactable: "Press E to descend"
-    - Triggers level transition
-    - **Why nineteenth**: Simple after entity system exists
-    - **Testing**: Can find stairs, transition to new level
+1. **Staircase Entity**
+   - Rare spawn in explored chunks
+   - Interactable for level transition
 
-20. **Level Transition System**
-    - Save current state (player stats, inventory)
-    - Unload Level 0 chunks
-    - Load Level 1 (new generator, new config)
-    - Reset player position, keep stats/items
-    - **Why twentieth**: Reuses existing level loading systems
-    - **Testing**: Smooth transition, stats persist
+2. **Level Transition System**
+   - Save player state
+   - Load new level configuration
+   - Reset chunks, keep stats/items
 
 ---
 
-## 🤔 Design Decisions Needed
+## 🤔 Design Decisions - Status
 
-These questions should be answered BEFORE implementing the relevant phase:
+### Resolved ✅
+- [x] **Auto-attack vs Manual attack**: AUTO-ATTACK (turn-based auto-battler)
+- [x] **Attack range indicators**: Dual system (visual highlight + action preview UI)
+- [x] **Attack frequency**: Turn-based cooldowns per attack type
+- [x] **Cone targeting**: Auto-aim at nearest enemy (not camera direction)
+- [x] **LOS blocking**: Walls block attacks, entities don't
 
-### Combat System (Phase 1)
-- [x] **Auto-attack vs Manual attack**: ✅ **DECIDED - AUTO-ATTACK**
-  - This is a **turn-based auto-battler** like Vampire Survivors
-  - Player moves and manages build, attacks happen automatically
-  - No manual attack button (unless special item abilities later)
-  - Focus is on positioning, build planning, and fast-paced movement
-
-- [x] **Attack range indicators**: ✅ **DECIDED - Dual system**
-  - **Visual highlight**: Shader effect on targetable enemies (shown between turns in IdleState)
-  - **Action preview UI**: Text showing "Attack [Enemy Name]" when enemy in range
-  - Updates based on player's next action:
-    - When movement indicator shows next position → preview attacks from that position
-    - When in look mode (waiting) → preview attacks from current position
-  - **Why dual**: Visual feedback for positioning + explicit UI for planning
-
-- [x] **Attack frequency**: ✅ **DECIDED - Turn-based cooldowns**
-  - Each attack type has a frequency (attacks every N turns)
-  - BODY: every 1-2 turns (high frequency)
-  - MIND: every 3-5 turns (medium frequency)
-  - NULL: every 5-10 turns (low frequency)
-  - Items can modify frequency (faster attacks = more DPS)
-
-### Entity System (Phase 2-3)
-- [ ] **Entity HP scaling**: Should entity HP scale with player level? Corruption? Both?
-  - **Recommendation**: Scale with corruption (ties to level exploration)
-
-- [ ] **Spawn density**: How many entities per chunk?
-  - Low corruption: 0-2 entities per chunk
-  - High corruption: 5-10 entities per chunk
-  - **Recommendation**: Start conservative, tune based on testing
-
-- [ ] **Entity persistence**: Do entities respawn when chunks unload/reload?
-  - Option A: Entities persist with chunks (if you clear a chunk, it stays clear)
-  - Option B: Entities respawn each time chunk loads (infinite enemies)
-  - **Recommendation**: Option A (reward clearing areas)
-
-### Examination & Clearance System (Cross-Cutting)
-- [ ] **Examinable integration for entities**: Entities need Examinable component (like items have)
-  - All entities, items, and environmental things are examinable
-  - Description data revealed progressively based on player's Clearance LVL
-  - **BEFORE IMPLEMENTING**: Spawn sub-agents to investigate existing Examinable system
-    - How does Item.get_description(clearance_level) work?
-    - How does ItemRenderer add Examinable to item billboards?
-    - How does KnowledgeDB store/retrieve entity data?
-    - How does Look Mode raycast to Examinable nodes?
-  - Must follow EXACT same patterns already in place
-  - **Testing**: Look at debug enemy, see progressively revealed info at higher clearance
-
-### AI System (Phase 4)
-- [ ] **AI turn budget**: How many entities can act per turn?
-  - Option A: All entities in loaded chunks act each turn
-  - Option B: Only entities near player act (performance optimization)
-  - Option C: Stagger entity turns (some act every other turn)
-  - **Recommendation**: Option B (entities in ACTIVE_RADIUS only)
-
-- [ ] **Pathfinding refresh**: How often do entities recalculate path?
-  - Every turn: Expensive but responsive
-  - Every N turns: Cheaper, entities lag behind player
-  - **Recommendation**: Every turn for entities in combat range, every 3 turns for distant entities
+### Still Open ❓
+- [ ] **Entity HP scaling**: Scale with corruption? Player level? Both?
+- [ ] **Spawn density tuning**: How many entities feels right?
+- [ ] **Entity persistence**: Clear chunks stay clear, or respawn?
+- [ ] **AI turn budget**: All entities act, or only nearby ones?
+- [ ] **Pathfinding refresh rate**: Every turn, or staggered?
 
 ---
 
-## 🎓 Lessons Learned & Patterns to Follow
+## 🎓 Lessons Learned (This Branch)
 
-### Reuse Existing Systems
-- **StatBlock** works great for player → reuse for entities
-- **ItemSpawner** pattern → EntitySpawner uses same approach
-- **Action pattern** (movement, wait) → Attack is just another action
-- **ChunkManager hooks** → Items spawn on chunk load → entities do same
+### Auto-Battler Design
+- Camera direction should NEVER affect attack targeting
+- Attacks auto-target nearest enemy (or nearest for cone direction)
+- Player agency is in positioning and build, not aiming
 
-### Test Incrementally
-- Phase 1: Attack empty space (tests mechanics without AI complexity)
-- Phase 2: Entities exist but don't act (tests spawning, rendering)
-- Phase 3: Entities spawn (tests integration with chunks)
-- Phase 4: Entities act (finally functional combat)
+### Visual Feedback is Critical
+- Floating damage numbers + emoji = satisfying hits
+- Health bars should only appear when damaged
+- Death effects (skull emoji) communicate kills clearly
 
-### Data-Driven Design
-- Entity templates define stats (not hardcoded in entity scripts)
-- Attack templates define damage/range/area
-- Spawn configs define probabilities
-- **Why**: Easy to balance, easy to add new content
+### Line-of-Sight Matters
+- Bresenham's algorithm works well for grid-based LOS
+- Check intermediate tiles only (not start/end positions)
+- Walls block attacks, but entities should NOT block (allows AOE)
 
-### Performance Considerations
-- Only AI-process entities near player (ACTIVE_RADIUS = 3 chunks)
-- Entities far from player "freeze" (no pathfinding, no updates)
-- Unload entities with chunks (don't keep all entities in memory)
-
----
-
-## 📝 Notes & Open Questions
-
-### Implementation Philosophy
-- **Quality over speed**: Each phase should be fully working before moving on
-- **Test early, test often**: Add debug visualizations (attack range, AI state, etc.)
-- **Document as you go**: Update CLAUDE.md with new patterns/lessons
-
-### Future Considerations (Post-MVP)
-- Advanced AI: Fleeing, grouping, special behaviors
-- More attack types: Status effects, AOE, DOT
-- Boss entities: Unique mechanics, multi-phase fights
-- Ally entities: Summons, pets, friendly NPCs
-- Level-specific mechanics: Hazards, traps, environmental dangers
-
-### User Testing Checklist
-After each phase, user should test:
-- [ ] **Functionality**: Does it work as designed?
-- [ ] **Performance**: Does it run smoothly? (60 FPS target)
-- [ ] **Feel**: Does it feel good to play?
-- [ ] **Balance**: Is difficulty appropriate?
-- [ ] **Bugs**: Any edge cases or crashes?
+### Documentation Prevents Bugs
+- Clear docstrings prevent future agents from misusing systems
+- "CRITICAL" warnings in class headers catch attention
+- Example: Camera direction warning saved debugging time
 
 ---
 
 ## 🚀 Next Steps
 
-**Immediate Action**: Review this TODO with user, discuss design decisions
+**Immediate Priority**: Phase 2 - Enemy AI
+- Enemies currently just stand there
+- Need movement toward player
+- Need enemy attacks (player takes damage)
 
-**Questions for User**:
-1. Does this implementation order make sense?
-2. Which design decisions do you want to make now vs later?
-3. Should we start with Phase 1 (Combat System Foundation)?
-4. Any concerns or additional features to add?
-
-**After Approval**: Create detailed implementation plan for Phase 1, begin coding
+**Testing Focus**:
+- Combat feels good with current visual feedback
+- Balance tuning needed once enemies fight back
+- Performance testing with many active AI entities
 
 ---
 
-*This is a living document - update as implementation progresses and new insights emerge*
+*This is a living document - update as implementation progresses*
