@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dwm25ymcxxixh"
 path.s3tc="res://.godot/imported/wallpaper_yellow.png-50e2d6c3049fe471346c1a50dfbee978.s3tc.ctex"
+path.etc2="res://.godot/imported/wallpaper_yellow.png-50e2d6c3049fe471346c1a50dfbee978.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/levels/level_00/textures/wallpaper_yellow.png"
-dest_files=["res://.godot/imported/wallpaper_yellow.png-50e2d6c3049fe471346c1a50dfbee978.s3tc.ctex"]
+dest_files=["res://.godot/imported/wallpaper_yellow.png-50e2d6c3049fe471346c1a50dfbee978.s3tc.ctex", "res://.godot/imported/wallpaper_yellow.png-50e2d6c3049fe471346c1a50dfbee978.etc2.ctex"]
 
 [params]
 
