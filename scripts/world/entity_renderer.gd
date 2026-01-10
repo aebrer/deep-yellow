@@ -161,8 +161,10 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 
 			if entity_billboards.has(world_pos):
 				# Disconnect signals before cleanup
-				if entity.hp_changed.is_connected(_on_entity_hp_changed):
-					entity.hp_changed.disconnect(_on_entity_hp_changed)
+				# hp_changed was connected with .bind(world_pos), so disconnect needs matching callable
+				var hp_callback = _on_entity_hp_changed.bind(world_pos)
+				if entity.hp_changed.is_connected(hp_callback):
+					entity.hp_changed.disconnect(hp_callback)
 				if entity.died.is_connected(_on_entity_died_signal):
 					entity.died.disconnect(_on_entity_died_signal)
 

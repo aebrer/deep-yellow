@@ -129,4 +129,4 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 0
 text = "Clearance: 0"
-tooltip_text = "Knowledge security level (choose via perks).\nUnlocks deeper entity information.\nMultiplies ALL EXP gains (×1 at CL0, ×2 at CL1, etc.)\n"
+tooltip_text = "Knowledge security level (choose via perks).\nUnlocks deeper entity information.\nBonus to ALL EXP gains (+10% per level).\n"

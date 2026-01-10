@@ -112,10 +112,10 @@ var current_mana: float = 0.0:
 # CLEARANCE (manual choice):
 #   - Only increases when chosen as a perk
 #   - Unlocks knowledge/entity information in KnowledgeDB
-#   - Multiplies ALL EXP gains (×1 at CL0, ×2 at CL1, ×3 at CL2, etc.)
+#   - Bonus to ALL EXP gains (+10% per level: ×1.0 at CL0, ×1.1 at CL1, ×1.2 at CL2, etc.)
 #   - "Glass cannon" build: faster scaling but must spend perk slots
 #
-# Example: At Clearance 2, examining floor gives 10 base → 30 EXP (10×3)
+# Example: At Clearance 2, examining floor gives 10 base → 12 EXP (10×1.2)
 # ============================================================================
 
 var exp: int = 0
