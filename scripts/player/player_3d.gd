@@ -287,17 +287,14 @@ func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 		stats.gain_exp(exp_reward)
 		Log.player("Entered new chunk %s" % Vector2i(chunk_position.x, chunk_position.y))
 
-func _on_entity_died(entity_data: Dictionary) -> void:
+func _on_entity_died(entity: WorldEntity) -> void:
 	"""Called when an entity is killed - award EXP"""
 	if not stats:
 		return
 
-	var entity_type = entity_data.get("entity_type", "unknown")
-	var max_hp = entity_data.get("max_hp", 100.0)
-
 	# EXP reward based on entity max HP (no level scaling - kills become more frequent with corruption)
 	# Base: max_hp / 10, minimum 10 EXP
-	var exp_reward = max(10, int(max_hp / 10.0))
+	var exp_reward = max(10, int(entity.max_hp / 10.0))
 
 	stats.gain_exp(exp_reward)
 

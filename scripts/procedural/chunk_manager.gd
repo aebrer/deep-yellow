@@ -440,23 +440,21 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
 
 		occupied_positions.append(spawn_pos)
 
-		# Create WorldEntity data
-		var entity_data = {
-			"entity_type": "debug_enemy",
-			"world_position": {"x": spawn_pos.x, "y": spawn_pos.y},
-			"current_hp": 50.0,  # Lower HP for faster testing (was 1100)
-			"max_hp": 50.0,
-			"is_dead": false,
-			"spawn_turn": 0
-		}
+		# Create WorldEntity object
+		var entity = WorldEntity.new(
+			"debug_enemy",
+			spawn_pos,
+			50.0,  # max_hp - lower for faster testing (was 1100)
+			0      # spawn_turn
+		)
 
-		# Find the subchunk containing this position and add entity data
+		# Find the subchunk containing this position and add entity
 		var local_pos = spawn_pos - chunk_world_pos
 		var subchunk_x = local_pos.x / SubChunk.SIZE
 		var subchunk_y = local_pos.y / SubChunk.SIZE
 		var subchunk = chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
 		if subchunk:
-			subchunk.add_world_entity(entity_data)
+			subchunk.add_world_entity(entity)
 			spawned_count += 1
 
 	if spawned_count > 0:

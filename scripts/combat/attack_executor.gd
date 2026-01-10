@@ -209,6 +209,9 @@ func _bankers_round(value: float) -> float:
 func _execute_attack(player, attack) -> bool:
 	"""Execute attack against valid targets.
 
+	Targets WorldEntity directly for damage (authoritative state).
+	Uses EntityRenderer only for VFX (spawn_hit_vfx).
+
 	Args:
 		player: Player3D reference
 		attack: Built PoolAttack
@@ -228,10 +231,16 @@ func _execute_attack(player, attack) -> bool:
 	# Pay cost (NULL attacks consume mana)
 	attack.pay_cost(player.stats)
 
-	# Apply damage to targets
+	# Apply damage to targets via WorldEntity (authoritative state)
 	for target_pos in targets:
-		var success = player.grid.entity_renderer.damage_entity_at(target_pos, attack.damage, attack.attack_emoji)
-		if success:
+		var entity = player.grid.get_entity_at(target_pos)
+		if entity and entity.is_alive():
+			# Apply damage to WorldEntity (emits signals for health bar / death VFX)
+			entity.take_damage(attack.damage)
+
+			# Spawn hit VFX via renderer (render-only)
+			player.grid.entity_renderer.spawn_hit_vfx(target_pos, attack.attack_emoji, attack.damage)
+
 			var type_name = _AttackTypes.TYPE_NAMES.get(attack.attack_type, "UNKNOWN")
 			Log.player("%s (%s) hits %s for %.0f damage" % [attack.attack_name, type_name, target_pos, attack.damage])
 
@@ -300,46 +309,10 @@ func _filter_cone_targets(player, candidates: Array[Vector2i]) -> Array[Vector2i
 	Auto-battler behavior: cone automatically aims toward the nearest enemy,
 	then includes all enemies within 45 degrees of that direction.
 	Player camera direction is irrelevant - attacks target automatically.
+
+	Delegates to _filter_cone_targets_from_position with player's current position.
 	"""
-	if candidates.is_empty():
-		return []
-
-	# Find nearest enemy to determine cone direction
-	var nearest_pos = candidates[0]
-	var nearest_dist = player.grid_position.distance_to(nearest_pos)
-	for pos in candidates:
-		var dist = player.grid_position.distance_to(pos)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest_pos = pos
-
-	# Cone aims toward the nearest enemy
-	var cone_delta = nearest_pos - player.grid_position
-	if cone_delta == Vector2i.ZERO:
-		return [nearest_pos]  # Edge case: enemy on same tile
-
-	var cone_angle = atan2(cone_delta.y, cone_delta.x)
-
-	# Include all enemies within 45 degrees of the cone direction
-	var in_cone: Array[Vector2i] = []
-	for pos in candidates:
-		var delta = pos - player.grid_position
-		if delta == Vector2i.ZERO:
-			in_cone.append(pos)
-			continue
-
-		var target_angle = atan2(delta.y, delta.x)
-
-		# Angular difference (handle wraparound)
-		var angle_diff = abs(target_angle - cone_angle)
-		if angle_diff > PI:
-			angle_diff = TAU - angle_diff
-
-		# Include if within ~45 degrees of cone direction (90 degree cone)
-		if angle_diff <= PI / 4.0:
-			in_cone.append(pos)
-
-	return in_cone
+	return _filter_cone_targets_from_position(candidates, player.grid_position)
 
 func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Vector2i]:
 	"""Find valid targets for attack from a specific position (for preview).
@@ -381,8 +354,8 @@ func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Ve
 			return candidates
 
 		_AttackTypes.Area.CONE:
-			# Return enemies in a cone in player's facing direction
-			return _filter_cone_targets_from_position(player, candidates, from_pos)
+			# Return enemies in a cone aimed at nearest enemy
+			return _filter_cone_targets_from_position(candidates, from_pos)
 
 		_:
 			# Default: nearest
@@ -390,11 +363,18 @@ func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Ve
 				return from_pos.distance_to(a) < from_pos.distance_to(b))
 			return [candidates[0]]
 
-func _filter_cone_targets_from_position(player, candidates: Array[Vector2i], from_pos: Vector2i) -> Array[Vector2i]:
+func _filter_cone_targets_from_position(candidates: Array[Vector2i], from_pos: Vector2i) -> Array[Vector2i]:
 	"""Filter candidates to those within a cone aimed at nearest enemy from a position.
 
 	Auto-battler behavior: cone automatically aims toward the nearest enemy,
 	NOT based on camera direction. Player has no agency over attack direction.
+
+	Args:
+		candidates: Array of potential target positions
+		from_pos: Position to calculate cone from
+
+	Returns:
+		Array of positions within the cone
 	"""
 	if candidates.is_empty():
 		return []

@@ -464,6 +464,23 @@ func _is_position_blocked_by_entity(pos: Vector2i) -> bool:
 		return entity_renderer.has_entity_at(pos)
 	return false  # No renderer = no entities = not blocked
 
+# ============================================================================
+# ENTITY QUERIES
+# ============================================================================
+
+func get_entity_at(world_pos: Vector2i) -> WorldEntity:
+	"""Get WorldEntity at world position
+
+	Args:
+		world_pos: World tile coordinates
+
+	Returns:
+		WorldEntity or null if no living entity at position
+	"""
+	if entity_renderer:
+		return entity_renderer.get_entity_at(world_pos)
+	return null
+
 func is_in_bounds(pos: Vector2i) -> bool:
 	"""Check if position is within grid bounds
 

@@ -3,16 +3,22 @@ class_name EntityRenderer extends Node3D
 ##
 ## Creates and manages Billboard3D nodes for entities that exist in loaded chunks.
 ## Billboards are created when chunks load and destroyed when chunks unload.
-## Entity data persists in SubChunk.world_entities for chunk reload.
+##
+## ARCHITECTURE: EntityRenderer is RENDER-ONLY
+## - WorldEntity is the authoritative source of entity state (HP, dead flag)
+## - EntityRenderer connects to WorldEntity signals for updates
+## - State modifications happen through WorldEntity.take_damage(), not here
+## - VFX spawning happens here (hit emoji, death emoji)
 ##
 ## Follows same pattern as ItemRenderer for consistency.
 ##
 ## Responsibilities:
 ## - Create Billboard3D for each entity in loaded chunks
 ## - Position billboards at entity world positions
-## - Remove billboards when entities die
+## - Connect to WorldEntity signals for state changes
+## - Spawn VFX when entities take damage or die
+## - Remove billboards when entities die (after VFX delay)
 ## - Cleanup billboards when chunks unload
-## - Sync entity HP/state with WorldEntity data
 
 # ============================================================================
 # DEPENDENCIES
@@ -31,8 +37,8 @@ const _EMOJI_FONT = preload("res://assets/fonts/default_font.tres")
 ## Maps world tile position to Sprite3D node
 var entity_billboards: Dictionary = {}  # Vector2i -> Sprite3D
 
-## Maps world tile position to WorldEntity data (for state sync)
-var entity_data_cache: Dictionary = {}  # Vector2i -> Dictionary
+## Maps world tile position to WorldEntity reference
+var entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
 
 ## Maps world tile position to health bar Node3D
 var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
@@ -44,9 +50,9 @@ var _highlighted_positions: Array[Vector2i] = []
 # SIGNALS
 # ============================================================================
 
-## Emitted when an entity dies from damage
-## entity_data: Dictionary with entity info (entity_type, exp_reward, etc.)
-signal entity_died(entity_data: Dictionary)
+## Emitted when an entity dies (for EXP rewards etc.)
+## entity: WorldEntity that died
+signal entity_died(entity: WorldEntity)
 
 # ============================================================================
 # CONFIGURATION
@@ -92,39 +98,41 @@ const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 func render_chunk_entities(chunk: Chunk) -> void:
 	"""Create billboards for all entities in chunk
 
+	Connects to WorldEntity signals for HP/death updates.
+
 	Args:
 		chunk: Chunk that was just loaded
 	"""
 	for subchunk in chunk.sub_chunks:
-		for entity_data in subchunk.world_entities:
+		for entity in subchunk.world_entities:
 			# Skip if dead
-			if entity_data.get("is_dead", false):
+			if entity.is_dead:
 				continue
 
-			# Get world position
-			var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
-			var world_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+			var world_pos = entity.world_position
 
 			# Skip if billboard already exists (shouldn't happen, but safety check)
 			if entity_billboards.has(world_pos):
 				continue
 
 			# Create billboard
-			var billboard = _create_billboard(entity_data, world_pos)
+			var billboard = _create_billboard_for_entity(entity)
 			if billboard:
 				add_child(billboard)
 				entity_billboards[world_pos] = billboard
-				entity_data_cache[world_pos] = entity_data
+				entity_cache[world_pos] = entity
 
 				# Create health bar (as sibling, not child - avoids billboard nesting issues)
 				var health_bar = _create_health_bar(billboard.position)
 				add_child(health_bar)
 				entity_health_bars[world_pos] = health_bar
 
+				# Connect to WorldEntity signals
+				entity.hp_changed.connect(_on_entity_hp_changed.bind(world_pos))
+				entity.died.connect(_on_entity_died_signal)
+
 				# Check if entity is already damaged
-				var current_hp = entity_data.get("current_hp", 0.0)
-				var max_hp = entity_data.get("max_hp", 1.0)
-				var hp_percent = current_hp / max_hp if max_hp > 0 else 1.0
+				var hp_percent = entity.get_hp_percentage()
 				if hp_percent < 1.0:
 					_update_health_bar(world_pos, hp_percent)
 				else:
@@ -140,21 +148,28 @@ func render_chunk_entities(chunk: Chunk) -> void:
 func unload_chunk_entities(chunk: Chunk) -> void:
 	"""Remove billboards for all entities in chunk
 
+	Disconnects WorldEntity signals before cleanup.
+
 	Args:
 		chunk: Chunk being unloaded
 	"""
 	var removed_count = 0
 
 	for subchunk in chunk.sub_chunks:
-		for entity_data in subchunk.world_entities:
-			var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
-			var world_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+		for entity in subchunk.world_entities:
+			var world_pos = entity.world_position
 
 			if entity_billboards.has(world_pos):
+				# Disconnect signals before cleanup
+				if entity.hp_changed.is_connected(_on_entity_hp_changed):
+					entity.hp_changed.disconnect(_on_entity_hp_changed)
+				if entity.died.is_connected(_on_entity_died_signal):
+					entity.died.disconnect(_on_entity_died_signal)
+
 				var billboard = entity_billboards[world_pos]
 				billboard.queue_free()
 				entity_billboards.erase(world_pos)
-				entity_data_cache.erase(world_pos)
+				entity_cache.erase(world_pos)
 
 				# Also remove health bar
 				if entity_health_bars.has(world_pos):
@@ -174,23 +189,23 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 # BILLBOARD CREATION
 # ============================================================================
 
-func _create_billboard(entity_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
+func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	"""Create a Sprite3D billboard for an entity
 
 	Args:
-		entity_data: Serialized WorldEntity data
-		world_pos: World tile position
+		entity: WorldEntity to create billboard for
 
 	Returns:
 		Sprite3D node or null if creation failed
 	"""
-	var entity_type = entity_data.get("entity_type", "unknown")
+	var entity_type = entity.entity_type
+	var world_pos = entity.world_position
 
 	# Create sprite node
 	var sprite = Sprite3D.new()
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art friendly
-	sprite.shaded = true  # Match debug_enemy.tscn setting
+	sprite.shaded = true
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_OPAQUE_PREPASS
 
 	# Position at world coordinates (centered in cell)
@@ -332,16 +347,16 @@ func _update_health_bar(world_pos: Vector2i, hp_percent: float) -> void:
 # ENTITY QUERIES
 # ============================================================================
 
-func get_entity_at(world_pos: Vector2i) -> Dictionary:
-	"""Get entity data at world position
+func get_entity_at(world_pos: Vector2i) -> WorldEntity:
+	"""Get WorldEntity at world position
 
 	Args:
 		world_pos: World tile coordinates
 
 	Returns:
-		Serialized entity data or empty dict if no entity at position
+		WorldEntity or null if no entity at position
 	"""
-	return entity_data_cache.get(world_pos, {})
+	return entity_cache.get(world_pos, null)
 
 func has_entity_at(world_pos: Vector2i) -> bool:
 	"""Check if there's a living entity at world position
@@ -352,11 +367,8 @@ func has_entity_at(world_pos: Vector2i) -> bool:
 	Returns:
 		true if entity exists and is alive (not dead)
 	"""
-	if not entity_billboards.has(world_pos):
-		return false
-	# Check if entity is marked dead (billboard removal may be delayed for VFX)
-	var entity_data = entity_data_cache.get(world_pos, {})
-	return not entity_data.get("is_dead", false)
+	var entity = entity_cache.get(world_pos, null)
+	return entity != null and not entity.is_dead
 
 func get_all_entity_positions() -> Array[Vector2i]:
 	"""Get world positions of all living entities
@@ -365,12 +377,10 @@ func get_all_entity_positions() -> Array[Vector2i]:
 		Array of world tile positions with living entities (excludes dead)
 	"""
 	var positions: Array[Vector2i] = []
-	for pos in entity_billboards.keys():
-		# Skip dead entities (billboard removal may be delayed for VFX)
-		var entity_data = entity_data_cache.get(pos, {})
-		if entity_data.get("is_dead", false):
-			continue
-		positions.append(pos)
+	for pos in entity_cache.keys():
+		var entity = entity_cache[pos] as WorldEntity
+		if entity and not entity.is_dead:
+			positions.append(pos)
 	return positions
 
 func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
@@ -384,10 +394,9 @@ func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
 		Array of entity positions within range (excludes dead entities)
 	"""
 	var in_range: Array[Vector2i] = []
-	for pos in entity_billboards.keys():
-		# Skip dead entities (billboard removal may be delayed for VFX)
-		var entity_data = entity_data_cache.get(pos, {})
-		if entity_data.get("is_dead", false):
+	for pos in entity_cache.keys():
+		var entity = entity_cache[pos] as WorldEntity
+		if not entity or entity.is_dead:
 			continue
 		var distance = center.distance_to(pos)
 		if distance <= radius:
@@ -395,66 +404,56 @@ func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
 	return in_range
 
 # ============================================================================
-# ENTITY STATE UPDATES
+# SIGNAL HANDLERS (WorldEntity signals)
 # ============================================================================
 
-func damage_entity_at(world_pos: Vector2i, amount: float, attack_emoji: String = "👊") -> bool:
-	"""Apply damage to entity at position
+func _on_entity_hp_changed(current_hp: float, max_hp: float, world_pos: Vector2i) -> void:
+	"""Handle WorldEntity hp_changed signal - update health bar
+
+	Args:
+		current_hp: New current HP
+		max_hp: Maximum HP
+		world_pos: Entity position (bound parameter)
+	"""
+	var hp_percent = current_hp / max_hp if max_hp > 0 else 0.0
+	_update_health_bar(world_pos, hp_percent)
+
+func _on_entity_died_signal(entity: WorldEntity) -> void:
+	"""Handle WorldEntity died signal - spawn death VFX and cleanup
+
+	Args:
+		entity: WorldEntity that died
+	"""
+	var world_pos = entity.world_position
+
+	# Spawn death skull emoji (2x size of hit emoji)
+	_spawn_death_emoji(world_pos)
+
+	# Emit our death signal for EXP rewards etc.
+	entity_died.emit(entity)
+
+	# Delay removal slightly so VFX is visible
+	_remove_entity_delayed(world_pos, HIT_EMOJI_DURATION)
+
+# ============================================================================
+# VFX SPAWNING (called by AttackExecutor)
+# ============================================================================
+
+func spawn_hit_vfx(world_pos: Vector2i, emoji: String, damage: float) -> void:
+	"""Spawn floating hit VFX at entity position
+
+	Called by AttackExecutor when damage is dealt. Does NOT modify entity state.
 
 	Args:
 		world_pos: World tile position
-		amount: Damage amount
-		attack_emoji: Emoji to display as hit VFX (default: punch)
-
-	Returns:
-		true if entity was found and damaged (false if dead or missing)
+		emoji: Emoji to display
+		damage: Damage amount to show
 	"""
-	if not entity_data_cache.has(world_pos):
-		return false
+	_spawn_hit_emoji(world_pos, emoji, damage)
 
-	var entity_data = entity_data_cache[world_pos]
-
-	# Don't damage already-dead entities (prevents multi-kill exploits)
-	if entity_data.get("is_dead", false):
-		return false
-
-	var current_hp = entity_data.get("current_hp", 0.0)
-	var new_hp = max(0.0, current_hp - amount)
-	entity_data["current_hp"] = new_hp
-
-	var max_hp = entity_data.get("max_hp", 1.0)
-	var hp_percent = new_hp / max_hp if max_hp > 0 else 0.0
-
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Entity at %s took %.1f damage (%.1f/%.1f HP)" % [
-		world_pos,
-		amount,
-		new_hp,
-		max_hp
-	])
-
-	# Update health bar display
-	_update_health_bar(world_pos, hp_percent)
-
-	# Spawn floating emoji VFX with damage number
-	_spawn_hit_emoji(world_pos, attack_emoji, amount)
-
-	# Check for death
-	if new_hp <= 0:
-		entity_data["is_dead"] = true
-
-		# Spawn death skull emoji (2x size of hit emoji)
-		_spawn_death_emoji(world_pos)
-
-		# Emit death signal for EXP rewards etc.
-		entity_died.emit(entity_data)
-
-		# Delay removal slightly so VFX is visible
-		_remove_entity_delayed(world_pos, HIT_EMOJI_DURATION)
-
-		var entity_type = entity_data.get("entity_type", "unknown")
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Entity '%s' at %s died!" % [entity_type, world_pos])
-
-	return true
+# ============================================================================
+# BILLBOARD REMOVAL
+# ============================================================================
 
 func remove_entity_at(world_pos: Vector2i) -> bool:
 	"""Remove entity billboard (when killed or despawned)
@@ -472,7 +471,7 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 	var billboard = entity_billboards[world_pos]
 	billboard.queue_free()
 	entity_billboards.erase(world_pos)
-	entity_data_cache.erase(world_pos)
+	entity_cache.erase(world_pos)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
@@ -710,7 +709,7 @@ func clear_all_entities() -> void:
 		health_bar.queue_free()
 
 	entity_billboards.clear()
-	entity_data_cache.clear()
+	entity_cache.clear()
 	entity_health_bars.clear()
 
 	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "EntityRenderer: Cleared all entity billboards")

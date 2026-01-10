@@ -24,7 +24,7 @@ var world_position: Vector2i  # Absolute tile position in world
 var tile_data: Array[Array] = []  # 16×16 tile types (layer 0)
 var ceiling_data: Array[Array] = []  # 16×16 ceiling tiles (layer 1)
 var world_items: Array[Dictionary] = []  # Serialized WorldItem data (persists across chunk load/unload)
-var world_entities: Array[Dictionary] = []  # Serialized WorldEntity data (persists across chunk load/unload)
+var world_entities: Array[WorldEntity] = []  # WorldEntity objects (persist across chunk load/unload)
 
 # ============================================================================
 # INITIALIZATION
@@ -180,16 +180,16 @@ func get_world_items_in_subchunk() -> Array[Dictionary]:
 # WORLD ENTITY MANAGEMENT
 # ============================================================================
 
-func add_world_entity(world_entity_data: Dictionary) -> void:
-	"""Add serialized world entity data to this sub-chunk
+func add_world_entity(entity: WorldEntity) -> void:
+	"""Add a WorldEntity to this sub-chunk
 
 	Args:
-		world_entity_data: Serialized WorldEntity (from WorldEntity.to_dict())
+		entity: WorldEntity object to store
 	"""
-	world_entities.append(world_entity_data)
+	world_entities.append(entity)
 
 func remove_world_entity(world_position: Vector2i) -> bool:
-	"""Remove world entity at position (when killed)
+	"""Remove world entity at position (when killed/despawned)
 
 	Args:
 		world_position: World tile coordinates
@@ -198,44 +198,36 @@ func remove_world_entity(world_position: Vector2i) -> bool:
 		true if entity was found and removed
 	"""
 	for i in range(world_entities.size()):
-		var entity_data = world_entities[i]
-		var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
-		var entity_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
-
-		if entity_pos == world_position:
+		if world_entities[i].world_position == world_position:
 			world_entities.remove_at(i)
 			return true
-
 	return false
 
-func update_world_entity(world_position: Vector2i, updated_data: Dictionary) -> bool:
-	"""Update entity data at position (e.g., after taking damage)
+func get_entity_at(world_position: Vector2i) -> WorldEntity:
+	"""Get entity at world position
 
 	Args:
 		world_position: World tile coordinates
-		updated_data: New entity data to store
 
 	Returns:
-		true if entity was found and updated
+		WorldEntity at position, or null if none
 	"""
-	for i in range(world_entities.size()):
-		var entity_data = world_entities[i]
-		var pos_data = entity_data.get("world_position", {"x": 0, "y": 0})
-		var entity_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
+	for entity in world_entities:
+		if entity.world_position == world_position:
+			return entity
+	return null
 
-		if entity_pos == world_position:
-			world_entities[i] = updated_data
-			return true
-
-	return false
-
-func get_world_entities_in_subchunk() -> Array[Dictionary]:
-	"""Get all world entities in this sub-chunk
+func get_living_entities() -> Array[WorldEntity]:
+	"""Get all living (non-dead) entities in this sub-chunk
 
 	Returns:
-		Array of serialized WorldEntity data
+		Array of WorldEntity objects that are alive
 	"""
-	return world_entities.duplicate()
+	var living: Array[WorldEntity] = []
+	for entity in world_entities:
+		if not entity.is_dead:
+			living.append(entity)
+	return living
 
 # ============================================================================
 # UTILITY

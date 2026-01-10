@@ -3,12 +3,24 @@ class_name WorldEntity extends RefCounted
 ##
 ## WorldEntities track enemies/NPCs in the world.
 ## They persist through chunk load/unload cycles and track state.
+## This is the AUTHORITATIVE source of entity state - EntityRenderer only renders.
 ##
 ## Responsibilities:
 ## - Store entity type and spawn parameters
 ## - Track world position
-## - Track current HP and status
+## - Track current HP and status (authoritative)
+## - Emit signals on state changes
 ## - Provide spawn metadata
+
+# ============================================================================
+# SIGNALS
+# ============================================================================
+
+## Emitted when entity HP changes (for health bar updates)
+signal hp_changed(current_hp: float, max_hp: float)
+
+## Emitted when entity dies (for VFX, EXP rewards, cleanup)
+signal died(entity: WorldEntity)
 
 # ============================================================================
 # PROPERTIES
@@ -16,10 +28,19 @@ class_name WorldEntity extends RefCounted
 
 var entity_type: String  ## Entity type ID (e.g., "debug_enemy", "bacteria_spawn")
 var world_position: Vector2i  ## Exact tile position in world coordinates
-var current_hp: float = 0.0  ## Current HP (persists across chunk unload)
 var max_hp: float = 0.0  ## Max HP at spawn time
-var is_dead: bool = false  ## Has this entity died?
 var spawn_turn: int = 0  ## When was this spawned?
+
+## Current HP - emits hp_changed signal on change
+var current_hp: float = 0.0:
+	set(value):
+		var old_hp = current_hp
+		current_hp = clampf(value, 0.0, max_hp)
+		if current_hp != old_hp:
+			hp_changed.emit(current_hp, max_hp)
+
+## Dead flag - once true, entity is permanently dead
+var is_dead: bool = false
 
 # ============================================================================
 # INITIALIZATION
@@ -71,10 +92,22 @@ func get_hp_percentage() -> float:
 # ============================================================================
 
 func take_damage(amount: float) -> void:
-	"""Apply damage to entity"""
-	current_hp = max(0.0, current_hp - amount)
-	if current_hp <= 0:
+	"""Apply damage to entity
+
+	Emits hp_changed signal. If HP reaches 0, sets is_dead and emits died signal.
+
+	Args:
+		amount: Damage to apply (positive value)
+	"""
+	if is_dead:
+		return  # Already dead, ignore further damage
+
+	current_hp = max(0.0, current_hp - amount)  # Setter emits hp_changed
+
+	if current_hp <= 0 and not is_dead:
 		is_dead = true
+		died.emit(self)
+		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "WorldEntity '%s' at %s died" % [entity_type, world_position])
 
 func heal(amount: float) -> void:
 	"""Heal entity"""
