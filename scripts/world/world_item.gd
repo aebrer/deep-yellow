@@ -46,12 +46,6 @@ func _init(
 	picked_up = false
 	discovered = false
 
-	Log.system("WorldItem spawned: %s at %s (Rarity: %s)" % [
-		item_resource.item_name if item_resource else "Unknown",
-		world_position,
-		ItemRarity.RARITY_NAMES.get(rarity, "Unknown")
-	])
-
 # ============================================================================
 # STATE QUERIES
 # ============================================================================
@@ -78,10 +72,6 @@ func mark_discovered() -> void:
 	"""Mark item as discovered (player has seen it)"""
 	if not discovered:
 		discovered = true
-		Log.system("Item discovered: %s at %s" % [
-			item_resource.item_name if item_resource else "Unknown",
-			world_position
-		])
 
 func mark_picked_up() -> void:
 	"""Mark item as picked up (player has taken it)"""

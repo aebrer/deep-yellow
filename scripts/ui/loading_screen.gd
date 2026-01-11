@@ -34,5 +34,4 @@ func _on_load_progress(loaded_count: int, total_count: int) -> void:
 
 func _on_load_completed() -> void:
 	"""Hide loading screen when initial load completes"""
-	Log.system("Initial load completed, hiding loading screen")
 	hide()

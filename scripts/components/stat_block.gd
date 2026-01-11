@@ -72,7 +72,7 @@ var bonus_anomaly: float = 0.0
 # Regeneration happens in PreTurnState before action execution.
 # Formula: regen_amount = max_resource * (regen_percent / 100.0)
 
-var hp_regen_percent: float = 0.0      # % of max HP regenerated per turn
+var hp_regen_percent: float = 0.1      # % of max HP regenerated per turn (0.1% base, perks add more)
 var sanity_regen_percent: float = 0.0  # % of max Sanity regenerated per turn
 var mana_regen_percent: float = 0.0    # % of max Mana regenerated per turn (adds to base NULL/2 regen)
 
@@ -258,7 +258,6 @@ func add_modifier(modifier: StatModifier) -> void:
 	modifiers.append(modifier)
 	_invalidate_cache()
 	emit_signal("modifier_added", modifier)
-	Log.system("Added modifier: %s" % str(modifier))
 
 func remove_modifier(unique_id: String) -> bool:
 	"""Remove a modifier by unique ID. Returns true if found."""
@@ -268,7 +267,6 @@ func remove_modifier(unique_id: String) -> bool:
 			modifiers.remove_at(i)
 			_invalidate_cache()
 			emit_signal("modifier_removed", removed)
-			Log.system("Removed modifier: %s" % str(removed))
 			return true
 	return false
 
@@ -284,7 +282,6 @@ func remove_modifiers_by_source(source: String) -> int:
 
 	if count > 0:
 		_invalidate_cache()
-		Log.system("Removed %d modifiers from %s" % [count, source])
 
 	return count
 
@@ -299,7 +296,6 @@ func tick_temporary_modifiers() -> void:
 	for mod in expired:
 		modifiers.erase(mod)
 		emit_signal("modifier_removed", mod)
-		Log.system("Expired modifier: %s" % str(mod))
 
 	if expired.size() > 0:
 		_invalidate_cache()
@@ -320,32 +316,27 @@ func take_damage(amount: float) -> void:
 	"""Reduce HP by amount."""
 	var old_hp = current_hp
 	current_hp -= amount
-	Log.system("Took %.1f damage (%.1f → %.1f)" % [amount, old_hp, current_hp])
 
 func heal(amount: float) -> void:
 	"""Restore HP by amount (clamped to max)."""
 	var old_hp = current_hp
 	current_hp += amount
-	Log.system("Healed %.1f HP (%.1f → %.1f)" % [amount, old_hp, current_hp])
 
 func drain_sanity(amount: float) -> void:
 	"""Reduce Sanity by amount."""
 	var old_sanity = current_sanity
 	current_sanity -= amount
-	Log.system("Lost %.1f sanity (%.1f → %.1f)" % [amount, old_sanity, current_sanity])
 
 func restore_sanity(amount: float) -> void:
 	"""Restore Sanity by amount (clamped to max)."""
 	var old_sanity = current_sanity
 	current_sanity += amount
-	Log.system("Restored %.1f sanity (%.1f → %.1f)" % [amount, old_sanity, current_sanity])
 
 func consume_mana(amount: float) -> bool:
 	"""Try to consume mana. Returns true if successful."""
 	if current_mana >= amount:
 		var old_mana = current_mana
 		current_mana -= amount
-		Log.system("Consumed %.1f mana (%.1f → %.1f)" % [amount, old_mana, current_mana])
 		return true
 	return false
 
@@ -353,7 +344,6 @@ func restore_mana(amount: float) -> void:
 	"""Restore Mana by amount (clamped to max)."""
 	var old_mana = current_mana
 	current_mana += amount
-	Log.system("Restored %.1f mana (%.1f → %.1f)" % [amount, old_mana, current_mana])
 
 func regenerate_resources() -> void:
 	"""Regenerate all resources based on regen stats. Called each turn in PreTurnState.
@@ -365,18 +355,12 @@ func regenerate_resources() -> void:
 	# HP regeneration (from perks only)
 	if hp_regen_percent > 0.0 and current_hp < max_hp:
 		var regen_amount: float = max_hp * (hp_regen_percent / 100.0)
-		var old_hp := current_hp
 		current_hp += regen_amount
-		if regen_amount > 0.0:
-			Log.system("Regenerated %.1f HP (%.1f → %.1f)" % [regen_amount, old_hp, current_hp])
 
 	# Sanity regeneration (from perks only)
 	if sanity_regen_percent > 0.0 and current_sanity < max_sanity:
 		var regen_amount: float = max_sanity * (sanity_regen_percent / 100.0)
-		var old_sanity := current_sanity
 		current_sanity += regen_amount
-		if regen_amount > 0.0:
-			Log.system("Regenerated %.1f sanity (%.1f → %.1f)" % [regen_amount, old_sanity, current_sanity])
 
 	# Mana regeneration (base NULL/2 + perk bonus)
 	var base_mana_regen: float = null_stat / 2.0 if null_stat > 0 else 0.0
@@ -384,9 +368,7 @@ func regenerate_resources() -> void:
 	var total_mana_regen: float = base_mana_regen + perk_mana_regen
 
 	if total_mana_regen > 0.0 and current_mana < max_mana:
-		var old_mana := current_mana
 		current_mana += total_mana_regen
-		Log.system("Regenerated %.1f mana (%.1f → %.1f)" % [total_mana_regen, old_mana, current_mana])
 
 func regenerate_mana() -> void:
 	"""DEPRECATED: Use regenerate_resources() instead. Kept for backwards compatibility."""
@@ -455,7 +437,6 @@ func _check_level_up() -> void:
 		var old_level = level
 		level += 1
 		emit_signal("level_increased", old_level, level)
-		Log.system("Level Up! %d → %d (spent %d EXP, %d remaining)" % [old_level, level, required, exp])
 
 		# Check next level with new cost
 		required = _exp_for_next_level()
@@ -486,7 +467,6 @@ func increase_clearance() -> void:
 	var old_clearance = clearance_level
 	clearance_level += 1
 	emit_signal("clearance_increased", old_clearance, clearance_level)
-	Log.system("Clearance increased! %d → %d (knowledge unlocked)" % [old_clearance, clearance_level])
 
 # ============================================================================
 # UTILITY

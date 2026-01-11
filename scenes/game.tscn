@@ -81,16 +81,6 @@ render_target_update_mode = 4
 [node name="TextUIOverlay" type="CanvasLayer" parent="."]
 layer = 10
 
-[node name="ExaminationPanel" type="Control" parent="TextUIOverlay"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("4_exam_panel")
-
 [node name="ActionPreviewUI" type="Control" parent="TextUIOverlay"]
 layout_mode = 3
 anchors_preset = 15
@@ -153,10 +143,12 @@ theme_override_constants/margin_bottom = 10
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 15
 
 [node name="CharacterSheet" type="VBoxContainer" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 0
 
 [node name="Title" type="Label" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet"]
@@ -165,6 +157,15 @@ text = "character"
 
 [node name="StatsPanel" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet" instance=ExtResource("6_stats_panel")]
 layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="CoreInventory" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer" instance=ExtResource("8_core_inventory")]
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ExaminationPanel" type="Control" parent="MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("4_exam_panel")

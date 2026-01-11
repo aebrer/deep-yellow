@@ -87,11 +87,6 @@ func render_chunk_items(chunk: Chunk) -> void:
 				item_billboards[world_pos] = billboard
 				item_data_cache[world_pos] = item_data
 
-	Log.grid("ItemRenderer: Created %d item billboards for chunk at %s" % [
-		chunk.sub_chunks.map(func(s): return s.world_items.size()).reduce(func(a, b): return a + b, 0),
-		chunk.position
-	])
-
 func unload_chunk_items(chunk: Chunk) -> void:
 	"""Remove billboards for all items in chunk
 
@@ -111,11 +106,6 @@ func unload_chunk_items(chunk: Chunk) -> void:
 				item_billboards.erase(world_pos)
 				item_data_cache.erase(world_pos)
 				removed_count += 1
-
-	Log.grid("ItemRenderer: Removed %d item billboards for chunk at %s" % [
-		removed_count,
-		chunk.position
-	])
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -225,7 +215,6 @@ func remove_item_at(world_pos: Vector2i) -> bool:
 	item_billboards.erase(world_pos)
 	item_data_cache.erase(world_pos)
 
-	Log.system("Removed item billboard at %s" % world_pos)
 	return true
 
 # ============================================================================
@@ -302,7 +291,6 @@ func clear_all_items() -> void:
 	item_billboards.clear()
 	item_data_cache.clear()
 
-	Log.system("ItemRenderer: Cleared all item billboards")
 
 # ============================================================================
 # DEBUG

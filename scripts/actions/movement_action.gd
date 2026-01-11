@@ -46,14 +46,6 @@ func execute(player) -> void:
 	# Advance turn counter
 	player.turn_count += 1
 
-	Log.action("Turn %d: Moved %s | grid(%d,%d) → (%d,%d) | world(X%+d, Z%+d)" % [
-		player.turn_count,
-		direction,
-		old_pos.x, old_pos.y,
-		player.grid_position.x, player.grid_position.y,
-		direction.x, direction.y
-	])
-
 func get_preview_info(player) -> Dictionary:
 	"""Get preview info for UI display"""
 	var target_pos = player.grid_position + direction

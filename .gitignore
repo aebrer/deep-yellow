@@ -48,3 +48,6 @@ tmp_*/
 tmp/*
 
 data/mazes
+
+# godot
+*.import

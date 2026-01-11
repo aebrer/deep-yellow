@@ -57,7 +57,6 @@ func _init(type: Item.PoolType, slots: int):
 		items[i] = null
 		enabled[i] = true  # Enabled by default
 
-	Log.system("ItemPool created: %s (%d slots)" % [Item.PoolType.keys()[pool_type], max_slots])
 
 # ============================================================================
 # ITEM MANAGEMENT
@@ -180,7 +179,6 @@ func reorder(from_index: int, to_index: int) -> bool:
 	enabled[to_index] = temp_enabled
 
 	emit_signal("item_reordered", from_index, to_index)
-	Log.system("Reordered items: slot %d <-> slot %d" % [from_index, to_index])
 	return true
 
 func toggle_item(slot_index: int) -> bool:

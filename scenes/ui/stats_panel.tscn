@@ -130,3 +130,10 @@ layout_mode = 2
 mouse_filter = 0
 text = "Clearance: 0"
 tooltip_text = "Knowledge security level (choose via perks).\nUnlocks deeper entity information.\nBonus to ALL EXP gains (+10% per level).\n"
+
+[node name="CorruptionLabel" type="Label" parent="Progression"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+text = "Corruption: 0.00"
+tooltip_text = "Reality degradation of current level.\nIncreases as you explore new areas.\nHigher corruption = more entities, tougher enemies, better loot."

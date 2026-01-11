@@ -164,13 +164,6 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				else:
 					health_bar.visible = false
 
-	var entity_count = chunk.sub_chunks.map(func(s): return s.world_entities.size()).reduce(func(a, b): return a + b, 0)
-	if entity_count > 0:
-		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "EntityRenderer: Created %d entity billboards for chunk at %s" % [
-			entity_count,
-			chunk.position
-		])
-
 func unload_chunk_entities(chunk: Chunk) -> void:
 	"""Remove billboards for all entities in chunk
 
@@ -209,12 +202,6 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 					entity_health_bars.erase(world_pos)
 
 				removed_count += 1
-
-	if removed_count > 0:
-		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "EntityRenderer: Removed %d entity billboards for chunk at %s" % [
-			removed_count,
-			chunk.position
-		])
 
 # ============================================================================
 # DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
@@ -263,7 +250,6 @@ func add_entity_billboard(entity: WorldEntity) -> void:
 		if not entity.moved.is_connected(_on_entity_moved):
 			entity.moved.connect(_on_entity_moved)
 
-		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Added billboard for spawned entity at %s" % world_pos)
 
 func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 	"""Handle WorldEntity moved signal - update billboard position
@@ -275,7 +261,6 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 	if not entity_billboards.has(old_pos):
 		# This is normal for entities in unloaded chunks - they still process AI
 		# but don't have billboards. Only warn at TRACE level.
-		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity moved from %s but no billboard (chunk unloaded?)" % old_pos)
 		return
 
 	# Get billboard and health bar
@@ -310,7 +295,6 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 	if health_bar:
 		health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
 
-	Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity billboard moved from %s to %s" % [old_pos, new_pos])
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -589,7 +573,6 @@ func _on_entity_died_signal(entity: WorldEntity) -> void:
 	var cache_pos = _find_entity_in_cache(entity)
 	if cache_pos == INVALID_POSITION:
 		# Entity not in cache - either already removed or in unloaded chunk
-		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity died but not in cache (already processed?): %s" % entity.entity_type)
 		return
 
 	# Spawn death skull emoji at current position
@@ -605,7 +588,6 @@ func _on_entity_died_signal(entity: WorldEntity) -> void:
 	# Remove dead entity from SubChunk to prevent memory leaks
 	_remove_dead_entity_from_subchunk(entity)
 
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Entity died and removed at %s" % cache_pos)
 
 func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null) -> void:
 	"""Remove entity billboard immediately (no delay)
@@ -708,7 +690,6 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 		true if entity was found and removed
 	"""
 	if not entity_billboards.has(world_pos):
-		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "remove_entity_at(%s): No billboard found (already removed?)" % world_pos)
 		return false
 
 	# Get entity for reverse lookup cleanup
@@ -732,7 +713,6 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 			health_bar.queue_free()
 		entity_health_bars.erase(world_pos)
 
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Removed entity billboard at %s" % world_pos)
 	return true
 
 # ============================================================================

@@ -58,7 +58,6 @@ func _ready() -> void:
 	camera.fov = default_fov
 	camera.current = false  # Start inactive
 
-	Log.camera("FirstPersonCamera initialized - FOV: %.1f" % default_fov)
 
 func _process(delta: float) -> void:
 	if not active:
@@ -123,10 +122,6 @@ func activate() -> void:
 	if tactical_camera:
 		h_pivot.rotation_degrees.y = tactical_camera.h_pivot.rotation_degrees.y
 		v_pivot.rotation_degrees.x = tactical_camera.v_pivot.rotation_degrees.x
-		Log.camera("Synced rotation from tactical camera: yaw=%.1f, pitch=%.1f" % [
-			h_pivot.rotation_degrees.y,
-			v_pivot.rotation_degrees.x
-		])
 
 	# Clear any stale cache entries (e.g., from old cache key format)
 	_clear_examination_cache()
@@ -135,9 +130,7 @@ func activate() -> void:
 	examination_world = Node3D.new()
 	examination_world.name = "OnDemandExaminationWorld"
 	get_tree().root.add_child(examination_world)
-	Log.camera("Created on-demand examination world")
 
-	Log.camera("First-person camera activated")
 
 func deactivate() -> void:
 	"""Switch back to tactical camera"""
@@ -148,12 +141,10 @@ func deactivate() -> void:
 	if tactical_camera:
 		tactical_camera.h_pivot.rotation_degrees.y = h_pivot.rotation_degrees.y
 		tactical_camera.v_pivot.rotation_degrees.x = v_pivot.rotation_degrees.x
-		Log.camera("Synced rotation back to tactical camera")
 
 	# Clear examination tile cache
 	_clear_examination_cache()
 
-	Log.camera("First-person camera deactivated")
 
 func adjust_fov(delta_fov: float) -> void:
 	"""Adjust field of view (zoom effect)"""
@@ -452,5 +443,3 @@ func _clear_examination_cache() -> void:
 	if examination_world:
 		examination_world.queue_free()
 		examination_world = null
-
-	Log.camera("Cleared examination tile cache")

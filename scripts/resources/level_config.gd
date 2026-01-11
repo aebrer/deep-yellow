@@ -252,11 +252,11 @@ var permitted_items: Array[Item] = []
 
 ## Called when level is loaded (before grid generation)
 func on_load() -> void:
-	Log.system("Loading level: %s (ID: %d)" % [display_name, level_id])
+	pass
 
 ## Called when level generation is complete
 func on_generation_complete() -> void:
-	Log.system("Level generation complete: %s" % display_name)
+	pass
 
 ## Called when player enters this level
 func on_enter() -> void:
@@ -268,7 +268,7 @@ func on_exit() -> void:
 
 ## Called when level is unloaded from memory
 func on_unload() -> void:
-	Log.system("Unloading level: %s" % display_name)
+	pass
 
 # ============================================================================
 # HELPER METHODS

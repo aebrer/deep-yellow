@@ -161,6 +161,11 @@ entity density: very low"""
 
 func on_load() -> void:
 	super.on_load()
+	# Defer welcome messages so they appear after UI log panel is ready
+	# (on_load runs during Game3D._ready, before Game._ready connects log signal)
+	_show_welcome_messages.call_deferred()
+
+func _show_welcome_messages() -> void:
 	Log.player("welcome to the backrooms. you are in the lobby.")
 	Log.player("the fluorescent lights buzz overhead. the air smells of mold.")
 

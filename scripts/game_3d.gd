@@ -30,9 +30,9 @@ extends Node3D
 @onready var grid: Grid3D = $Grid3D
 @onready var player: Player3D = $Player3D
 @onready var move_indicator: Node3D = $MoveIndicator
+@onready var exp_bar: EXPBar = $ViewportUILayer/EXPBar
 
 func _ready() -> void:
-	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Initializing 3D viewport (640x480 with PSX shaders)")
 
 	# ========================================================================
 	# LEVEL LOADING - Game always starts on Level 0
@@ -55,4 +55,6 @@ func _ready() -> void:
 	if grid.entity_renderer:
 		grid.entity_renderer.entity_died.connect(player._on_entity_died)
 
-	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "3D viewport ready - controls active")
+	# Wire up EXP bar to player
+	if exp_bar:
+		exp_bar.set_player(player)

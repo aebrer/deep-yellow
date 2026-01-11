@@ -75,9 +75,7 @@ var _level_registry: Dictionary = {}
 # ============================================================================
 
 func _ready() -> void:
-	Log.system("LevelManager initialized")
 	_build_level_registry()
-	Log.system("Found %d registered levels" % _level_registry.size())
 
 ## Build registry of available levels
 ##
@@ -96,7 +94,6 @@ func _build_level_registry() -> void:
 		# Register the path (don't check file existence - it doesn't work in web builds)
 		# The actual load() will fail gracefully if the file isn't included
 		_level_registry[level_id] = config_path
-		Log.system("Registered level %d: %s" % [level_id, config_path])
 
 # ============================================================================
 # PUBLIC API - LOADING
@@ -107,7 +104,6 @@ func load_level(level_id: int) -> LevelConfig:
 	# Check cache first
 	if _level_cache.has(level_id):
 		_touch_lru(level_id)
-		Log.system("Level %d loaded from cache" % level_id)
 		return _level_cache[level_id]
 
 	# Check preloaded
@@ -115,7 +111,6 @@ func load_level(level_id: int) -> LevelConfig:
 		var preloaded_config: LevelConfig = _preloaded_levels[level_id]
 		_add_to_cache(level_id, preloaded_config)
 		_preloaded_levels.erase(level_id)
-		Log.system("Level %d loaded from preload" % level_id)
 		return preloaded_config
 
 	# Load from disk
@@ -135,7 +130,6 @@ func _load_level_from_disk(level_id: int) -> LevelConfig:
 	# Check preloaded configs first (required for web builds)
 	if PRELOADED_CONFIGS.has(level_id):
 		var config: LevelConfig = PRELOADED_CONFIGS[level_id]
-		Log.system("Level %d loaded from PRELOADED_CONFIGS" % level_id)
 		if config.validate():
 			config.on_load()
 			return config
@@ -161,7 +155,6 @@ func _load_level_from_disk(level_id: int) -> LevelConfig:
 		push_error("[LevelManager] Validation failed for level %d" % level_id)
 		return null
 
-	Log.system("Level %d loaded from disk: %s" % [level_id, config.display_name])
 	config.on_load()
 
 	return config
@@ -178,7 +171,6 @@ func transition_to_level(target_level_id: int) -> void:
 		_current_level.on_exit()
 
 	level_transition_started.emit(from_level_id, target_level_id)
-	Log.system("Transitioning: level %d -> level %d" % [from_level_id, target_level_id])
 
 	# Load target level
 	var target_config := load_level(target_level_id)
@@ -194,7 +186,6 @@ func transition_to_level(target_level_id: int) -> void:
 	_preload_exit_destinations(_current_level)
 
 	level_transition_completed.emit(target_level_id)
-	Log.system("Transition complete: now in level %d" % target_level_id)
 
 ## Get current active level
 func get_current_level() -> LevelConfig:
@@ -215,11 +206,9 @@ func is_level_preloaded(level_id: int) -> bool:
 ## Preload a level asynchronously (for fast transitions)
 func preload_level(level_id: int) -> void:
 	if _level_cache.has(level_id):
-		Log.system("Level %d already cached, skipping preload" % level_id)
 		return
 
 	if _preloaded_levels.has(level_id):
-		Log.system("Level %d already preloaded" % level_id)
 		return
 
 	if not _level_registry.has(level_id):
@@ -230,7 +219,6 @@ func preload_level(level_id: int) -> void:
 	var config := _load_level_from_disk(level_id)
 	if config:
 		_preloaded_levels[level_id] = config
-		Log.system("Level %d preloaded" % level_id)
 
 ## Preload all exit destinations for a level
 func _preload_exit_destinations(config: LevelConfig) -> void:
@@ -252,7 +240,6 @@ func _add_to_cache(level_id: int, config: LevelConfig) -> void:
 	_level_cache[level_id] = config
 	_touch_lru(level_id)
 
-	Log.system("Level %d added to cache (%d/%d)" % [level_id, _level_cache.size(), MAX_CACHED_LEVELS])
 
 ## Mark level as recently used (move to end of LRU)
 func _touch_lru(level_id: int) -> void:
@@ -275,7 +262,6 @@ func _evict_lru() -> void:
 	_level_cache.erase(evict_id)
 	level_unloaded.emit(evict_id)
 
-	Log.system("Evicted level %d from cache (LRU)" % evict_id)
 
 ## Clear all cached levels (for testing/debugging)
 func clear_cache() -> void:
@@ -287,7 +273,6 @@ func clear_cache() -> void:
 	_lru_order.clear()
 	_preloaded_levels.clear()
 
-	Log.system("Level cache cleared")
 
 # ============================================================================
 # DEVELOPMENT / DEBUGGING
@@ -310,7 +295,6 @@ func hot_reload_current() -> void:
 	if reloaded:
 		_current_level = reloaded
 		_add_to_cache(level_id, reloaded)
-		Log.system("Hot-reloaded level %d" % level_id)
 	else:
 		push_error("[LevelManager] Hot-reload failed for level %d" % level_id)
 

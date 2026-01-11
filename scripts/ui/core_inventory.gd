@@ -91,9 +91,10 @@ func _get_examination_panel() -> void:
 	if not game_root:
 		return
 
-	var text_ui_overlay = game_root.get_node_or_null("TextUIOverlay")
-	if text_ui_overlay:
-		examination_panel = text_ui_overlay.get_node_or_null("ExaminationPanel")
+	# ExaminationPanel is now embedded in RightSide VBoxContainer (sibling node)
+	var right_side_vbox = game_root.get_node_or_null("MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer")
+	if right_side_vbox:
+		examination_panel = right_side_vbox.get_node_or_null("ExaminationPanel")
 
 func set_player(p: Player3D) -> void:
 	"""Called by Game node to set player reference"""
@@ -409,9 +410,13 @@ func _highlight_slot(slot: Control) -> void:
 	if examination_panel and slot in tooltip_texts:
 		# Directly set examination panel content with item info
 		var item_name = label.text.split(" (")[0]  # Extract just the item name
+		examination_panel.header_label.text = "ITEM INFO"
+		examination_panel.header_label.visible = true
 		examination_panel.entity_name_label.text = item_name
+		examination_panel.entity_name_label.visible = true
 		examination_panel.threat_level_label.visible = false  # Hide threat for items
 		examination_panel.description_label.text = tooltip_texts[slot]
+		examination_panel.description_label.visible = true
 		examination_panel.panel.visible = true
 
 func _unhighlight_slot(slot: Control) -> void:
@@ -450,7 +455,6 @@ func _start_reorder(slot: Control, pool_type: Item.PoolType, slot_index: int) ->
 		label.add_theme_stylebox_override("normal", style)
 		label.add_theme_stylebox_override("focus", style)
 
-	Log.system("Picked up item from slot %d in %s pool (press X/RMB to drop, B to cancel)" % [slot_index, Item.PoolType.keys()[pool_type]])
 
 	# Emit signal to update action preview
 	reorder_state_changed.emit(true)
@@ -476,7 +480,6 @@ func _toggle_item(pool_type: Item.PoolType, slot_index: int) -> void:
 	if player.state_machine:
 		player.state_machine.change_state("PreTurnState")
 
-	Log.system("Queued toggle action for slot %d" % slot_index)
 
 func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target_slot_index: int) -> void:
 	"""Drop item at new position (reorder within same pool, consumes a turn)"""
@@ -513,7 +516,6 @@ func _drop_reorder(target_slot: Control, target_pool_type: Item.PoolType, target
 	if player.state_machine:
 		player.state_machine.change_state("PreTurnState")
 
-	Log.system("Queued reorder action from slot %d to %d" % [reordering_slot_index, target_slot_index])
 
 func _cancel_reorder() -> void:
 	"""Cancel current reorder operation"""
@@ -523,7 +525,6 @@ func _cancel_reorder() -> void:
 		if label:
 			label.remove_theme_stylebox_override("normal")
 			label.remove_theme_stylebox_override("focus")
-		Log.system("Cancelled reorder operation")
 
 	reordering_slot = null
 	reordering_slot_index = -1

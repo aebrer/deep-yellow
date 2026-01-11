@@ -75,23 +75,18 @@ func configure_from_level(level_config: LevelConfig) -> void:
 	current_level = level_config
 	grid_size = level_config.grid_size
 
-	Log.system("Configuring grid for: %s" % level_config.display_name)
-	Log.system("Grid size: %d x %d" % [grid_size.x, grid_size.y])
 
 	# Check if ChunkManager exists (indicates procedural generation mode)
 	if has_node("/root/ChunkManager"):
 		use_procedural_generation = true
-		Log.system("ChunkManager detected - enabling procedural generation mode")
 
 		# Debug: Log our node path so ChunkManager can find us
 		var our_path = get_path()
-		Log.system("Grid3D path: %s" % our_path)
 
 	# Apply visual settings
 	_apply_level_visuals(level_config)
 
 	# Procedural mode: ChunkManager will populate via load_chunk()
-	Log.system("Procedural generation mode enabled - waiting for ChunkManager")
 
 	# Cache materials and generate examination overlay
 	_cache_wall_materials()
@@ -132,7 +127,6 @@ func _apply_level_visuals(config: LevelConfig) -> void:
 			# Future levels: Could be black void, red emergency lights, etc.
 			env.background_mode = Environment.BG_COLOR
 			env.background_color = config.background_color
-			Log.system("Applied background color: %s" % config.background_color)
 
 			# Fog settings (future: enable when fog system is ready)
 			# Will create depth and atmosphere, hide distant geometry
@@ -163,12 +157,6 @@ func _apply_level_visuals(config: LevelConfig) -> void:
 		# Level 0: (0, 0, 80) = nearly straight down from above (overhead fluorescents)
 		# Future: (45, 0, 45) might be angled like setting sun, etc.
 		light.rotation_degrees = config.directional_light_rotation
-
-		Log.system("Applied directional light: color=%s energy=%.2f rotation=%s" % [
-			config.directional_light_color,
-			config.directional_light_energy,
-			config.directional_light_rotation
-		])
 	else:
 		push_warning("[Grid3D] OverheadLight node not found - cannot apply lighting settings")
 
@@ -182,7 +170,6 @@ func _apply_level_visuals(config: LevelConfig) -> void:
 		var mesh_lib = load(config.mesh_library_path) as MeshLibrary
 		if mesh_lib:
 			grid_map.mesh_library = mesh_lib
-			Log.system("Loaded MeshLibrary: %s" % config.mesh_library_path)
 		else:
 			push_error("[Grid3D] Failed to load MeshLibrary: %s" % config.mesh_library_path)
 
@@ -288,7 +275,6 @@ func unload_chunk(chunk: Chunk) -> void:
 	if entity_renderer:
 		entity_renderer.unload_chunk_entities(chunk)
 
-	Log.grid("Unloaded chunk %s from GridMap" % chunk.position)
 
 func _cache_wall_materials() -> void:
 	"""Cache wall materials from MeshLibrary for player position updates"""
@@ -310,17 +296,10 @@ func _cache_wall_materials() -> void:
 		var material = wall_mesh.surface_get_material(i)
 		if material and material is ShaderMaterial:
 			wall_materials.append(material)
-			var shader_path = material.shader.resource_path if material.shader else "no shader"
-			print("[Grid3D] Cached wall material %d: %s" % [i, shader_path])
-
-			# Try to get current player_position value to verify uniform exists
+			# Verify uniform exists
 			var test_value = material.get_shader_parameter("player_position")
-			if test_value != null:
-				print("[Grid3D] ✓ Material has player_position uniform (current: %s)" % test_value)
-			else:
-				push_warning("[Grid3D] ✗ Material missing player_position uniform!")
-
-	print("[Grid3D] Total wall materials cached: %d" % wall_materials.size())
+			if test_value == null:
+				push_warning("[Grid3D] Wall material missing player_position uniform!")
 
 func _cache_ceiling_materials() -> void:
 	"""Cache ceiling materials from MeshLibrary for player position updates"""
@@ -342,17 +321,10 @@ func _cache_ceiling_materials() -> void:
 		var material = ceiling_mesh.surface_get_material(i)
 		if material and material is ShaderMaterial:
 			ceiling_materials.append(material)
-			var shader_path = material.shader.resource_path if material.shader else "no shader"
-			print("[Grid3D] Cached ceiling material %d: %s" % [i, shader_path])
-
-			# Try to get current player_position value to verify uniform exists
+			# Verify uniform exists
 			var test_value = material.get_shader_parameter("player_position")
-			if test_value != null:
-				print("[Grid3D] ✓ Material has player_position uniform (current: %s)" % test_value)
-			else:
-				push_warning("[Grid3D] ✗ Material missing player_position uniform!")
-
-	print("[Grid3D] Total ceiling materials cached: %d" % ceiling_materials.size())
+			if test_value == null:
+				push_warning("[Grid3D] Ceiling material missing player_position uniform!")
 
 # Debug: Track frame count for periodic logging
 var _frame_count: int = 0

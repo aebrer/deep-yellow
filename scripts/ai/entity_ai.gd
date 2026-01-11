@@ -91,7 +91,7 @@ static func _reset_turn_state(entity: WorldEntity) -> void:
 		TYPE_BACTERIA_MOTHERLOAD:
 			# Will be set to 2 if player is nearby, otherwise 1
 			entity.moves_remaining = 1
-			entity.attack_damage = 8.0
+			entity.attack_damage = 4.0  # Halved from 8.0 for balance
 			entity.attack_range = ATTACK_RANGE_MOTHERLOAD
 		_:
 			entity.moves_remaining = 0  # Debug enemies don't move
@@ -141,13 +141,11 @@ static func _process_bacteria_spawn(entity: WorldEntity, player_pos: Vector2i, g
 			attacked = true
 			entity.attack_cooldown = 1  # 1 turn cooldown
 			entity.must_wait = true  # Must wait next turn after attacking
-			Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "%s attacked, will wait next turn" % entity.entity_type)
 
 	# If already in attack range, maybe hold position or shuffle around
 	# Probabilistic behavior makes swarms feel more organic
 	if distance_to_player <= entity.attack_range:
 		if randf() < HOLD_POSITION_CHANCE:
-			Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "%s holding position (in attack range)" % entity.entity_type)
 			return
 		else:
 			# Shuffle around the player instead of moving toward them
@@ -194,20 +192,17 @@ static func _process_bacteria_motherload(entity: WorldEntity, player_pos: Vector
 			attacked = true
 			entity.attack_cooldown = 2  # 2 turn cooldown
 			entity.moves_remaining = 1  # Only 1 move post-attack
-			Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload attacked, 1 move remaining")
 
 	# Try to spawn minions (if not attacked and off cooldown)
 	if not attacked and entity.spawn_cooldown == 0 and can_sense_player:
 		_spawn_minion(entity, grid)
 		entity.spawn_cooldown = MOTHERLOAD_SPAWN_COOLDOWN
 		entity.must_wait = true  # Must wait after spawning
-		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload spawned minion, will wait next turn")
 		return  # Don't move after spawning
 
 	# If already in attack range, maybe hold position or shuffle around
 	if distance_to_player <= entity.attack_range:
 		if randf() < HOLD_POSITION_CHANCE:
-			Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload holding position (in attack range)")
 			return
 		else:
 			# Shuffle around the player
@@ -302,11 +297,6 @@ static func _move_toward_target(entity: WorldEntity, target_pos: Vector2i, grid)
 
 	# Try pathfinding first (autoload is named "Pathfinding" in project.godot)
 	var pathfinder = grid.get_node_or_null("/root/Pathfinding")
-
-	if not pathfinder:
-		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Pathfinding autoload unavailable, using greedy navigation")
-	elif not pathfinder.has_point(current_pos):
-		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity at %s not in pathfinding graph, using greedy navigation" % current_pos)
 
 	if pathfinder and pathfinder.has_point(current_pos):
 		var path = pathfinder.find_path(current_pos, target_pos)
@@ -486,7 +476,6 @@ static func _shuffle_around_target(entity: WorldEntity, target_pos: Vector2i, gr
 		if distance_to_target <= entity.attack_range and _can_move_to(next_pos, grid):
 			entity.move_to(next_pos)
 			entity.moves_remaining -= 1
-			Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "%s shuffled around player" % entity.entity_type)
 			return true
 
 	return false  # Couldn't find valid shuffle position
@@ -579,11 +568,8 @@ static func _spawn_minion(entity: WorldEntity, grid) -> void:
 			# Add to the appropriate subchunk
 			if _add_entity_to_chunk(spawn, grid):
 				Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Motherload spawned bacteria at %s" % spawn_pos)
-			else:
-				Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload spawn failed at %s - chunk/subchunk issue" % spawn_pos)
 			return
 
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload couldn't spawn - no adjacent empty tiles")
 
 static func _add_entity_to_chunk(entity: WorldEntity, grid) -> bool:
 	"""Add a newly spawned entity to the appropriate chunk/subchunk

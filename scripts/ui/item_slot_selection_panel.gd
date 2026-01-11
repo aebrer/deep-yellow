@@ -107,7 +107,6 @@ func show_slot_selection(item: Item, pool: ItemPool, player: Player3D, position:
 		player: Player reference
 		position: World position of item (for removal after pickup)
 	"""
-	Log.system("show_slot_selection: %s at %s" % [item.item_name, position])
 
 	current_item = item
 	current_pool = pool
@@ -168,7 +167,6 @@ func _update_panel_position() -> void:
 
 func _rebuild_content() -> void:
 	"""Rebuild UI content for current item/pool"""
-	Log.system("_rebuild_content: clearing %d old children" % content_vbox.get_child_count())
 
 	# Clear old content - CRITICAL: Remove from group and destroy immediately
 	var vbox = content_vbox
@@ -188,7 +186,6 @@ func _rebuild_content() -> void:
 		child.free()
 	slot_buttons.clear()
 
-	Log.system("_rebuild_content: building UI for %s" % (current_item.item_name if current_item else "null"))
 
 	# Header
 	var header = Label.new()
@@ -332,17 +329,8 @@ func _on_slot_selected(slot_index: int, action_type: ActionType) -> void:
 		slot_index: Selected slot
 		action_type: What action to perform
 	"""
-	Log.system("_on_slot_selected: slot=%d, action=%d, visible=%s, accepting=%s, item=%s" % [
-		slot_index,
-		action_type,
-		visible,
-		_accepting_input,
-		current_item.item_name if current_item else "null"
-	])
-
 	# Ignore if panel not ready (prevents queued-for-deletion buttons from firing)
 	if not visible or not _accepting_input:
-		Log.system("  Ignoring - panel not ready (visible=%s, accepting=%s)" % [visible, _accepting_input])
 		return
 
 	# Create action to execute the pickup

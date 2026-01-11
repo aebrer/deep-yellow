@@ -104,5 +104,4 @@ static func _mark_item_picked_up_in_chunk(chunk: Chunk, world_pos: Vector2i) -> 
 
 			if item_world_pos == world_pos:
 				item_data_ref["picked_up"] = true
-				Log.grid("Marked item at %s as picked up in chunk data" % world_pos)
 				return

@@ -78,17 +78,9 @@ var _left_mouse_just_pressed: bool = false
 # ============================================================================
 
 func _ready() -> void:
-	Log.system("InputManager initialized - Controller-first input system ready")
-	Log.system("Aim deadzone: %.2f" % aim_deadzone)
-	Log.system("Debug mode: %s" % ("ON" if debug_input else "OFF"))
-
-	# List connected controllers for debugging
+	# Controller detection (for debugging - warnings if none detected)
 	var joypads = Input.get_connected_joypads()
-	if joypads.size() > 0:
-		Log.system("Connected controllers:")
-		for joypad in joypads:
-			Log.system("  - Device %d: %s" % [joypad, Input.get_joy_name(joypad)])
-	else:
+	if joypads.size() == 0:
 		Log.warn(Log.Category.SYSTEM, "No controllers detected (keyboard fallback available)")
 
 func _process(_delta: float) -> void:
@@ -112,10 +104,6 @@ func _input(event: InputEvent) -> void:
 	_detect_input_device(event)
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Generic input logging - log ALL input events when debug enabled
-	if debug_input:
-		_log_input_event(event)
-
 	# Track action presses for this frame
 	# Note: This runs AFTER scene input handlers, so it won't interfere
 	var tracked_actions := [
@@ -149,7 +137,6 @@ func _detect_input_device(event: InputEvent) -> void:
 	if new_device != current_input_device:
 		current_input_device = new_device
 		input_device_changed.emit(new_device)
-		Log.input("Input device switched to: %s" % ("GAMEPAD" if new_device == InputDevice.GAMEPAD else "MOUSE+KEYBOARD"))
 
 # ============================================================================
 # AIM DIRECTION (Continuous analog input)
@@ -298,100 +285,14 @@ func is_action_pressed(action: String) -> bool:
 func set_aim_deadzone(deadzone: float) -> void:
 	"""Set aim deadzone (0.0 to 0.9)"""
 	aim_deadzone = clampf(deadzone, 0.0, 0.9)
-	Log.system("InputManager aim deadzone set to: %.2f" % aim_deadzone)
 
 func set_debug_mode(enabled: bool) -> void:
 	"""Enable/disable debug logging"""
 	debug_input = enabled
-	Log.system("InputManager debug mode: %s" % ("ON" if enabled else "OFF"))
 
 # ============================================================================
 # DEBUG UTILITIES
 # ============================================================================
-
-func _log_input_event(event: InputEvent) -> void:
-	"""Generic input event logger - logs ALL input types automatically (TRACE level - very verbose)"""
-	# Keyboard key presses
-	if event is InputEventKey:
-		if event.pressed and not event.echo:
-			var key_name = OS.get_keycode_string(event.keycode)
-			Log.input_trace("Key pressed: %s" % key_name)
-		elif not event.pressed:
-			var key_name = OS.get_keycode_string(event.keycode)
-			Log.input_trace("Key released: %s" % key_name)
-
-	# Joypad button presses
-	elif event is InputEventJoypadButton:
-		if event.pressed:
-			var button_name = _get_button_name(event.button_index)
-			Log.input_trace("Gamepad button pressed: %s (index: %d)" % [button_name, event.button_index])
-		else:
-			var button_name = _get_button_name(event.button_index)
-			Log.input_trace("Gamepad button released: %s (index: %d)" % [button_name, event.button_index])
-
-	# Joypad motion (analog sticks, triggers)
-	elif event is InputEventJoypadMotion:
-		var axis_name = _get_axis_name(event.axis)
-		# Log all stick/trigger movement above deadzone
-		if abs(event.axis_value) > 0.15:
-			Log.input_trace("Gamepad %s: %.2f" % [axis_name, event.axis_value])
-
-	# Mouse button presses
-	elif event is InputEventMouseButton:
-		if event.pressed:
-			var button_name = _get_mouse_button_name(event.button_index)
-			Log.input_trace("Mouse button pressed: %s" % button_name)
-		else:
-			var button_name = _get_mouse_button_name(event.button_index)
-			Log.input_trace("Mouse button released: %s" % button_name)
-
-	# Mouse motion - log when significant
-	elif event is InputEventMouseMotion:
-		if event.relative.length() > 5:
-			Log.input_trace("Mouse moved: (%.1f, %.1f)" % [event.relative.x, event.relative.y])
-
-func _get_axis_name(axis: int) -> String:
-	"""Convert axis index to human-readable name"""
-	match axis:
-		JOY_AXIS_LEFT_X: return "LeftStick-X"
-		JOY_AXIS_LEFT_Y: return "LeftStick-Y"
-		JOY_AXIS_RIGHT_X: return "RightStick-X"
-		JOY_AXIS_RIGHT_Y: return "RightStick-Y"
-		JOY_AXIS_TRIGGER_LEFT: return "LeftTrigger"
-		JOY_AXIS_TRIGGER_RIGHT: return "RightTrigger"
-		_: return "Axis%d" % axis
-
-func _get_button_name(button_index: int) -> String:
-	"""Convert button index to human-readable name (Xbox layout)"""
-	match button_index:
-		JOY_BUTTON_A: return "A"
-		JOY_BUTTON_B: return "B"
-		JOY_BUTTON_X: return "X"
-		JOY_BUTTON_Y: return "Y"
-		JOY_BUTTON_LEFT_SHOULDER: return "LB"
-		JOY_BUTTON_RIGHT_SHOULDER: return "RB"
-		JOY_BUTTON_LEFT_STICK: return "LeftStickClick"
-		JOY_BUTTON_RIGHT_STICK: return "RightStickClick"
-		JOY_BUTTON_BACK: return "Back"
-		JOY_BUTTON_START: return "Start"
-		JOY_BUTTON_GUIDE: return "Guide"
-		JOY_BUTTON_DPAD_UP: return "DPad-Up"
-		JOY_BUTTON_DPAD_DOWN: return "DPad-Down"
-		JOY_BUTTON_DPAD_LEFT: return "DPad-Left"
-		JOY_BUTTON_DPAD_RIGHT: return "DPad-Right"
-		_: return "Button%d" % button_index
-
-func _get_mouse_button_name(button_index: int) -> String:
-	"""Convert mouse button index to human-readable name"""
-	match button_index:
-		MOUSE_BUTTON_LEFT: return "LeftClick"
-		MOUSE_BUTTON_RIGHT: return "RightClick"
-		MOUSE_BUTTON_MIDDLE: return "MiddleClick"
-		MOUSE_BUTTON_WHEEL_UP: return "WheelUp"
-		MOUSE_BUTTON_WHEEL_DOWN: return "WheelDown"
-		MOUSE_BUTTON_XBUTTON1: return "Mouse4"
-		MOUSE_BUTTON_XBUTTON2: return "Mouse5"
-		_: return "MouseButton%d" % button_index
 
 func get_debug_info() -> Dictionary:
 	"""Get current input state for debugging UI"""

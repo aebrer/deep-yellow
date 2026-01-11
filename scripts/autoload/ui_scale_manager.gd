@@ -50,7 +50,6 @@ var _game_theme: Theme = null
 func set_theme(theme: Theme) -> void:
 	"""Set the theme to modify for scaling (called by game.gd on startup)"""
 	_game_theme = theme
-	Log.system("UIScaleManager: Theme registered for scaling")
 
 func set_resolution_scale(minimap_scale: int) -> void:
 	"""Called by minimap when its scale factor changes"""
@@ -60,9 +59,6 @@ func set_resolution_scale(minimap_scale: int) -> void:
 
 	if new_scale != current_scale:
 		current_scale = new_scale
-		Log.system("UIScaleManager: Scale changed to %.1fx (minimap=%d, threshold=%d)" % [
-			current_scale, minimap_scale, HIGH_RES_SCALE_THRESHOLD
-		])
 		_apply_theme_scaling()
 		scale_changed.emit(current_scale)
 
@@ -80,10 +76,6 @@ func _apply_theme_scaling() -> void:
 	_game_theme.default_font_size = scaled_default
 	_game_theme.set_font_size("font_size", "Label", scaled_label)
 	_game_theme.set_font_size("normal_font_size", "RichTextLabel", scaled_rich_text)
-
-	Log.system("UIScaleManager: Theme fonts scaled to %d/%d/%d" % [
-		scaled_default, scaled_label, scaled_rich_text
-	])
 
 func get_scaled_font_size(base_size: int) -> int:
 	"""Get a font size scaled for current resolution"""

@@ -38,7 +38,6 @@ func start() -> void:
 	should_exit = false
 	thread = Thread.new()
 	thread.start(_thread_function)
-	Log.system("ChunkGenerationThread started")
 
 func stop() -> void:
 	"""Stop the worker thread (blocks until thread exits)"""
@@ -54,7 +53,6 @@ func stop() -> void:
 	# Wait for thread to finish
 	thread.wait_to_finish()
 	thread = null
-	Log.system("ChunkGenerationThread stopped")
 
 # ============================================================================
 # PUBLIC API (Main Thread)

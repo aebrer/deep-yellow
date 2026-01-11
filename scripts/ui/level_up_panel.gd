@@ -173,12 +173,10 @@ func show_level_up(player: Player3D, level: int) -> void:
 		player: Player reference
 		level: New level reached
 	"""
-	Log.system("show_level_up: Level %d (visible=%s, queue_size=%d)" % [level, visible, _pending_levelups.size()])
 
 	# If already showing, queue this level-up for later
 	if visible:
 		_pending_levelups.append({"player": player, "level": level})
-		Log.system("Queued level-up for Level %d (queue size: %d)" % [level, _pending_levelups.size()])
 		return
 
 	# Show immediately
@@ -439,10 +437,6 @@ func _close_panel() -> void:
 	# Check for queued level-ups
 	if _pending_levelups.size() > 0:
 		var next_levelup = _pending_levelups.pop_front()
-		Log.system("Processing queued level-up: Level %d (%d remaining)" % [
-			next_levelup["level"],
-			_pending_levelups.size()
-		])
 		# Defer showing next level-up to allow current button to finish its callback
 		# This prevents "Object is locked" errors from freeing buttons mid-signal
 		call_deferred("_show_level_up_immediate", next_levelup["player"], next_levelup["level"])

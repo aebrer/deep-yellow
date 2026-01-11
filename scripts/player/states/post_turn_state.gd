@@ -34,11 +34,9 @@ func _on_chunk_updates_complete() -> void:
 	# Death occurs when HP or Sanity reaches 0
 	if player and player.stats:
 		if player.stats.current_hp <= 0.0 or player.stats.current_sanity <= 0.0:
-			Log.state("Chunk updates complete, but player is dead - not transitioning")
 			return
 
 	var target_state = "IdleState"
 	if player and player.return_state:
 		target_state = player.return_state
-	Log.state("Chunk updates complete, returning to %s" % target_state)
 	transition_to(target_state)

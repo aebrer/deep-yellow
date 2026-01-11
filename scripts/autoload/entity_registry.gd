@@ -22,7 +22,6 @@ var _entities: Dictionary = {}
 
 func _ready() -> void:
 	_load_entities()
-	Log.system("EntityRegistry initialized with %d entities" % _entities.size())
 
 func _load_entities() -> void:
 	"""Load all EntityInfo resources"""
@@ -97,7 +96,7 @@ func _load_entities() -> void:
 	bacteria_motherload.clearance_info[0] = ""  # No additional info at clearance 0
 	bacteria_motherload.clearance_info[1] = "Moves faster when it senses prey. Highly aggressive."
 	bacteria_motherload.clearance_info[2] = "Periodically spawns Bacteria Spawn from its mass. The glow intensifies before spawning."
-	bacteria_motherload.clearance_info[3] = "--- FIELD DATA ---\nDamage: 8 HP per attack\nSpeed: 2 moves per turn (when aware)\nSpawn cooldown: 10 turns\nSense range: 32 tiles"
+	bacteria_motherload.clearance_info[3] = "--- FIELD DATA ---\nDamage: 4 HP per attack\nSpeed: 2 moves per turn (when aware)\nSpawn cooldown: 10 turns\nSense range: 32 tiles"
 	bacteria_motherload.object_class = "Keter"
 	bacteria_motherload.threat_level = 3  # Dangerous (Yellow) - rare early, common later
 	_entities["bacteria_motherload"] = bacteria_motherload
@@ -116,7 +115,6 @@ func _load_entities() -> void:
 	debug_enemy.threat_level = 0
 	_entities["debug_enemy"] = debug_enemy
 
-	Log.system("Loaded %d entities (including grid tiles)" % _entities.size())
 
 # ============================================================================
 # PUBLIC API
@@ -149,7 +147,6 @@ func register_entity(entity: EntityInfo) -> void:
 		return
 
 	_entities[entity.entity_id] = entity
-	Log.system("Registered entity: %s" % entity.entity_id)
 
 func _get_unknown_entity_info() -> Dictionary:
 	"""Fallback info for unregistered entities"""

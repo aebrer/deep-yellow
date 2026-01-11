@@ -49,7 +49,6 @@ func _init() -> void:
 	config.add_entity(exit_stairs)
 
 	setup_level_config(config)
-	Log.system("Level0Generator initialized with %d entity types" % config.permitted_entities.size())
 
 # ============================================================================
 # MAZE GENERATION - ROOM + CORRIDOR ALGORITHM (PORTED FROM PYTHON)

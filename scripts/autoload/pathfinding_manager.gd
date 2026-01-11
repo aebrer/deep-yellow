@@ -23,7 +23,7 @@ var next_id: int = 0
 var grid: Node = null
 
 func _ready() -> void:
-	Log.system("PathfindingManager initialized")
+	pass
 
 ## Build navigation graph from walkable tiles in a chunk
 func build_navigation_graph(chunk_positions: Array, grid_ref: Node) -> void:
@@ -53,7 +53,6 @@ func build_navigation_graph(chunk_positions: Array, grid_ref: Node) -> void:
 		_connect_neighbors(pos, point_id)
 
 	var build_time := Time.get_ticks_msec() - start_time
-	Log.system("PathfindingManager: Built graph with %d points in %dms" % [astar.get_point_count(), build_time])
 
 ## Add all walkable tiles from a chunk to the graph
 func _add_chunk_to_graph(chunk_pos: Vector2i) -> void:
@@ -332,10 +331,6 @@ func add_chunk(chunk: Chunk) -> void:
 						_connect_neighbors(world_pos, pos_to_id[world_pos])
 
 	var build_time := Time.get_ticks_msec() - start_time
-	if added_count > 0:
-		Log.msg(Log.Category.GRID, Log.Level.DEBUG, "PathfindingManager: Added %d points from chunk %s in %dms (total: %d)" % [
-			added_count, chunk.position, build_time, astar.get_point_count()
-		])
 
 func remove_chunk(chunk: Chunk) -> void:
 	"""Remove all tiles from a chunk from the navigation graph
@@ -368,10 +363,6 @@ func remove_chunk(chunk: Chunk) -> void:
 		id_to_pos.erase(point_id)
 
 	var build_time := Time.get_ticks_msec() - start_time
-	if removed_count > 0:
-		Log.msg(Log.Category.GRID, Log.Level.DEBUG, "PathfindingManager: Removed %d points from chunk %s in %dms (total: %d)" % [
-			removed_count, chunk.position, build_time, astar.get_point_count()
-		])
 
 func set_grid_reference(grid_ref: Node) -> void:
 	"""Set the grid reference for walkability queries

@@ -19,12 +19,6 @@ func execute(player) -> void:
 	# Advance turn counter
 	player.turn_count += 1
 
-	Log.action("Turn %d: Waited in place at grid(%d, %d)" % [
-		player.turn_count,
-		player.grid_position.x,
-		player.grid_position.y
-	])
-
 func get_preview_info(player) -> Dictionary:
 	"""Get preview info for UI display"""
 	return {

@@ -47,6 +47,7 @@ var examination_panel: ExaminationPanel = null
 @onready var level_label: Label = %LevelLabel
 @onready var exp_label: Label = %EXPLabel
 @onready var clearance_label: Label = %ClearanceLabel
+@onready var corruption_label: Label = %CorruptionLabel
 
 func _ready():
 	# Wait for player to be set by Game node
@@ -74,9 +75,10 @@ func _get_examination_panel() -> void:
 	if not game_root:
 		return
 
-	var text_ui_overlay = game_root.get_node_or_null("TextUIOverlay")
-	if text_ui_overlay:
-		examination_panel = text_ui_overlay.get_node_or_null("ExaminationPanel")
+	# ExaminationPanel is now embedded in RightSide VBoxContainer
+	var right_side_vbox = game_root.get_node_or_null("MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer")
+	if right_side_vbox:
+		examination_panel = right_side_vbox.get_node_or_null("ExaminationPanel")
 
 func set_player(p: Player3D) -> void:
 	"""Called by Game node to set player reference"""
@@ -104,6 +106,10 @@ func _connect_signals() -> void:
 	player.stats.exp_gained.connect(_on_exp_gained)
 	player.stats.level_increased.connect(_on_level_increased)
 	player.stats.clearance_increased.connect(_on_clearance_increased)
+
+	# Turn completed - update corruption (changes when player explores)
+	if player.has_signal("turn_completed") and not player.turn_completed.is_connected(_on_turn_completed):
+		player.turn_completed.connect(_on_turn_completed)
 
 func _update_all_stats() -> void:
 	"""Update all stat displays"""
@@ -147,6 +153,8 @@ func _update_all_stats() -> void:
 		exp_label.text = "EXP: %d / %d" % [s.exp, s.exp + next_exp]
 	if clearance_label:
 		clearance_label.text = "Clearance: %d" % s.clearance_level
+	if corruption_label:
+		_update_corruption()
 
 # ============================================================================
 # SIGNAL HANDLERS
@@ -156,6 +164,10 @@ func _on_stat_changed(stat_name: String, _old_value: float, _new_value: float) -
 	"""Update display when a stat changes"""
 	# Just refresh everything for simplicity
 	_update_all_stats()
+
+func _on_turn_completed() -> void:
+	"""Update corruption display after each turn (corruption changes on exploration)"""
+	_update_corruption()
 
 func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
 	"""Update resource display"""
@@ -190,6 +202,35 @@ func _on_clearance_increased(_old_level: int, new_level: int) -> void:
 	if clearance_label:
 		clearance_label.text = "Clearance: %d" % new_level
 
+func _update_corruption() -> void:
+	"""Update corruption display from ChunkManager"""
+	if not corruption_label:
+		return
+
+	var corruption: float = 0.0
+	if ChunkManager and ChunkManager.corruption_tracker:
+		# Get corruption for current level (Level 0 = level_id 0)
+		var current_level_id = 0
+		if LevelManager:
+			var current_level = LevelManager.get_current_level()
+			if current_level:
+				current_level_id = current_level.level_id
+		corruption = ChunkManager.corruption_tracker.get_corruption(current_level_id)
+
+	corruption_label.text = "Corruption: %.2f" % corruption
+
+	# Color based on corruption level
+	var color: Color
+	if corruption < 0.25:
+		color = Color(0.7, 0.7, 0.7)  # Gray - low
+	elif corruption < 0.5:
+		color = Color(0.7, 0.5, 0.9)  # Light purple
+	elif corruption < 1.0:
+		color = Color(0.7, 0.3, 0.9)  # Purple
+	else:
+		color = Color(0.9, 0.2, 0.6)  # Magenta - high
+	corruption_label.add_theme_color_override("font_color", color)
+
 # ============================================================================
 # HOVER/FOCUS HIGHLIGHTING
 # ============================================================================
@@ -200,7 +241,7 @@ func _setup_label_highlights() -> void:
 		body_label, mind_label, null_label,
 		hp_label, sanity_label, mana_label,
 		strength_label, perception_label, anomaly_label,
-		level_label, exp_label, clearance_label
+		level_label, exp_label, clearance_label, corruption_label
 	]
 
 	for label in tooltip_labels:
@@ -260,10 +301,7 @@ func _highlight_label(label: Label) -> void:
 	if examination_panel and label in tooltip_texts:
 		# Extract stat name from label text
 		var stat_name = label.text.split(":")[0]  # Get the part before the colon
-		examination_panel.entity_name_label.text = stat_name
-		examination_panel.threat_level_label.visible = false  # Hide threat for stats
-		examination_panel.description_label.text = tooltip_texts[label]
-		examination_panel.panel.visible = true
+		examination_panel.show_stat_info(stat_name, tooltip_texts[label])
 
 func _unhighlight_label(label: Label) -> void:
 	"""Remove visual highlight and hide examination panel"""

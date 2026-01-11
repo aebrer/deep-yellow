@@ -63,13 +63,6 @@ func _ready() -> void:
 	# Mouse will be captured on first click via _unhandled_input
 	if not OS.has_feature("web"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	else:
-		Log.camera("Web export detected - mouse will capture on first click")
-
-	Log.camera("TacticalCamera initialized - Zoom: %.1f, Rotation: %.1f°" % [
-		current_zoom,
-		default_yaw
-	])
 
 func _process(delta: float) -> void:
 	# Apply accumulated mouse motion (from _unhandled_input)
@@ -110,7 +103,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if OS.has_feature("web") and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		if event is InputEventMouseButton and event.pressed:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-			Log.camera("Mouse captured on click (web)")
 			get_viewport().set_input_as_handled()
 			return
 

@@ -101,12 +101,6 @@ func _init(
 	spawn_turn = p_spawn_turn
 	is_dead = false
 
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "WorldEntity created: %s at %s (HP: %.0f)" % [
-		entity_type,
-		world_position,
-		max_hp
-	])
-
 # ============================================================================
 # STATE QUERIES
 # ============================================================================
@@ -166,7 +160,6 @@ func move_to(new_pos: Vector2i) -> void:
 	var old_pos = world_position
 	world_position = new_pos
 	moved.emit(old_pos, new_pos)
-	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "%s moved from %s to %s" % [entity_type, old_pos, new_pos])
 
 # ============================================================================
 # SERIALIZATION

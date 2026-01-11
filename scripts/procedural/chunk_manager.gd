@@ -82,11 +82,6 @@ func _ready() -> void:
 	# Find Grid3D in scene tree (it may be nested in UI structure)
 	_find_grid_3d()
 
-	Log.system("ChunkManager initialized (seed: %d, generators: %d, threaded: true, items: true)" % [
-		world_seed,
-		level_generators.size()
-	])
-
 	# Connect to node_added signal to detect when game scene loads
 	# DON'T start chunk generation yet - wait for Grid3D to exist first
 	get_tree().node_added.connect(_on_node_added)
@@ -96,7 +91,6 @@ func _on_node_added(node: Node) -> void:
 	# The root Control node from game.tscn is named "Game"
 	# (Not "Game3D" - that's just the instance name for the nested game_3d.tscn)
 	if node.name == "Game" and node is Control:
-		Log.system("Game scene detected, resetting chunk state for new run...")
 		# Reset all state for new run (handles scene reload/restart)
 		# This clears loaded_chunks, generating_chunks, visited_chunks, and resets initial_load_complete
 		start_new_run()
@@ -132,7 +126,6 @@ func _connect_to_player_signal() -> void:
 	if player:
 		if not player.turn_completed.is_connected(on_turn_completed):
 			player.turn_completed.connect(on_turn_completed)
-			Log.system("[ChunkManager] Connected to player turn_completed signal")
 	else:
 		Log.warn(Log.Category.SYSTEM, "Player not found for turn signal connection")
 
@@ -248,10 +241,6 @@ func _process_generation_queue() -> void:
 
 			if has_all_chunks or (generation_thread and generation_thread.get_pending_count() == 0):
 				initial_load_complete = true
-				Log.system("Initial chunk load complete (%d/%d chunks), switching to 1-chunk-per-turn mode" % [
-					loaded_chunks.size(),
-					expected_chunks
-				])
 				initial_load_completed.emit()
 
 		return
@@ -259,7 +248,6 @@ func _process_generation_queue() -> void:
 	# Check memory limit
 	if loaded_chunks.size() >= MAX_LOADED_CHUNKS:
 		if not hit_chunk_limit:
-			Log.grid("Hit MAX_LOADED_CHUNKS (%d), stopping generation (queue: %d)" % [MAX_LOADED_CHUNKS, generating_chunks.size()])
 			hit_chunk_limit = true
 		# Emit completion signal since we can't generate more chunks
 		if was_generating:
@@ -340,22 +328,13 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 	# Spawn items (separate pass after terrain generation, on main thread)
 	var level_config: LevelConfig = level_configs.get(level_id, null)
 
-	# Debug logging to diagnose spawning issues
-	Log.system("Item spawning check: level_config=%s, item_spawner=%s, permitted_items=%d" % [
-		"exists" if level_config else "null",
-		"exists" if item_spawner else "null",
-		level_config.permitted_items.size() if level_config else 0
-	])
-
 	if level_config and item_spawner and not level_config.permitted_items.is_empty():
-		Log.system("Attempting to spawn items in chunk at %s" % chunk.position)
 		var spawned_items = item_spawner.spawn_items_for_chunk(
 			chunk,
 			0,  # Turn number (will be updated later with actual turn tracking)
 			level_config.permitted_items
 		)
 
-		Log.system("Spawned %d items in chunk" % spawned_items.size())
 
 		# Store spawned items in subchunks for persistence
 		for world_item in spawned_items:
@@ -413,13 +392,6 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# Only warn once per session
 		if loaded_chunks.size() == 1:
 			push_warning("[ChunkManager] Grid3D not found in scene tree - procedural generation disabled")
-
-	# Log first few chunks and progress milestones to System for visibility
-	if loaded_chunks.size() <= 5 or loaded_chunks.size() % 25 == 0:
-		Log.system("ChunkManager: %d chunks generated (latest: %s)" % [
-			loaded_chunks.size(),
-			chunk_pos
-		])
 
 func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Load chunk immediately (fallback for synchronous generation)"""
@@ -641,9 +613,6 @@ func process_entity_ai() -> void:
 				_EntityAI.process_entity_turn(entity, player_pos, grid_3d)
 				entities_processed += 1
 
-	if entities_processed > 0:
-		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Processed AI for %d entities" % entities_processed)
-
 # ============================================================================
 # ITEM DISCOVERY
 # ============================================================================
@@ -682,7 +651,6 @@ func _update_item_discovery() -> void:
 				# Mark as discovered if within range
 				if distance <= DISCOVERY_RANGE:
 					item_data["discovered"] = true
-					Log.system("Item discovered at %s (distance: %.1f tiles)" % [item_pos, distance])
 
 # ============================================================================
 # CHUNK UNLOADING
@@ -711,7 +679,6 @@ func _unload_distant_chunks() -> void:
 
 	# Unload distant chunks
 	if not chunks_to_unload.is_empty():
-		Log.grid("Unloading %d chunks beyond radius %d" % [chunks_to_unload.size(), UNLOAD_RADIUS])
 		hit_chunk_limit = false  # Reset limit flag since we're freeing up space
 
 	var unload_count := 0
@@ -744,7 +711,6 @@ func _unload_chunk(chunk_key: Vector3i) -> void:
 	# Remove from memory
 	loaded_chunks.erase(chunk_key)
 
-	Log.grid("Unloaded chunk %s" % Vector2i(chunk_key.x, chunk_key.y))
 
 # ============================================================================
 # COORDINATE CONVERSION
@@ -802,10 +768,8 @@ func _find_grid_3d() -> void:
 	var root = get_tree().root
 	grid_3d = _search_for_grid_3d(root)
 
-	if grid_3d:
-		Log.system("Found Grid3D at: %s" % grid_3d.get_path())
-	else:
-		Log.system("Grid3D not found in scene tree")
+	# Note: grid_3d may be null during ChunkManager._ready() before game scene loads
+	# This is expected - Grid3D will be found later when _find_grid_3d() is called again
 
 func _search_for_grid_3d(node: Node) -> Grid3D:
 	"""Recursively search for Grid3D node"""
@@ -943,11 +907,6 @@ func start_new_run(new_seed: int = -1) -> void:
 	# Re-initialize level generators (fresh instances for new run)
 	level_generators.clear()
 	level_generators[0] = Level0Generator.new()
-
-	Log.system("New run started (seed: %d, generators: %d)" % [
-		world_seed,
-		level_generators.size()
-	])
 
 # ============================================================================
 # CHUNK VALIDATION

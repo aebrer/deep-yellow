@@ -106,7 +106,6 @@ func process_frame(delta: float) -> void:
 
 	# Check for look mode activation via InputManager (handles trigger synthesis)
 	if InputManager.is_action_just_pressed("look_mode"):
-		Log.system("[IdleState] look_mode action detected - transitioning to LookModeState")
 		transition_to("LookModeState")
 		return
 

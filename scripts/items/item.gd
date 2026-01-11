@@ -168,13 +168,10 @@ func _apply_stat_bonus(player: Player3D) -> void:
 	match pool_type:
 		PoolType.BODY:
 			player.stats.body += level
-			Log.system("Applied +%d BODY from %s" % [level, item_name])
 		PoolType.MIND:
 			player.stats.mind += level
-			Log.system("Applied +%d MIND from %s" % [level, item_name])
 		PoolType.NULL:
 			player.stats.null_stat += level
-			Log.system("Applied +%d NULL from %s" % [level, item_name])
 
 func _remove_stat_bonus(player: Player3D) -> void:
 	"""Remove base stat bonus when item is unequipped."""
@@ -184,13 +181,10 @@ func _remove_stat_bonus(player: Player3D) -> void:
 	match pool_type:
 		PoolType.BODY:
 			player.stats.body -= level
-			Log.system("Removed +%d BODY from %s" % [level, item_name])
 		PoolType.MIND:
 			player.stats.mind -= level
-			Log.system("Removed +%d MIND from %s" % [level, item_name])
 		PoolType.NULL:
 			player.stats.null_stat -= level
-			Log.system("Removed +%d NULL from %s" % [level, item_name])
 
 # ============================================================================
 # ATTACK MODIFIERS

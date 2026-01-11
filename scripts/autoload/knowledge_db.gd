@@ -45,7 +45,7 @@ var examined_at_clearance: Dictionary = {}
 # ============================================================================
 
 func _ready() -> void:
-	Log.system("KnowledgeDB initialized - Clearance: %d" % clearance_level)
+	pass
 
 # ============================================================================
 # EXAMINATION API
@@ -63,9 +63,6 @@ func examine_entity(entity_id: String) -> void:
 		_mark_examined(key)
 		var exp = _get_entity_exp()
 		emit_signal("discovery_made", "entity", entity_id, exp)
-		Log.system("Novel entity examined! %s +%d EXP (Clearance %d)" % [entity_id, exp, clearance_level])
-	else:
-		Log.trace(Log.Category.SYSTEM, "Entity already examined at Clearance %d: %s" % [clearance_level, entity_id])
 
 func get_entity_info(entity_id: String) -> Dictionary:
 	"""Get display information for entity based on clearance
@@ -102,9 +99,6 @@ func examine_item(item_id: String, item_rarity: String = "common") -> void:
 		_mark_examined(key)
 		var exp = _get_item_exp(item_rarity)
 		emit_signal("discovery_made", "item", item_id, exp)
-		Log.system("Novel item examined! %s (%s) +%d EXP (Clearance %d)" % [item_id, item_rarity, exp, clearance_level])
-	else:
-		Log.trace(Log.Category.SYSTEM, "Item already examined at Clearance %d: %s" % [clearance_level, item_id])
 
 func examine_environment(env_type: String) -> void:
 	"""Called when player examines environment (wall, floor, ceiling) - awards EXP if novel"""
@@ -118,9 +112,6 @@ func examine_environment(env_type: String) -> void:
 		_mark_examined(key)
 		var exp = 10  # Fixed 10 EXP for environment examination
 		emit_signal("discovery_made", "environment", env_type, exp)
-		Log.system("Novel environment examined! %s +%d EXP (Clearance %d)" % [env_type, exp, clearance_level])
-	else:
-		Log.trace(Log.Category.SYSTEM, "Environment already examined at Clearance %d: %s" % [clearance_level, env_type])
 
 # ============================================================================
 # CLEARANCE MANAGEMENT
@@ -129,13 +120,11 @@ func examine_environment(env_type: String) -> void:
 func set_clearance_level(level: int) -> void:
 	"""Set player clearance level (0-5)"""
 	clearance_level = clampi(level, 0, 5)
-	Log.system("Clearance level set to: %d" % clearance_level)
 
 func increase_clearance() -> void:
 	"""Increase clearance level by 1 (max 5)"""
 	if clearance_level < 5:
 		clearance_level += 1
-		Log.system("Clearance increased to: %d" % clearance_level)
 
 # ============================================================================
 # NOVELTY TRACKING (PRIVATE)
@@ -199,7 +188,6 @@ func reset_knowledge() -> void:
 	"""Reset all knowledge (for debugging)"""
 	examined_at_clearance.clear()
 	clearance_level = 0
-	Log.system("Knowledge database reset")
 
 func get_stats() -> Dictionary:
 	"""Get knowledge statistics for debugging"""

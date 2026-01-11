@@ -28,13 +28,11 @@ var state_name: String = "BaseState"
 
 ## Called when entering this state
 func enter() -> void:
-	if InputManager and InputManager.debug_input:
-		Log.state("Entered: %s" % state_name)
+	pass
 
 ## Called when exiting this state
 func exit() -> void:
-	if InputManager and InputManager.debug_input:
-		Log.state("Exited: %s" % state_name)
+	pass
 
 # ============================================================================
 # INPUT HANDLING

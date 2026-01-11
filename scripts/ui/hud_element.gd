@@ -79,7 +79,6 @@ func _gui_input(event):
 func activate():
 	"""Override in subclasses for custom behavior."""
 	emit_signal("element_activated")
-	Log.system("HUD element activated: %s" % name)
 
 func _update_visual_state():
 	"""Override to show focus/hover state.

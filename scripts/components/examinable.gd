@@ -45,7 +45,6 @@ func _add_default_collision_shape() -> void:
 	box.size = Vector3(1, 2, 1)  # Human-sized default
 	shape.shape = box
 	add_child(shape)
-	Log.trace(Log.Category.SYSTEM, "[Examinable] Added default collision shape to: %s" % get_parent().name)
 
 # ============================================================================
 # EXAMINATION API

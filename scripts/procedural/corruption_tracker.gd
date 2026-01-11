@@ -99,7 +99,6 @@ func reset_level(level_id: int) -> void:
 func reset_all() -> void:
 	"""Reset all corruption (new run)"""
 	corruption_by_level.clear()
-	Log.system("All corruption reset (new run)")
 
 # ============================================================================
 # UTILITY

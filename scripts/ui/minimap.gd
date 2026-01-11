@@ -100,8 +100,6 @@ func _ready() -> void:
 		# Set initial scale (deferred to ensure container has size)
 		call_deferred("_update_texture_scale")
 
-	Log.system("Minimap initialized (%dx%d)" % [MAP_SIZE, MAP_SIZE])
-	Log.system("Minimap TextureRect: %s" % map_texture_rect)
 
 func _process(_delta: float) -> void:
 	# Update camera rotation every frame (for north orientation)
@@ -156,7 +154,6 @@ func on_chunk_unloaded(_chunk_pos: Vector2i) -> void:
 func _on_initial_load_completed() -> void:
 	"""Called when ChunkManager finishes initial chunk loading"""
 	content_dirty = true
-	Log.system("Minimap ready after initial chunk load")
 
 func _update_texture_scale() -> void:
 	"""Dynamically scale texture by largest integer that fits container (pixel-perfect scaling)"""
@@ -196,10 +193,6 @@ func _update_texture_scale() -> void:
 		if UIScaleManager:
 			UIScaleManager.set_resolution_scale(scale_factor)
 		resolution_scale_changed.emit(scale_factor)  # Keep signal for any direct listeners
-
-	Log.system("Minimap scaled to %dx (%d pixels) for container %v" % [
-		scale_factor, new_size, container_size
-	])
 
 func _on_container_resized() -> void:
 	"""Called when parent container changes size"""

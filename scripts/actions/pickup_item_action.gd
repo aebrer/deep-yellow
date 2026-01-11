@@ -61,7 +61,6 @@ func execute(player: Player3D) -> void:
 		var old_pos = player.grid_position
 		player.grid_position = target_position
 		player.update_visual_position()
-		Log.movement("Moved to item at %s (from %s)" % [target_position, old_pos])
 
 	# Show pickup UI (pauses game and lets player choose slot)
 	_show_pickup_ui(player)
@@ -177,7 +176,6 @@ func _get_slot_selection_ui(player: Player3D) -> ItemSlotSelectionPanel:
 	ui.name = "ItemSlotSelectionPanel"
 	game_node.add_child(ui)
 
-	Log.system("Created ItemSlotSelectionPanel UI")
 	return ui
 
 func get_preview_info(player) -> Dictionary:

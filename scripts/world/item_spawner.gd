@@ -46,7 +46,6 @@ func _init(p_corruption_tracker: CorruptionTracker, p_level_config) -> void:
 	corruption_tracker = p_corruption_tracker
 	level_config = p_level_config
 
-	Log.system("ItemSpawner initialized for level")
 
 # ============================================================================
 # SPAWNING LOGIC
@@ -117,19 +116,6 @@ func spawn_items_for_chunk(
 					turn_number
 				)
 				spawned_items.append(world_item)
-
-				Log.system("Spawned %s (%s) at %s (corruption: %.3f, prob: %.1f%%)" % [
-					item.item_name,
-					ItemRarity.RARITY_NAMES.get(rarity, "Unknown"),
-					spawn_pos,
-					corruption,
-					final_prob * 100.0
-				])
-			else:
-				Log.system("Failed to find spawn location for %s (%s)" % [
-					item.item_name,
-					ItemRarity.RARITY_NAMES.get(rarity, "Unknown")
-				])
 
 	return spawned_items
 

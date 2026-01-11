@@ -13,7 +13,7 @@ extends Control
 @onready var log_text: RichTextLabel = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/VBoxContainer/LogText
 @onready var stats_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet/StatsPanel
 @onready var core_inventory_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory
-@onready var examination_panel: ExaminationPanel = $TextUIOverlay/ExaminationPanel
+@onready var examination_panel: ExaminationPanel = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/ExaminationPanel
 @onready var action_preview_ui: ActionPreviewUI = $TextUIOverlay/ActionPreviewUI
 @onready var minimap: Control = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/Minimap/MarginContainer/AspectRatioContainer/MinimapControl
 @onready var fps_counter: Label = $FPSCounter
@@ -52,13 +52,10 @@ func _ready() -> void:
 	# Clear placeholder text
 	log_text.clear()
 
-	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Initializing game with HUD layout")
-
 	# Register theme with UIScaleManager for automatic font scaling
 	# The theme is set on this root Control node (game.gd extends Control)
 	if UIScaleManager and theme:
 		UIScaleManager.set_theme(theme)
-		Log.system("Game theme registered with UIScaleManager")
 
 	# Get player reference from 3D scene
 	player = game_3d.get_node_or_null("Player3D")
@@ -74,7 +71,6 @@ func _ready() -> void:
 	# Connect to player death signal
 	if player.stats:
 		player.stats.entity_died.connect(_on_player_died)
-		Log.system("Connected to player death signal")
 
 	# Create game over panel (hidden until needed)
 	_create_game_over_panel()
@@ -82,13 +78,11 @@ func _ready() -> void:
 	# Wire up stats panel to player
 	if stats_panel:
 		stats_panel.set_player(player)
-		Log.system("StatsPanel connected to player")
 
 	# Wire up core inventory to player
 	if core_inventory_panel:
 		core_inventory_panel.set_player(player)
 		core_inventory_panel.reorder_state_changed.connect(_on_inventory_reorder_state_changed)
-		Log.system("CoreInventory connected to player")
 
 	# Wire up minimap to grid and player
 	if minimap:
@@ -96,21 +90,16 @@ func _ready() -> void:
 		if grid:
 			minimap.set_grid(grid)
 			minimap.set_player(player)
-			Log.system("Minimap connected to grid and player")
 
 			# Connect to ChunkManager autoload for chunk updates
 			if ChunkManager:
 				ChunkManager.chunk_updates_completed.connect(_on_chunk_updates_completed)
-				Log.system("Minimap connected to ChunkManager")
 		else:
 			Log.error(Log.Category.SYSTEM, "Failed to find Grid3D for minimap")
 
 	# Connect to PauseManager to handle action preview on pause/unpause
 	if PauseManager:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
-		Log.system("Game connected to PauseManager")
-
-	Log.msg(Log.Category.SYSTEM, Log.Level.INFO, "Game ready - 3D viewport: 640x480, UI: native resolution")
 
 	# Connect to window size changes (web-compatible!)
 	get_window().size_changed.connect(_on_window_size_changed)
@@ -126,7 +115,6 @@ func _process(_delta: float) -> void:
 func _on_window_size_changed() -> void:
 	"""Handle window/canvas resize events (triggered by browser resize)"""
 	var window_size := get_window().size
-	Log.system("Window size changed: %v" % [window_size])
 	_check_aspect_ratio()
 
 func add_log_message(message: String, color: String = "white") -> void:
@@ -260,7 +248,6 @@ func _check_aspect_ratio() -> void:
 	"""Detect aspect ratio and switch layout if needed"""
 	# Prevent feedback loop: ignore resize events triggered during layout switch
 	if _switching_layout:
-		Log.system("Ignoring aspect ratio check during layout switch (preventing feedback loop)")
 		return
 
 	# Use get_window().size for accurate canvas size on web exports
@@ -270,25 +257,14 @@ func _check_aspect_ratio() -> void:
 	# Portrait mode: height > width (aspect ratio < 1.0)
 	var is_portrait := aspect_ratio < 1.0
 
-	# Debug logging
-	Log.system("Aspect ratio check - Window size: %v, Ratio: %.2f, Portrait: %s, Current: %s" % [
-		window_size,
-		aspect_ratio,
-		"YES" if is_portrait else "NO",
-		"PORTRAIT" if current_layout == LayoutMode.PORTRAIT else "LANDSCAPE"
-	])
-
 	# Switch layout if mode changed
 	if is_portrait and current_layout == LayoutMode.LANDSCAPE:
-		Log.system("Triggering switch to portrait")
 		_switch_to_portrait()
 	elif not is_portrait and current_layout == LayoutMode.PORTRAIT:
-		Log.system("Triggering switch to landscape")
 		_switch_to_landscape()
 
 func _switch_to_portrait() -> void:
 	"""Switch UI layout to portrait mode (vertical stack)"""
-	Log.system("Switching to portrait layout")
 	_switching_layout = true  # Set guard flag
 	current_layout = LayoutMode.PORTRAIT
 
@@ -320,7 +296,6 @@ func _switch_to_portrait() -> void:
 
 	# Ensure viewport container receives input (critical for mouse control)
 	viewport_container.mouse_filter = Control.MOUSE_FILTER_STOP
-	Log.system("Portrait mode: Viewport container mouse_filter set to STOP")
 
 	# 2. Stats panel (compact - subsections horizontal)
 	# Wrap in PanelContainer to preserve black background
@@ -347,7 +322,7 @@ func _switch_to_portrait() -> void:
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(true)
 
-	# Reposition examination panel to bottom overlay
+	# Switch examination panel to overlay mode (appears over info row)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
 		examination_panel.set_portrait_mode(true)
 
@@ -387,7 +362,6 @@ func _switch_to_portrait() -> void:
 	log_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_container.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Expand vertically
 
-	Log.system("Portrait layout active")
 
 	# Clear guard flag AFTER all deferred layout events complete
 	# This catches spurious resize events triggered by node reparenting
@@ -395,7 +369,6 @@ func _switch_to_portrait() -> void:
 
 func _switch_to_landscape() -> void:
 	"""Switch UI layout back to landscape mode (horizontal split)"""
-	Log.system("Switching to landscape layout")
 	_switching_layout = true  # Set guard flag
 	current_layout = LayoutMode.LANDSCAPE
 
@@ -459,7 +432,7 @@ func _switch_to_landscape() -> void:
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(false)
 
-	# Restore examination panel to left side
+	# Restore examination panel to embedded mode (in RightSide VBoxContainer)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
 		examination_panel.set_portrait_mode(false)
 
@@ -469,7 +442,9 @@ func _switch_to_landscape() -> void:
 	core_inventory.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	core_inventory.visible = true
 
-	Log.system("Landscape layout restored")
+	# Ensure ExaminationPanel is at the end (after character_sheet and core_inventory)
+	if examination_panel and examination_panel.get_parent() == right_side_vbox:
+		right_side_vbox.move_child(examination_panel, -1)  # Move to last position
 
 	# Clear guard flag AFTER all deferred layout events complete
 	call_deferred("_clear_layout_switch_flag")
@@ -477,7 +452,6 @@ func _switch_to_landscape() -> void:
 func _clear_layout_switch_flag() -> void:
 	"""Clear layout switch guard flag (called deferred after layout complete)"""
 	_switching_layout = false
-	Log.system("Layout switch guard flag cleared")
 
 # ============================================================================
 # VIEWPORT HELPERS
@@ -504,7 +478,6 @@ func _create_game_over_panel() -> void:
 	game_over_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	game_over_panel.process_mode = Node.PROCESS_MODE_ALWAYS  # Work even when paused
 	add_child(game_over_panel)
-	Log.system("Game over panel created")
 
 func _on_player_died(cause: String) -> void:
 	"""Handle player death - show game over screen"""
@@ -516,6 +489,10 @@ func _on_player_died(cause: String) -> void:
 	if "turn_count" in player:
 		turns = player.turn_count
 
+	var kills = 0
+	if "kill_count" in player:
+		kills = player.kill_count
+
 	var level = 0
 	var total_exp = 0
 	if player.stats:
@@ -525,5 +502,12 @@ func _on_player_died(cause: String) -> void:
 		for i in range(level):
 			total_exp += int(100 * pow(i + 1, 1.5))  # Add EXP spent on each level
 
-	# Show game over screen
-	game_over_panel.show_game_over(cause, turns, level, total_exp)
+	# Get corruption (sum across all levels for total risk taken)
+	var corruption: float = 0.0
+	if ChunkManager and ChunkManager.corruption_tracker:
+		var all_corruption = ChunkManager.corruption_tracker.get_all_corruption_levels()
+		for level_corruption in all_corruption.values():
+			corruption += level_corruption
+
+	# Show game over screen with kills and corruption for SCORE calculation
+	game_over_panel.show_game_over(cause, turns, level, total_exp, kills, corruption)

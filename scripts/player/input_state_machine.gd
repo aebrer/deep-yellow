@@ -43,7 +43,6 @@ func _ready() -> void:
 	if PauseManager:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
 
-	Log.system("InputStateMachine ready with %d states" % states.size())
 
 func _register_state(state: PlayerInputState) -> void:
 	"""Register a state and connect its signals"""
@@ -51,7 +50,6 @@ func _register_state(state: PlayerInputState) -> void:
 	state.player = get_parent()  # Assumes parent is Player
 	state.state_machine = self
 	state.state_transition_requested.connect(_on_state_transition_requested)
-	Log.state("Registered state: %s" % state.name)
 
 # ============================================================================
 # STATE MANAGEMENT
@@ -70,9 +68,6 @@ func change_state(new_state_name: String) -> void:
 	# Enter new state
 	current_state = states[new_state_name]
 	current_state.enter()
-
-	if InputManager and InputManager.debug_input:
-		Log.state_info("State changed: %s" % new_state_name)
 
 func get_current_state_name() -> String:
 	"""Get name of current state for debugging"""
@@ -111,5 +106,4 @@ func _on_pause_toggled(is_paused: bool) -> void:
 	the scene may be in a transitional state. Exit to IdleState to prevent errors.
 	"""
 	if is_paused and current_state and current_state.name == "LookModeState":
-		Log.state("Pause activated while in LookModeState - exiting to IdleState")
 		change_state("IdleState")

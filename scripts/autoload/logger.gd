@@ -57,21 +57,23 @@ enum Category {
 # ============================================================================
 
 ## Global log level - messages below this level are suppressed
-@export var global_level: Level = Level.DEBUG
+## INFO = shows INFO, PLAYER, WARN, ERROR (filters out DEBUG and TRACE)
+@export var global_level: Level = Level.INFO
 
 ## Enable/disable individual categories (independent of level)
+## Most disabled by default to reduce log volume - enable as needed for debugging
 @export_group("Category Filters")
-@export var log_input: bool = false     # Disabled by default (very verbose, only for input bugs)
-@export var log_state: bool = true
-@export var log_movement: bool = true
-@export var log_action: bool = true
-@export var log_turn: bool = true
-@export var log_grid: bool = true       # ENABLED for procedural generation debugging
-@export var log_camera: bool = true     # ENABLED for web build input debugging
-@export var log_entity: bool = true
-@export var log_ability: bool = true
-@export var log_physics: bool = false   # Disabled by default (very verbose)
-@export var log_system: bool = true
+@export var log_input: bool = false     # Disabled - very verbose, only for input bugs
+@export var log_state: bool = false     # Disabled - state transitions (enable for state machine bugs)
+@export var log_movement: bool = false  # Disabled - movement logging (enable for movement bugs)
+@export var log_action: bool = false    # Disabled - action execution (enable for action bugs)
+@export var log_turn: bool = true       # ENABLED - turn start/end is critical context
+@export var log_grid: bool = false      # Disabled - chunk loading (enable for generation bugs)
+@export var log_camera: bool = false    # Disabled - camera movement (enable for camera bugs)
+@export var log_entity: bool = false    # Disabled - entity spawning/AI (enable for AI bugs)
+@export var log_ability: bool = false   # Disabled - ability system (enable for ability bugs)
+@export var log_physics: bool = false   # Disabled - very verbose
+@export var log_system: bool = true     # ENABLED - system initialization and critical events
 
 ## Output configuration
 @export_group("Output Settings")
@@ -173,6 +175,10 @@ func _should_log(category: Category, level: Level) -> bool:
 	# Level check first (most common filter)
 	if level < global_level:
 		return false
+
+	# WARN and ERROR always bypass category filters - they're important!
+	if level >= Level.WARN:
+		return true
 
 	# Category check (using match for performance)
 	match category:
