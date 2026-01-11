@@ -148,11 +148,10 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				# Add reverse lookup for O(1) entity position finding
 				entity_to_pos[entity] = world_pos
 
-				# Connect to WorldEntity signals using metadata to track callbacks
-				# This allows proper disconnect later (Callable.bind() creates new instances)
-				var hp_callback = _on_entity_hp_changed.bind(world_pos)
-				entity.set_meta("_hp_callback", hp_callback)
-				entity.hp_changed.connect(hp_callback)
+				# Connect to WorldEntity signals
+				# Bind to entity (not position) so callbacks remain valid after entity moves
+				if not entity.hp_changed.is_connected(_on_entity_hp_changed):
+					entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
 				if not entity.died.is_connected(_on_entity_died_signal):
 					entity.died.connect(_on_entity_died_signal)
 				if not entity.moved.is_connected(_on_entity_moved):
@@ -187,12 +186,11 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 
 			if entity_billboards.has(world_pos):
-				# Disconnect signals before cleanup using stored callback from metadata
-				if entity.has_meta("_hp_callback"):
-					var hp_callback = entity.get_meta("_hp_callback")
-					if entity.hp_changed.is_connected(hp_callback):
-						entity.hp_changed.disconnect(hp_callback)
-					entity.remove_meta("_hp_callback")
+				# Disconnect signals before cleanup
+				# hp_changed is bound to entity, so we need to check with that binding
+				var hp_callback = _on_entity_hp_changed.bind(entity)
+				if entity.hp_changed.is_connected(hp_callback):
+					entity.hp_changed.disconnect(hp_callback)
 				if entity.died.is_connected(_on_entity_died_signal):
 					entity.died.disconnect(_on_entity_died_signal)
 				if entity.moved.is_connected(_on_entity_moved):
@@ -256,10 +254,10 @@ func add_entity_billboard(entity: WorldEntity) -> void:
 		# Add reverse lookup
 		entity_to_pos[entity] = world_pos
 
-		# Connect to WorldEntity signals using metadata to track callbacks
-		var hp_callback = _on_entity_hp_changed.bind(world_pos)
-		entity.set_meta("_hp_callback", hp_callback)
-		entity.hp_changed.connect(hp_callback)
+		# Connect to WorldEntity signals
+		# Bind to entity (not position) so callbacks remain valid after entity moves
+		if not entity.hp_changed.is_connected(_on_entity_hp_changed):
+			entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
 		if not entity.died.is_connected(_on_entity_died_signal):
 			entity.died.connect(_on_entity_died_signal)
 		if not entity.moved.is_connected(_on_entity_moved):
@@ -285,14 +283,8 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 	var entity = entity_cache[old_pos]
 	var health_bar = entity_health_bars.get(old_pos, null)
 
-	# Reconnect hp_changed signal with new position using metadata
-	if entity.has_meta("_hp_callback"):
-		var old_hp_callback = entity.get_meta("_hp_callback")
-		if entity.hp_changed.is_connected(old_hp_callback):
-			entity.hp_changed.disconnect(old_hp_callback)
-	var new_hp_callback = _on_entity_hp_changed.bind(new_pos)
-	entity.set_meta("_hp_callback", new_hp_callback)
-	entity.hp_changed.connect(new_hp_callback)
+	# No signal reconnection needed - hp_changed is bound to entity reference,
+	# not position. The callback looks up current position via entity_to_pos.
 
 	# Update cache keys
 	entity_billboards.erase(old_pos)
@@ -570,14 +562,20 @@ func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
 # SIGNAL HANDLERS (WorldEntity signals)
 # ============================================================================
 
-func _on_entity_hp_changed(current_hp: float, max_hp: float, world_pos: Vector2i) -> void:
+func _on_entity_hp_changed(current_hp: float, max_hp: float, entity: WorldEntity) -> void:
 	"""Handle WorldEntity hp_changed signal - update health bar
 
 	Args:
 		current_hp: New current HP
 		max_hp: Maximum HP
-		world_pos: Entity position (bound parameter)
+		entity: WorldEntity reference (bound parameter, remains valid after entity moves)
 	"""
+	# Look up current position from reverse lookup (always current, even after move)
+	var world_pos = entity_to_pos.get(entity, INVALID_POSITION)
+	if world_pos == INVALID_POSITION:
+		# Entity not rendered (chunk unloaded) - skip health bar update
+		return
+
 	var hp_percent = current_hp / max_hp if max_hp > 0 else 0.0
 	_update_health_bar(world_pos, hp_percent)
 

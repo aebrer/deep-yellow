@@ -238,6 +238,10 @@ static func _execute_attack(entity: WorldEntity, target_pos: Vector2i, grid) -> 
 		target_pos: Player position
 		grid: Grid3D for VFX spawning
 	"""
+	if not grid:
+		Log.warn(Log.Category.ENTITY, "EntityAI: No grid reference for attack")
+		return
+
 	# Get player reference to deal damage
 	var player = grid.get_node_or_null("../Player3D")
 	if not player:
@@ -298,6 +302,11 @@ static func _move_toward_target(entity: WorldEntity, target_pos: Vector2i, grid)
 
 	# Try pathfinding first (autoload is named "Pathfinding" in project.godot)
 	var pathfinder = grid.get_node_or_null("/root/Pathfinding")
+
+	if not pathfinder:
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Pathfinding autoload unavailable, using greedy navigation")
+	elif not pathfinder.has_point(current_pos):
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity at %s not in pathfinding graph, using greedy navigation" % current_pos)
 
 	if pathfinder and pathfinder.has_point(current_pos):
 		var path = pathfinder.find_path(current_pos, target_pos)
@@ -523,6 +532,9 @@ static func _can_move_to(pos: Vector2i, grid) -> bool:
 	Returns:
 		true if can move there
 	"""
+	if not grid:
+		return false
+
 	# Check tile walkability
 	if not grid.is_walkable(pos):
 		return false
@@ -565,31 +577,35 @@ static func _spawn_minion(entity: WorldEntity, grid) -> void:
 			)
 
 			# Add to the appropriate subchunk
-			_add_entity_to_chunk(spawn, grid)
-
-			Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Motherload spawned bacteria at %s" % spawn_pos)
+			if _add_entity_to_chunk(spawn, grid):
+				Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Motherload spawned bacteria at %s" % spawn_pos)
+			else:
+				Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload spawn failed at %s - chunk/subchunk issue" % spawn_pos)
 			return
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Motherload couldn't spawn - no adjacent empty tiles")
 
-static func _add_entity_to_chunk(entity: WorldEntity, grid) -> void:
+static func _add_entity_to_chunk(entity: WorldEntity, grid) -> bool:
 	"""Add a newly spawned entity to the appropriate chunk/subchunk
 
 	Args:
 		entity: Entity to add
 		grid: Grid3D reference
+
+	Returns:
+		true if entity was successfully added, false otherwise
 	"""
 	# Use ChunkManager autoload to find the chunk
 	var chunk = ChunkManager.get_chunk_at_tile(entity.world_position, 0)  # Level 0 for now
 	if not chunk:
 		Log.warn(Log.Category.ENTITY, "Can't spawn entity at %s - no chunk loaded" % entity.world_position)
-		return
+		return false
 
 	# Find the subchunk
 	var subchunk = chunk.get_sub_chunk_at_tile(entity.world_position)
 	if not subchunk:
 		Log.warn(Log.Category.ENTITY, "Can't spawn entity at %s - no subchunk found" % entity.world_position)
-		return
+		return false
 
 	# Add to subchunk storage
 	subchunk.add_world_entity(entity)
@@ -597,3 +613,5 @@ static func _add_entity_to_chunk(entity: WorldEntity, grid) -> void:
 	# Create billboard immediately if renderer exists
 	if grid.entity_renderer:
 		grid.entity_renderer.add_entity_billboard(entity)
+
+	return true
