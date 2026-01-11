@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=15 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
@@ -19,6 +19,7 @@
 [ext_resource type="Material" path="res://post_process/vhs_post_process_mat.tres" id="18_vhs"]
 [ext_resource type="Script" path="res://scripts/ui/examination_panel.gd" id="19_exampanel"]
 [ext_resource type="PackedScene" uid="uid://loading_screen" path="res://scenes/ui/loading_screen.tscn" id="20_loadingscreen"]
+[ext_resource type="Script" path="res://scripts/ui/exp_bar.gd" id="21_expbar"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -175,6 +176,16 @@ mouse_filter = 2
 
 [node name="ViewportUILayer" type="CanvasLayer" parent="."]
 layer = 1000
+
+[node name="EXPBar" type="Control" parent="ViewportUILayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("21_expbar")
 
 [node name="ExaminationCrosshair" type="Control" parent="ViewportUILayer"]
 layout_mode = 3

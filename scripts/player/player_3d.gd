@@ -46,6 +46,7 @@ var pending_action = null
 var return_state: String = "IdleState"  # State to return to after turn completes
 var suppress_input_next_frame: bool = false  # Skip input for one frame (prevents UI->movement double-trigger)
 var turn_count: int = 0
+var kill_count: int = 0  # Entities killed (for SCORE)
 
 # Stats (NEW)
 var stats: StatBlock = null
@@ -293,9 +294,12 @@ func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 		Log.turn("Entered new chunk %s" % Vector2i(chunk_position.x, chunk_position.y))
 
 func _on_entity_died(entity: WorldEntity) -> void:
-	"""Called when an entity is killed - award EXP"""
+	"""Called when an entity is killed - award EXP and track kill"""
 	if not stats:
 		return
+
+	# Track kill for SCORE
+	kill_count += 1
 
 	# EXP reward based on entity max HP (no level scaling - kills become more frequent with corruption)
 	# Base: max_hp / 10, minimum 10 EXP

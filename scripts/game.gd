@@ -486,6 +486,10 @@ func _on_player_died(cause: String) -> void:
 	if "turn_count" in player:
 		turns = player.turn_count
 
+	var kills = 0
+	if "kill_count" in player:
+		kills = player.kill_count
+
 	var level = 0
 	var total_exp = 0
 	if player.stats:
@@ -495,5 +499,12 @@ func _on_player_died(cause: String) -> void:
 		for i in range(level):
 			total_exp += int(100 * pow(i + 1, 1.5))  # Add EXP spent on each level
 
-	# Show game over screen
-	game_over_panel.show_game_over(cause, turns, level, total_exp)
+	# Get corruption (sum across all levels for total risk taken)
+	var corruption: float = 0.0
+	if ChunkManager and ChunkManager.corruption_tracker:
+		var all_corruption = ChunkManager.corruption_tracker.get_all_corruption_levels()
+		for level_corruption in all_corruption.values():
+			corruption += level_corruption
+
+	# Show game over screen with kills and corruption for SCORE calculation
+	game_over_panel.show_game_over(cause, turns, level, total_exp, kills, corruption)

@@ -23,8 +23,11 @@ signal restart_requested
 var panel: PanelContainer  ## Main panel (for positioning)
 var cause_label: Label
 var turns_label: Label
+var kills_label: Label
 var level_label: Label
 var exp_label: Label
+var corruption_label: Label
+var score_label: Label
 var restart_button: Button
 
 # ============================================================================
@@ -33,8 +36,11 @@ var restart_button: Button
 
 var death_cause: String = ""
 var final_turns: int = 0
+var final_kills: int = 0
 var final_level: int = 0
 var final_exp: int = 0
+var final_corruption: float = 0.0
+var final_score: float = 0
 var _accepting_input: bool = false  ## Only accept button presses after panel fully set up
 
 # ============================================================================
@@ -128,6 +134,12 @@ func _build_ui() -> void:
 	turns_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stats_container.add_child(turns_label)
 
+	# Kills
+	kills_label = Label.new()
+	kills_label.text = "Kills: 0"
+	kills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_container.add_child(kills_label)
+
 	# Level reached
 	level_label = Label.new()
 	level_label.text = "Level Reached: 0"
@@ -139,6 +151,26 @@ func _build_ui() -> void:
 	exp_label.text = "Total EXP: 0"
 	exp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stats_container.add_child(exp_label)
+
+	# Corruption
+	corruption_label = Label.new()
+	corruption_label.text = "Corruption: 0.00"
+	corruption_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	corruption_label.add_theme_color_override("font_color", Color(0.7, 0.3, 0.9))  # Purple
+	stats_container.add_child(corruption_label)
+
+	# Separator before SCORE
+	var score_separator = HSeparator.new()
+	score_separator.add_theme_constant_override("separation", 12)
+	stats_container.add_child(score_separator)
+
+	# SCORE (composite metric)
+	score_label = Label.new()
+	score_label.text = "SCORE: 0"
+	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	score_label.add_theme_font_size_override("font_size", 22)
+	score_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))  # Gold
+	stats_container.add_child(score_label)
 
 	# Spacer
 	var spacer3 = Control.new()
@@ -159,12 +191,24 @@ func _build_ui() -> void:
 # PUBLIC API
 # ============================================================================
 
-func show_game_over(cause: String, turns: int, level: int, total_exp: int) -> void:
+func show_game_over(cause: String, turns: int, level: int, total_exp: int, kills: int = 0, corruption: float = 0.0) -> void:
 	"""Show the game over screen with final stats"""
 	death_cause = cause
 	final_turns = turns
+	final_kills = kills
 	final_level = level
 	final_exp = total_exp
+	final_corruption = corruption
+
+	# Calculate SCORE with weighted formula:
+	# - Corruption × Kills: risk-taking multiplied by combat engagement
+	# - EXP / Turns: progression efficiency (more EXP per turn = better)
+	# Formula prioritizes risk-taking and efficient progression
+	var corruption_score: float = corruption * 500.0
+	var kill_score: float = kills * 10.0
+	var exp_score: float = float(total_exp)
+	var turn_divisor: float = maxf(1.0, turns * 0.025)  # Avoid division by zero
+	final_score = Utilities.bankers_round((corruption_score * kill_score) + (exp_score / turn_divisor))
 
 	# Update labels
 	match cause:
@@ -178,8 +222,11 @@ func show_game_over(cause: String, turns: int, level: int, total_exp: int) -> vo
 			cause_label.text = "You have perished."
 
 	turns_label.text = "Turns Survived: %d" % turns
+	kills_label.text = "Kills: %d" % kills
 	level_label.text = "Level Reached: %d" % level
 	exp_label.text = "Total EXP: %d" % total_exp
+	corruption_label.text = "Corruption: %.2f" % corruption
+	score_label.text = "SCORE: %d" % final_score
 
 	# Update panel position to center on game viewport
 	_update_panel_position()

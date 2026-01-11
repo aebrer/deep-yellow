@@ -30,6 +30,7 @@ extends Node3D
 @onready var grid: Grid3D = $Grid3D
 @onready var player: Player3D = $Player3D
 @onready var move_indicator: Node3D = $MoveIndicator
+@onready var exp_bar: EXPBar = $ViewportUILayer/EXPBar
 
 func _ready() -> void:
 
@@ -53,3 +54,7 @@ func _ready() -> void:
 	# Connect entity death signal for EXP rewards
 	if grid.entity_renderer:
 		grid.entity_renderer.entity_died.connect(player._on_entity_died)
+
+	# Wire up EXP bar to player
+	if exp_bar:
+		exp_bar.set_player(player)
