@@ -25,6 +25,9 @@ var description_label: RichTextLabel
 ## Font with emoji fallback (project default doesn't auto-apply to programmatic Labels)
 var emoji_font: Font = null
 
+## Portrait mode overlay panel (separate from embedded panel)
+var portrait_overlay: PanelContainer = null
+
 # ============================================================================
 # STATE
 # ============================================================================
@@ -146,22 +149,34 @@ func show_panel(target: Examinable) -> void:
 	# Get entity info
 	var info = KnowledgeDB.get_entity_info(target.entity_id)
 
+	# Get common values
+	var entity_name = "Entity: " + info.get("name", "Unknown")
+	var threat_name = info.get("threat_level_name", "")
+	if threat_name.is_empty():
+		print("[ExaminationPanel] WARNING: threat_level_name empty for entity_id: %s, info: %s" % [target.entity_id, info])
+		threat_name = _format_threat_level(info.get("threat_level", 0))
+	var threat_text = "Threat: " + threat_name
+	var description = info.get("description", "[DATA EXPUNGED]")
+	var threat = info.get("threat_level", 0)
+
+	if _is_portrait_mode:
+		# Use overlay panel in portrait mode
+		_show_portrait_overlay(entity_name, threat_text, description, threat)
+	else:
+		# Use embedded panel in landscape mode
+		_show_embedded_panel(entity_name, threat_text, description, threat)
+
+func _show_embedded_panel(entity_name: String, threat_text: String, description: String, threat: int) -> void:
+	"""Show the embedded panel (landscape mode)"""
 	# Reset header to default (stats_panel may have changed it to "STAT INFO")
 	header_label.text = "OBJECT EXAMINATION REPORT"
 
 	# Update labels
-	entity_name_label.text = "Entity: " + info.get("name", "Unknown")
-	# Use SCP-style threat level name from EntityInfo (e.g., "●●●○○ Keter")
-	var threat_name = info.get("threat_level_name", "")
-	if threat_name.is_empty():
-		# Debug: Log when threat_level_name is missing
-		print("[ExaminationPanel] WARNING: threat_level_name empty for entity_id: %s, info: %s" % [target.entity_id, info])
-		threat_name = _format_threat_level(info.get("threat_level", 0))
-	threat_level_label.text = "Threat: " + threat_name
-	description_label.text = info.get("description", "[DATA EXPUNGED]")
+	entity_name_label.text = entity_name
+	threat_level_label.text = threat_text
+	description_label.text = description
 
 	# Set colors based on threat
-	var threat = info.get("threat_level", 0)
 	_set_threat_colors(threat)
 
 	# Ensure all labels are visible (defensive fix for intermittent visibility bug)
@@ -173,24 +188,248 @@ func show_panel(target: Examinable) -> void:
 	# Show panel
 	panel.visible = true
 
+func _show_portrait_overlay(entity_name: String, threat_text: String, description: String, threat: int) -> void:
+	"""Show the overlay panel (portrait mode)"""
+	if not portrait_overlay:
+		_build_portrait_overlay()
+
+	if not portrait_overlay:
+		return  # Failed to create overlay
+
+	# Get overlay labels
+	var vbox = portrait_overlay.get_node("ContentVBox")
+	var header = vbox.get_node("OverlayHeader")
+	var entity_label = vbox.get_node("OverlayEntityName")
+	var threat_label = vbox.get_node("OverlayThreatLevel")
+	var desc_label = vbox.get_node("OverlayDescription")
+
+	# Update content
+	header.text = "OBJECT EXAMINATION REPORT"
+	entity_label.text = entity_name
+	threat_label.text = threat_text
+	desc_label.text = description
+
+	# Set threat color on threat label
+	var color: Color
+	match threat:
+		0, 1: color = Color.WHITE
+		2: color = Color.YELLOW
+		3, 4: color = Color.ORANGE
+		5: color = Color.RED
+		_: color = Color.GRAY
+	threat_label.add_theme_color_override("font_color", color)
+
+	# Position overlay over the info panel (minimap + log row at bottom)
+	_position_portrait_overlay()
+
+	# Show overlay
+	portrait_overlay.visible = true
+
+func _position_portrait_overlay() -> void:
+	"""Position the portrait overlay at the bottom of the screen (over info row)"""
+	if not portrait_overlay:
+		return
+
+	var game_root = get_tree().root.get_node_or_null("Game")
+	if not game_root:
+		return
+
+	# Get the window size
+	var window_size = get_window().size
+
+	# Let panel auto-size first
+	portrait_overlay.reset_size()
+
+	# Wait a frame for size to be calculated
+	await get_tree().process_frame
+
+	# Position at bottom of screen with some margin
+	var margin = 10
+	var panel_size = portrait_overlay.size
+
+	# Full width minus margins
+	portrait_overlay.custom_minimum_size.x = window_size.x - (margin * 2)
+	portrait_overlay.reset_size()
+
+	# Wait for size update
+	await get_tree().process_frame
+
+	panel_size = portrait_overlay.size
+	portrait_overlay.position = Vector2(
+		margin,  # Left margin
+		window_size.y - panel_size.y - margin  # Bottom with margin
+	)
+
 func hide_panel() -> void:
-	"""Hide the panel"""
+	"""Hide the panel (both embedded and overlay)"""
 	panel.visible = false
+	if portrait_overlay:
+		portrait_overlay.visible = false
 
 func set_portrait_mode(is_portrait: bool) -> void:
-	"""Track portrait mode state (layout now handled by parent container)"""
+	"""Switch between embedded panel (landscape) and overlay panel (portrait)"""
+	if _is_portrait_mode == is_portrait:
+		return  # No change
+
 	_is_portrait_mode = is_portrait
-	# Panel is now embedded in RightSide VBoxContainer, so no repositioning needed
+
+	if is_portrait:
+		# Hide embedded panel in portrait mode
+		panel.visible = false
+		# Create overlay if needed
+		if not portrait_overlay:
+			_build_portrait_overlay()
+	else:
+		# Hide overlay and show embedded panel in landscape mode
+		if portrait_overlay:
+			portrait_overlay.visible = false
+		# Embedded panel visibility controlled by show_panel/hide_panel
+
+func _build_portrait_overlay() -> void:
+	"""Build the portrait mode overlay panel (appears on top of info row)"""
+	# Find the Game node to add overlay at top level
+	var game_root = get_tree().root.get_node_or_null("Game")
+	if not game_root:
+		return
+
+	portrait_overlay = PanelContainer.new()
+	portrait_overlay.name = "ExaminationOverlay"
+	portrait_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_overlay.visible = false  # Hidden until needed
+	portrait_overlay.z_index = 50  # Above game content but below game over
+
+	# Style panel (SCP aesthetic - matching embedded style)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0.95)
+	style.border_color = Color(1, 1, 1, 1)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	portrait_overlay.add_theme_stylebox_override("panel", style)
+
+	# Add to Game node so it can be positioned absolutely
+	game_root.add_child(portrait_overlay)
+
+	# Content container
+	var vbox = VBoxContainer.new()
+	vbox.name = "ContentVBox"
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	portrait_overlay.add_child(vbox)
+
+	# Header
+	var header = Label.new()
+	header.name = "OverlayHeader"
+	header.text = "OBJECT EXAMINATION REPORT"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+	header.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	if emoji_font:
+		header.add_theme_font_override("font", emoji_font)
+	vbox.add_child(header)
+
+	# Separator
+	var separator1 = HSeparator.new()
+	separator1.add_theme_constant_override("separation", 6)
+	vbox.add_child(separator1)
+
+	# Entity name
+	var entity_name = Label.new()
+	entity_name.name = "OverlayEntityName"
+	entity_name.text = "Entity: Unknown"
+	entity_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	entity_name.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
+	entity_name.add_theme_color_override("font_color", Color.WHITE)
+	if emoji_font:
+		entity_name.add_theme_font_override("font", emoji_font)
+	vbox.add_child(entity_name)
+
+	# Threat level
+	var threat_level = Label.new()
+	threat_level.name = "OverlayThreatLevel"
+	threat_level.text = "Threat: Unknown"
+	threat_level.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	threat_level.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+	if emoji_font:
+		threat_level.add_theme_font_override("font", emoji_font)
+	vbox.add_child(threat_level)
+
+	# Separator
+	var separator2 = HSeparator.new()
+	separator2.add_theme_constant_override("separation", 6)
+	vbox.add_child(separator2)
+
+	# Description
+	var description = RichTextLabel.new()
+	description.name = "OverlayDescription"
+	description.bbcode_enabled = true
+	description.scroll_active = false
+	description.fit_content = true
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	description.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
+	description.add_theme_color_override("default_color", Color(0.9, 0.9, 0.9))
+	if emoji_font:
+		description.add_theme_font_override("normal_font", emoji_font)
+	vbox.add_child(description)
 
 func _on_pause_toggled(_is_paused: bool) -> void:
 	"""Handle pause state changes (no repositioning needed when embedded)"""
-	pass  # Panel position is managed by parent container
+	pass  # Panel position is managed by parent container or overlay positioning
 
 func set_target(target: Examinable) -> void:
 	current_target = target
 
 func clear_target() -> void:
 	current_target = null
+
+func show_stat_info(stat_name: String, description: String) -> void:
+	"""Show stat information (used by stats_panel for hover tooltips)"""
+	if _is_portrait_mode:
+		_show_stat_info_overlay(stat_name, description)
+	else:
+		_show_stat_info_embedded(stat_name, description)
+
+func _show_stat_info_embedded(stat_name: String, description: String) -> void:
+	"""Show stat info in embedded panel (landscape mode)"""
+	header_label.text = "STAT INFO"
+	header_label.visible = true
+	entity_name_label.text = stat_name
+	entity_name_label.visible = true
+	threat_level_label.visible = false  # Hide threat for stats
+	description_label.text = description
+	description_label.visible = true
+	panel.visible = true
+
+func _show_stat_info_overlay(stat_name: String, description: String) -> void:
+	"""Show stat info in overlay panel (portrait mode)"""
+	if not portrait_overlay:
+		_build_portrait_overlay()
+
+	if not portrait_overlay:
+		return
+
+	# Get overlay labels
+	var vbox = portrait_overlay.get_node("ContentVBox")
+	var header = vbox.get_node("OverlayHeader")
+	var entity_label = vbox.get_node("OverlayEntityName")
+	var threat_label = vbox.get_node("OverlayThreatLevel")
+	var desc_label = vbox.get_node("OverlayDescription")
+
+	# Update content
+	header.text = "STAT INFO"
+	entity_label.text = stat_name
+	threat_label.visible = false  # Hide threat for stats
+	desc_label.text = description
+
+	# Position and show overlay
+	_position_portrait_overlay()
+	portrait_overlay.visible = true
 
 func _format_threat_level(level: int) -> String:
 	"""Convert threat level to display string"""
@@ -229,6 +468,7 @@ func _get_font_size(base_size: int) -> int:
 
 func _update_all_font_sizes() -> void:
 	"""Update all font sizes after scale change"""
+	# Update embedded panel labels
 	if header_label:
 		header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	if entity_name_label:
@@ -237,6 +477,23 @@ func _update_all_font_sizes() -> void:
 		threat_level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	if description_label:
 		description_label.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
+
+	# Update portrait overlay labels if they exist
+	if portrait_overlay:
+		var vbox = portrait_overlay.get_node_or_null("ContentVBox")
+		if vbox:
+			var header = vbox.get_node_or_null("OverlayHeader")
+			var entity = vbox.get_node_or_null("OverlayEntityName")
+			var threat = vbox.get_node_or_null("OverlayThreatLevel")
+			var desc = vbox.get_node_or_null("OverlayDescription")
+			if header:
+				header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+			if entity:
+				entity.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
+			if threat:
+				threat.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
+			if desc:
+				desc.add_theme_font_size_override("normal_font_size", _get_font_size(FONT_SIZE_DESCRIPTION))
 
 func _on_scale_changed(_scale: float) -> void:
 	"""Handle UI scale changes from UIScaleManager"""

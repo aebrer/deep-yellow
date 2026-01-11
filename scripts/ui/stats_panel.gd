@@ -301,14 +301,7 @@ func _highlight_label(label: Label) -> void:
 	if examination_panel and label in tooltip_texts:
 		# Extract stat name from label text
 		var stat_name = label.text.split(":")[0]  # Get the part before the colon
-		examination_panel.header_label.text = "STAT INFO"
-		examination_panel.header_label.visible = true
-		examination_panel.entity_name_label.text = stat_name
-		examination_panel.entity_name_label.visible = true
-		examination_panel.threat_level_label.visible = false  # Hide threat for stats
-		examination_panel.description_label.text = tooltip_texts[label]
-		examination_panel.description_label.visible = true
-		examination_panel.panel.visible = true
+		examination_panel.show_stat_info(stat_name, tooltip_texts[label])
 
 func _unhighlight_label(label: Label) -> void:
 	"""Remove visual highlight and hide examination panel"""

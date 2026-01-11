@@ -322,7 +322,7 @@ func _switch_to_portrait() -> void:
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(true)
 
-	# Reposition examination panel to bottom overlay
+	# Switch examination panel to overlay mode (appears over info row)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
 		examination_panel.set_portrait_mode(true)
 
@@ -432,7 +432,7 @@ func _switch_to_landscape() -> void:
 	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
 		action_preview_ui.set_portrait_mode(false)
 
-	# Restore examination panel to left side
+	# Restore examination panel to embedded mode (in RightSide VBoxContainer)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
 		examination_panel.set_portrait_mode(false)
 
@@ -442,6 +442,9 @@ func _switch_to_landscape() -> void:
 	core_inventory.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	core_inventory.visible = true
 
+	# Ensure ExaminationPanel is at the end (after character_sheet and core_inventory)
+	if examination_panel and examination_panel.get_parent() == right_side_vbox:
+		right_side_vbox.move_child(examination_panel, -1)  # Move to last position
 
 	# Clear guard flag AFTER all deferred layout events complete
 	call_deferred("_clear_layout_switch_flag")

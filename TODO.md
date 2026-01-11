@@ -2,7 +2,7 @@
 
 **Created**: 2026-01-08
 **Last Updated**: 2026-01-11
-**Status**: Phase 1 COMPLETE - Combat System Fully Functional, UI Polish In Progress
+**Status**: Phase 1-3 COMPLETE - Combat, AI, and Spawning Systems Fully Functional
 
 This document outlines the implementation plan for the remaining core gameplay systems needed to make Backrooms Power Crawl a complete, playable game.
 
@@ -18,14 +18,13 @@ The game currently has:
 - ✅ Chunk streaming and generation
 - ✅ Level progression (EXP, Level, Clearance)
 - ✅ UI systems (HUD, inventory, examination)
-- ✅ **Auto-attack combat system** (NEW!)
-- ✅ **Debug enemy spawning** (NEW!)
-- ✅ **Combat visual feedback** (NEW!)
+- ✅ Auto-attack combat system
+- ✅ **Real enemy entities** (Bacteria Motherload, Bacteria Spawn with AI)
+- ✅ **Enemy AI system** (pathfinding, sense/think/act, target acquisition)
+- ✅ **Enemy attacks** (enemies attack player back)
+- ✅ **Entity spawning system** (corruption-based, weighted spawn tables)
 
 What we need to add:
-- ❌ **Real enemy entities** (Bacteria Motherload, Bacteria Spawn with actual AI)
-- ❌ **Enemy AI system** (pathfinding, behavior trees, target acquisition)
-- ❌ **Enemy attacks** (enemies attack player back)
 - ❌ **More items** (variety for Level 0)
 - ❌ **Staircase exit** (Level 0 → Level 1 transition)
 
@@ -101,7 +100,7 @@ What we need to add:
 - Examination support (Examinable component)
 - Minimap integration (entities shown as dots)
 
-### 11. HUD & UI Improvements ✅ (Recent)
+### 11. HUD & UI Improvements ✅
 - **EXP Bar**: Vertical progress bar along left edge of game viewport
   - Fills bottom-to-top as EXP accumulates toward next level
   - Shows current level number in center
@@ -115,8 +114,11 @@ What we need to add:
   - Color-coded by severity (gray → purple → magenta)
   - Updates each turn as player explores
 - **Utilities Autoload**: Shared functions (banker's rounding) in `scripts/autoload/utilities.gd`
+- **Examination Panel**: Embedded in RightSide VBoxContainer below inventory
+  - Full width, proper anchoring
+  - Shows stat tooltips and entity examination info
 
-### 12. Balance Adjustments ✅ (Recent)
+### 12. Balance Adjustments ✅
 - **Motherload Damage Halved**: Direct damage reduced from 8 → 4
 - **Starting HP Regen**: Base 0.1% HP regen per turn (tiny passive recovery)
   - Perks add +0.3% each for meaningful stacking
@@ -125,51 +127,74 @@ What we need to add:
 
 ---
 
+## ✅ COMPLETED: Phase 2 - Real Enemy AI
+
+**Status**: FULLY IMPLEMENTED AND TESTED
+
+### 1. AI Controller Base ✅
+- `scripts/ai/entity_ai.gd` - Static utility class with sense/think/act pattern
+- Turn-based: AI acts after player turn completes (via ChunkManager)
+- Entity types: debug_enemy, bacteria_spawn, bacteria_motherload
+- Per-entity state tracking (cooldowns, last seen position, moves remaining)
+
+### 2. Pathfinding Integration ✅
+- Uses existing PathfindingManager autoload (A* algorithm)
+- Smart sidestep when path blocked by other entities
+- Fallback to greedy navigation when pathfinding unavailable
+- Wander behavior for entities not tracking player
+
+### 3. Enemy Attack System ✅
+- Enemies attack player when in range with LOS
+- **Bacteria Spawn**: 1 damage, 1.5 range, must wait after attacking
+- **Bacteria Motherload**: 4 damage (halved for balance), 1.5 range, 2 turn cooldown
+- Attack VFX spawned on player (🦠 and 🧫 emojis)
+- Damage dealt via player.stats.take_damage()
+
+### 4. Entity Behavior Patterns ✅
+- **Bacteria Spawn**:
+  - 1 move per turn
+  - Senses player from 80 tiles away
+  - Must wait 1 turn after attacking
+  - Probabilistic hold/shuffle in attack range (organic swarm feel)
+- **Bacteria Motherload**:
+  - 2 moves per turn when player nearby, 1 otherwise
+  - Senses player from 32 tiles
+  - Spawns bacteria_spawn minions (10 turn cooldown)
+  - Must wait after spawning, not after attacking
+  - Wanders when player not sensed
+
+---
+
+## ✅ COMPLETED: Phase 3 - Entity Spawning System
+
+**Status**: FULLY IMPLEMENTED AND TESTED
+
+### 1. EntitySpawner System ✅
+- Integrated into ChunkManager._spawn_entities_in_chunk()
+- Uses LevelConfig.entity_spawn_table for entity types and weights
+- Weighted spawn selection based on corruption and threat level
+
+### 2. Corruption-Based Scaling ✅
+- Entity count scales with corruption: BASE + (corruption × ENTITIES_PER_CORRUPTION)
+- Entity HP scales with corruption via hp_scale multiplier
+- Higher threat entities become MORE common at high corruption
+- Lower threat entities become LESS common at high corruption
+- Corruption threshold per entity type (minimum corruption to spawn)
+
+### 3. Entity Persistence ✅
+- WorldEntity.is_dead flag tracks killed entities
+- Dead entities excluded from AI processing and rendering
+- SubChunk.get_living_entities() filters out dead entities
+- WorldEntity.to_dict()/from_dict() for chunk save/load (future)
+
+### 4. Level 0 Entity Configuration ✅
+- `scripts/resources/level_00_config.gd` with entity_spawn_table
+- bacteria_spawn: weight 10, 100 HP, threat 1, +50% HP/corruption
+- bacteria_motherload: weight 3, 500 HP, threat 3, +100% HP/corruption, requires 0.3 corruption
+
+---
+
 ## 📋 Remaining Implementation Phases
-
-### Phase 2: Real Enemy AI (Priority: HIGH)
-**Goal**: Enemies move toward player and attack back
-
-1. **AI Controller Base**
-   - `scripts/ai/ai_controller.gd` - Base AI decision tree
-   - Turn-based: AI acts after player turn completes
-   - Sense → Think → Act pattern
-   - **Dependencies**: None (uses existing entity system)
-
-2. **Pathfinding Integration**
-   - Reuse existing PathfindingManager (A* algorithm)
-   - Move toward player each turn
-   - Stop when in attack range
-   - **Dependencies**: AI Controller
-
-3. **Enemy Attack System**
-   - Enemies use same attack system as player
-   - Bacteria Spawn: weak BODY attacks, high frequency
-   - Bacteria Motherload: strong BODY attacks, spawns minions
-   - **Dependencies**: AI Controller, Pathfinding
-
-4. **Entity Templates**
-   - Data-driven entity definitions
-   - `assets/entities/bacteria_spawn.tres`
-   - `assets/entities/bacteria_motherload.tres`
-   - Stats, attack patterns, spawn weights
-
-### Phase 3: Entity Spawning System (Priority: MEDIUM)
-**Goal**: Replace debug enemies with proper spawning
-
-1. **EntitySpawner System**
-   - Like ItemSpawner but for entities
-   - Spawn probabilities based on corruption
-   - Per-level configuration
-
-2. **Corruption-Based Scaling**
-   - Low corruption: 0-2 entities per chunk
-   - High corruption: 5-10 entities per chunk
-   - Entity HP/damage scales with corruption
-
-3. **Entity Persistence**
-   - Killed entities stay dead (per-chunk tracking)
-   - Entities persist with chunk save/load
 
 ### Phase 4: Items & Variety (Priority: MEDIUM)
 **Goal**: More items to find, build diversity
@@ -206,13 +231,15 @@ What we need to add:
 - [x] **Attack frequency**: Turn-based cooldowns per attack type
 - [x] **Cone targeting**: Auto-aim at nearest enemy (not camera direction)
 - [x] **LOS blocking**: Walls block attacks, entities don't
+- [x] **Entity HP scaling**: Scales with corruption via hp_scale multiplier
+- [x] **Spawn density tuning**: BASE_ENTITIES + corruption × ENTITIES_PER_CORRUPTION
+- [x] **Entity persistence**: Dead entities tracked via is_dead flag
+- [x] **AI turn budget**: All entities in loaded chunks act each turn
+- [x] **Pathfinding refresh**: Every turn, with intelligent sidestep fallback
 
 ### Still Open ❓
-- [ ] **Entity HP scaling**: Scale with corruption? Player level? Both?
-- [ ] **Spawn density tuning**: How many entities feels right?
-- [ ] **Entity persistence**: Clear chunks stay clear, or respawn?
-- [ ] **AI turn budget**: All entities act, or only nearby ones?
-- [ ] **Pathfinding refresh rate**: Every turn, or staggered?
+- [ ] **Item variety**: What effects should items have?
+- [ ] **Level exit placement**: Fixed location or procedural?
 
 ---
 
@@ -233,6 +260,12 @@ What we need to add:
 - Check intermediate tiles only (not start/end positions)
 - Walls block attacks, but entities should NOT block (allows AOE)
 
+### AI Architecture
+- Static utility class (EntityAI) works well for simple behaviors
+- WorldEntity holds ALL state - AI just reads/modifies it
+- Sense/Think/Act pattern keeps logic organized
+- Pathfinding should be terrain-only, entity collision checked at move time
+
 ### Documentation Prevents Bugs
 - Clear docstrings prevent future agents from misusing systems
 - "CRITICAL" warnings in class headers catch attention
@@ -243,17 +276,17 @@ What we need to add:
 ## 🚀 Next Steps
 
 **Immediate Priority**: UI Polish
-- Move/shrink examination panel (right side under inventory)
+- ✅ Move/shrink examination panel (right side under inventory) - DONE
+- Portrait mode examination panel overlay
 - Any other HUD adjustments as needed
 
-**Then**: Phase 2 - Enemy AI
-- Enemies currently just stand there
-- Need movement toward player
-- Need enemy attacks (player takes damage)
+**Then**: Phase 4 - Item Variety
+- More item types beyond Debug Item
+- Attack modifiers and special effects
 
 **Testing Focus**:
-- Combat feels good with current visual feedback
-- Balance tuning needed once enemies fight back
+- Combat feels good with current visual feedback ✅
+- Balance tuning with real enemies ✅
 - Performance testing with many active AI entities
 
 ---
