@@ -37,8 +37,20 @@ extends Resource
 ## SCP-style object class (shown at all clearance levels)
 @export var object_class: String = "Safe"
 
-## Threat level (0-5 scale, shown at all clearance levels)
-@export var threat_level: int = 0
+## Threat level (1-5 scale, matches entity_spawn_table threat_level)
+## See get_threat_level_name() for SCP-style names
+@export var threat_level: int = 1
+
+## SCP-style threat level designations (biblical/Hebrew alphabet aesthetic)
+## Matches ChunkManager's threat_level system for entity spawning
+const THREAT_LEVEL_NAMES = {
+	0: "○○○○○ Gimel",        # Environment/props - negligible threat
+	1: "●○○○○ Daleth",       # Weak - common early (bacteria_spawn)
+	2: "●●○○○ Epsilon",      # Moderate - stable distribution
+	3: "●●●○○ Keter",        # Dangerous - rare early, common later (motherload)
+	4: "●●●●○ Aleph",        # Elite - very rare, severe threat
+	5: "●●●●● YOU WILL DIE", # Boss/Apex - certain death without preparation
+}
 
 # ============================================================================
 # API
@@ -69,12 +81,20 @@ func get_description(clearance: int) -> String:
 		desc += "\nScaling: " + scaling_hint + "\n"
 
 	# Add clearance-specific additional info (ADDITIVE)
-	var cl = clampi(clearance, 0, 5)
-	for i in range(cl + 1):
+	var clamped_clearance := clampi(clearance, 0, 5)
+	for i in range(clamped_clearance + 1):
 		if i < clearance_info.size() and not clearance_info[i].is_empty():
 			desc += "\n" + clearance_info[i]
 
 	return desc
+
+func get_threat_level_name() -> String:
+	"""Get SCP-style threat level designation"""
+	return THREAT_LEVEL_NAMES.get(threat_level, "●●●○○ Unknown")
+
+static func threat_level_to_name(level: int) -> String:
+	"""Static helper to convert threat_level int to SCP-style name"""
+	return THREAT_LEVEL_NAMES.get(level, "●●●○○ Unknown")
 
 func get_info(clearance: int) -> Dictionary:
 	"""Get complete entity info dictionary for examination UI"""
@@ -82,5 +102,6 @@ func get_info(clearance: int) -> Dictionary:
 		"name": entity_name,
 		"description": get_description(clearance),
 		"object_class": object_class,
-		"threat_level": threat_level
+		"threat_level": threat_level,
+		"threat_level_name": get_threat_level_name()
 	}

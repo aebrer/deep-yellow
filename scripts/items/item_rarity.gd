@@ -21,19 +21,22 @@ enum Tier {
 }
 
 ## Base spawn probabilities per rarity (before corruption modifiers)
+## NOTE: Quadrupled for testing (original values in comments)
 const BASE_SPAWN_PROBABILITY = {
-	Tier.DEBUG: 1.0,      # 100% - always spawns
-	Tier.COMMON: 0.05,    # 5%
-	Tier.UNCOMMON: 0.02,  # 2%
-	Tier.RARE: 0.005,     # 0.5%
-	Tier.EPIC: 0.001,     # 0.1%
-	Tier.LEGENDARY: 0.0001,  # 0.01%
-	Tier.ANOMALY: 0.00001     # 0.001%
+	Tier.DEBUG: 1.0,       # 100% - always spawns
+	Tier.COMMON: 0.20,     # 20% (was 5%)
+	Tier.UNCOMMON: 0.08,   # 8% (was 2%)
+	Tier.RARE: 0.02,       # 2% (was 0.5%)
+	Tier.EPIC: 0.004,      # 0.4% (was 0.1%)
+	Tier.LEGENDARY: 0.0004,   # 0.04% (was 0.01%)
+	Tier.ANOMALY: 0.00004     # 0.004% (was 0.001%)
 }
 
 ## Default corruption multipliers per rarity
-## Positive = more common with corruption
-## Negative = less common with corruption (scarcity)
+## Used in formula: final_prob = base_prob × (1 + corruption × multiplier)
+## Corruption is UNBOUNDED (0.0, 0.5, 1.0, 2.0, ...) so multipliers scale linearly
+## Positive = more common as corruption rises
+## Negative = less common as corruption rises (scarcity)
 const CORRUPTION_MULTIPLIERS = {
 	Tier.DEBUG: 0.0,        # Unaffected by corruption
 	Tier.COMMON: -0.3,      # Gets less common (supplies dry up)

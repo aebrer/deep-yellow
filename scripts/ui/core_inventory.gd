@@ -5,7 +5,6 @@ Shows:
 - BODY Pool (3 slots)
 - MIND Pool (3 slots)
 - NULL Pool (3 slots)
-- LIGHT Pool (1 slot)
 
 Each slot displays:
 - [EMPTY] if no item
@@ -38,7 +37,6 @@ var reordering_slot_index: int = -1
 @onready var body_pool_section: VBoxContainer = $BodyPool
 @onready var mind_pool_section: VBoxContainer = $MindPool
 @onready var null_pool_section: VBoxContainer = $NullPool
-@onready var light_pool_section: VBoxContainer = $LightPool
 
 # Slot container references (HBoxContainer)
 @onready var body_slot_0: HBoxContainer = %BodySlot0
@@ -52,8 +50,6 @@ var reordering_slot_index: int = -1
 @onready var null_slot_0: HBoxContainer = %NullSlot0
 @onready var null_slot_1: HBoxContainer = %NullSlot1
 @onready var null_slot_2: HBoxContainer = %NullSlot2
-
-@onready var light_slot_0: HBoxContainer = %LightSlot0
 
 # Examination panel reference (unified system)
 var examination_panel: ExaminationPanel = null
@@ -138,15 +134,6 @@ func _connect_signals() -> void:
 			player.null_pool.item_reordered.connect(_on_item_reordered.bind(Item.PoolType.NULL))
 			player.null_pool.item_toggled.connect(_on_item_toggled.bind(Item.PoolType.NULL))
 
-	# LIGHT pool
-	if player.light_pool:
-		if not player.light_pool.item_added.is_connected(_on_item_added):
-			player.light_pool.item_added.connect(_on_item_added.bind(Item.PoolType.LIGHT))
-			player.light_pool.item_removed.connect(_on_item_removed.bind(Item.PoolType.LIGHT))
-			player.light_pool.item_leveled_up.connect(_on_item_leveled_up.bind(Item.PoolType.LIGHT))
-			player.light_pool.item_reordered.connect(_on_item_reordered.bind(Item.PoolType.LIGHT))
-			player.light_pool.item_toggled.connect(_on_item_toggled.bind(Item.PoolType.LIGHT))
-
 func _update_all_slots() -> void:
 	"""Update all slot displays"""
 	if not player:
@@ -155,7 +142,6 @@ func _update_all_slots() -> void:
 	_update_pool_slots(Item.PoolType.BODY)
 	_update_pool_slots(Item.PoolType.MIND)
 	_update_pool_slots(Item.PoolType.NULL)
-	_update_pool_slots(Item.PoolType.LIGHT)
 
 func _update_pool_slots(pool_type: Item.PoolType) -> void:
 	"""Update all slots for a specific pool"""
@@ -207,7 +193,6 @@ func _get_pool(pool_type: Item.PoolType) -> ItemPool:
 		Item.PoolType.BODY: return player.body_pool
 		Item.PoolType.MIND: return player.mind_pool
 		Item.PoolType.NULL: return player.null_pool
-		Item.PoolType.LIGHT: return player.light_pool
 		_: return null
 
 func _get_slot_containers(pool_type: Item.PoolType) -> Array[HBoxContainer]:
@@ -220,8 +205,6 @@ func _get_slot_containers(pool_type: Item.PoolType) -> Array[HBoxContainer]:
 			slots = [mind_slot_0, mind_slot_1, mind_slot_2]
 		Item.PoolType.NULL:
 			slots = [null_slot_0, null_slot_1, null_slot_2]
-		Item.PoolType.LIGHT:
-			slots = [light_slot_0]
 	return slots
 
 # ============================================================================
@@ -269,8 +252,7 @@ func _setup_label_highlights() -> void:
 	tooltip_slots = [
 		body_slot_0, body_slot_1, body_slot_2,
 		mind_slot_0, mind_slot_1, mind_slot_2,
-		null_slot_0, null_slot_1, null_slot_2,
-		light_slot_0
+		null_slot_0, null_slot_1, null_slot_2
 	]
 
 	for slot in tooltip_slots:
@@ -328,9 +310,6 @@ func _on_slot_input(event: InputEvent, slot: Control) -> void:
 	elif slot in [null_slot_0, null_slot_1, null_slot_2]:
 		pool_type = Item.PoolType.NULL
 		slot_index = [null_slot_0, null_slot_1, null_slot_2].find(slot)
-	elif slot == light_slot_0:
-		pool_type = Item.PoolType.LIGHT
-		slot_index = 0
 	else:
 		return  # Unknown slot
 
@@ -431,7 +410,6 @@ func _highlight_slot(slot: Control) -> void:
 		# Directly set examination panel content with item info
 		var item_name = label.text.split(" (")[0]  # Extract just the item name
 		examination_panel.entity_name_label.text = item_name
-		examination_panel.object_class_label.visible = false  # Hide class for items
 		examination_panel.threat_level_label.visible = false  # Hide threat for items
 		examination_panel.description_label.text = tooltip_texts[slot]
 		examination_panel.panel.visible = true
@@ -612,8 +590,6 @@ func _apply_vertical_layout() -> void:
 	_ensure_child(mind_pool_section, 4)
 	_ensure_child(spacer3, 5) if spacer3 else null
 	_ensure_child(null_pool_section, 6)
-	_ensure_child(spacer4, 7) if spacer4 else null
-	_ensure_child(light_pool_section, 8)
 
 	# Show spacers in vertical mode
 	if spacer1: spacer1.visible = true
@@ -632,7 +608,6 @@ func _apply_horizontal_layout() -> void:
 	if spacer1: spacer1.visible = false
 	if spacer2: spacer2.visible = false
 	if spacer3: spacer3.visible = false
-	if spacer4: spacer4.visible = false
 
 	# Create HBoxContainer if it doesn't exist
 	var hbox = get_node_or_null("HorizontalContainer")
@@ -648,13 +623,11 @@ func _apply_horizontal_layout() -> void:
 	_ensure_child_of(body_pool_section, hbox, 0)
 	_ensure_child_of(mind_pool_section, hbox, 1)
 	_ensure_child_of(null_pool_section, hbox, 2)
-	_ensure_child_of(light_pool_section, hbox, 3)
 
 	# Make pool sections expand to fill available width
 	body_pool_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mind_pool_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	null_pool_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	light_pool_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 func _ensure_child(node: Node, index: int) -> void:
 	"""Ensure node is a child of this container at the specified index"""

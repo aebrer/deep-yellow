@@ -36,10 +36,12 @@ func _execute_turn() -> void:
 	player.pending_action.execute(player)
 	player.pending_action = null
 
-	# Execute all item pools (BODY → MIND → NULL → LIGHT)
+	# Execute all item pools (BODY → MIND → NULL)
 	player.execute_item_pools()
 
-	# TODO: Process enemy turns
+	# Process enemy turns
+	ChunkManager.process_entity_ai()
+
 	# TODO: Process environmental effects
 
 	Log.turn("===== TURN %d COMPLETE =====" % player.turn_count)

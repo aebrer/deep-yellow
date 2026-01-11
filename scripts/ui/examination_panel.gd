@@ -23,7 +23,6 @@ var panel: PanelContainer
 var scroll_container: ScrollContainer
 var header_label: Label
 var entity_name_label: Label
-var object_class_label: Label
 var threat_level_label: Label
 var description_label: RichTextLabel
 
@@ -129,15 +128,6 @@ func _build_panel() -> void:
 		entity_name_label.add_theme_font_override("font", emoji_font)
 	vbox.add_child(entity_name_label)
 
-	# Object class
-	object_class_label = Label.new()
-	object_class_label.text = "Class: Unknown"
-	object_class_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	object_class_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
-	if emoji_font:
-		object_class_label.add_theme_font_override("font", emoji_font)
-	vbox.add_child(object_class_label)
-
 	# Threat level
 	threat_level_label = Label.new()
 	threat_level_label.text = "Threat: Unknown"
@@ -208,8 +198,8 @@ func show_panel(target: Examinable) -> void:
 
 	# Update labels
 	entity_name_label.text = "Entity: " + info.get("name", "Unknown")
-	object_class_label.text = "Class: " + info.get("object_class", "[REDACTED]")
-	threat_level_label.text = "Threat: " + _format_threat_level(info.get("threat_level", 0))
+	# Use SCP-style threat level name from EntityInfo (e.g., "●●●○○ Keter")
+	threat_level_label.text = "Threat: " + info.get("threat_level_name", _format_threat_level(info.get("threat_level", 0)))
 	description_label.text = info.get("description", "[DATA EXPUNGED]")
 
 	# Set colors based on threat
@@ -316,8 +306,6 @@ func _update_all_font_sizes() -> void:
 		header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	if entity_name_label:
 		entity_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ENTITY_NAME))
-	if object_class_label:
-		object_class_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	if threat_level_label:
 		threat_level_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
 	if description_label:

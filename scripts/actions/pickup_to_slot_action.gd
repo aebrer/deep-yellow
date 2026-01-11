@@ -5,7 +5,7 @@ class_name PickupToSlotAction extends Action
 ## It handles equipping to empty slots, leveling up duplicates, or overwriting.
 
 var item: Item  ## The item being picked up
-var pool_type: Item.PoolType  ## Which pool (BODY/MIND/NULL/LIGHT)
+var pool_type: Item.PoolType  ## Which pool (BODY/MIND/NULL)
 var slot_index: int  ## Target slot (0-N)
 var action_type: int  ## ActionType enum value (equip/combine/overwrite)
 var world_position: Vector2i  ## Item's world position (for removal)
@@ -15,7 +15,7 @@ func _init(picked_item: Item, target_pool: Item.PoolType, target_slot: int, type
 
 	Args:
 		picked_item: Item resource to equip
-		target_pool: Pool type (BODY/MIND/NULL/LIGHT)
+		target_pool: Pool type (BODY/MIND/NULL)
 		target_slot: Slot index (0-N)
 		type: ActionType (EQUIP_EMPTY, COMBINE_LEVEL_UP, OVERWRITE)
 		pos: World position of item

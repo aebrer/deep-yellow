@@ -18,6 +18,9 @@ extends Control
 @onready var minimap: Control = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/Minimap/MarginContainer/AspectRatioContainer/MinimapControl
 @onready var fps_counter: Label = $FPSCounter
 
+## Game over panel (created dynamically)
+var game_over_panel: GameOverPanel = null
+
 ## Access to player in 3D scene
 var player: Node3D
 
@@ -67,6 +70,14 @@ func _ready() -> void:
 	# Connect to player signals
 	player.action_preview_changed.connect(_on_player_action_preview_changed)
 	player.turn_completed.connect(_on_player_turn_completed)
+
+	# Connect to player death signal
+	if player.stats:
+		player.stats.entity_died.connect(_on_player_died)
+		Log.system("Connected to player death signal")
+
+	# Create game over panel (hidden until needed)
+	_create_game_over_panel()
 
 	# Wire up stats panel to player
 	if stats_panel:
@@ -482,3 +493,37 @@ func get_game_viewport_rect() -> Rect2:
 		return viewport_container.get_global_rect()
 	# Fallback to full viewport if container not available
 	return get_viewport_rect()
+
+# ============================================================================
+# GAME OVER
+# ============================================================================
+
+func _create_game_over_panel() -> void:
+	"""Create the game over panel (hidden until needed)"""
+	game_over_panel = GameOverPanel.new()
+	game_over_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_panel.process_mode = Node.PROCESS_MODE_ALWAYS  # Work even when paused
+	add_child(game_over_panel)
+	Log.system("Game over panel created")
+
+func _on_player_died(cause: String) -> void:
+	"""Handle player death - show game over screen"""
+	if not game_over_panel or not player:
+		return
+
+	# Gather final stats
+	var turns = player.turn_count if player.has_method("get") else 0
+	if "turn_count" in player:
+		turns = player.turn_count
+
+	var level = 0
+	var total_exp = 0
+	if player.stats:
+		level = player.stats.level
+		# Calculate total EXP earned (current + spent on levels)
+		total_exp = player.stats.exp
+		for i in range(level):
+			total_exp += int(100 * pow(i + 1, 1.5))  # Add EXP spent on each level
+
+	# Show game over screen
+	game_over_panel.show_game_over(cause, turns, level, total_exp)

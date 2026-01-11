@@ -7,6 +7,10 @@ extends Node
 ## - Tracking corruption per level
 ## - Coordinating with generators and spawners
 ## - Providing chunk query API
+## - Processing entity AI each turn
+
+# Preload EntityAI for turn processing
+const _EntityAI = preload("res://scripts/ai/entity_ai.gd")
 
 ## Emitted when chunk updates complete (for PostTurnState to unblock input)
 @warning_ignore("unused_signal")
@@ -91,8 +95,13 @@ func _on_node_added(node: Node) -> void:
 	"""Detect when game scene loads and initialize chunk generation"""
 	# The root Control node from game.tscn is named "Game"
 	# (Not "Game3D" - that's just the instance name for the nested game_3d.tscn)
-	if node.name == "Game" and node is Control and not grid_3d:
-		Log.system("Game scene detected, searching for Grid3D and starting chunk generation...")
+	if node.name == "Game" and node is Control:
+		Log.system("Game scene detected, resetting chunk state for new run...")
+		# Reset all state for new run (handles scene reload/restart)
+		# This clears loaded_chunks, generating_chunks, visited_chunks, and resets initial_load_complete
+		start_new_run()
+		# Clear grid_3d reference since we're reloading
+		grid_3d = null
 		# Search for Grid3D (deferred to ensure SubViewport content is ready)
 		call_deferred("_find_grid_3d")
 		call_deferred("_connect_to_player_signal")
@@ -128,7 +137,11 @@ func _connect_to_player_signal() -> void:
 		Log.warn(Log.Category.SYSTEM, "Player not found for turn signal connection")
 
 func on_turn_completed() -> void:
-	"""Called when a turn completes (triggered by player's turn_completed signal)"""
+	"""Called when a turn completes (triggered by player's turn_completed signal)
+
+	Note: Entity AI is processed in ExecutingTurnState before this signal fires.
+	This handles chunk management and item discovery.
+	"""
 	# Check if player entered a new chunk (for corruption tracking)
 	_check_player_chunk_change()
 
@@ -382,9 +395,16 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# First load terrain into GridMap (needed for is_walkable)
 		grid_3d.load_chunk(chunk)
 
+		# Add chunk to pathfinding graph (after terrain is loaded)
+		# Note: autoload is named "Pathfinding" in project.godot
+		var pathfinder = get_node_or_null("/root/Pathfinding")
+		if pathfinder:
+			pathfinder.set_grid_reference(grid_3d)
+			pathfinder.add_chunk(chunk)
+
 		# Spawn entities AFTER GridMap is populated (is_walkable needs GridMap)
 		# but BEFORE entity rendering (entities need to be in chunk data)
-		_spawn_debug_enemy_in_chunk(chunk, chunk_key)
+		_spawn_entities_in_chunk(chunk, chunk_key)
 
 		# Now render entities (after they've been added to chunk data)
 		if grid_3d.entity_renderer:
@@ -407,48 +427,80 @@ func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 	_load_chunk_to_grid(chunk, chunk_key)
 
 # ============================================================================
-# DEBUG ENEMY SPAWNING
+# ENTITY SPAWNING
 # ============================================================================
 
-const DEBUG_ENEMIES_PER_CHUNK = 20  # Number of debug enemies to spawn per chunk
+## Base entities per chunk at 0 corruption
+const BASE_ENTITIES_PER_CHUNK = 3
 
-func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
-	"""Spawn multiple debug enemies throughout the chunk for combat testing.
+## Additional entities per corruption point (unbounded scaling)
+## Corruption is now an unbounded value (0.0, 0.01, 0.02, ..., 1.0, 2.0, ...)
+## At corruption 1.0: 3 + 2 = 5 per chunk
+## At corruption 5.0: 3 + 10 = 13 per chunk
+const ENTITIES_PER_CORRUPTION = 2
 
-	Debug enemies:
-	- Spawns ~20 per chunk (scattered randomly)
-	- Has moderate HP for testing
-	- Does NOT move or attack
-	- Stationary punching bags for testing attack systems
+func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
+	"""Spawn entities in chunk based on level config and corruption.
 
-	Now uses WorldEntity data pattern (like items) instead of Node3D instances.
-	EntityRenderer creates billboards when chunk loads.
+	Uses LevelConfig.entity_spawn_table for entity types and weights.
+	Higher corruption = more entities + tougher enemies.
+
+	Args:
+		chunk: Chunk to spawn entities in
+		chunk_key: Chunk key (includes level_id)
 	"""
 	if not grid_3d:
-		Log.warn(Log.Category.ENTITY, "Cannot spawn debug enemy - no grid_3d reference")
+		Log.warn(Log.Category.ENTITY, "Cannot spawn entities - no grid_3d reference")
 		return
 
-	var chunk_world_pos = chunk.position * CHUNK_SIZE  # Chunk origin in world tiles
+	# Get level config
+	var level_config = LevelManager.load_level(chunk_key.z)
+	if not level_config:
+		Log.warn(Log.Category.ENTITY, "No level config for level %d" % chunk_key.z)
+		return
+
+	# Get corruption for this level
+	var corruption = get_corruption(chunk_key.z)
+
+	# Calculate entity count based on corruption
+	var entity_count = BASE_ENTITIES_PER_CHUNK + int(corruption * ENTITIES_PER_CORRUPTION)
+
+	var chunk_world_pos = chunk.position * CHUNK_SIZE
 	var spawned_count = 0
 	var occupied_positions: Array[Vector2i] = []
 
-	# Try to spawn DEBUG_ENEMIES_PER_CHUNK enemies scattered throughout chunk
-	for _i in range(DEBUG_ENEMIES_PER_CHUNK):
+	# Get valid entity types for current corruption
+	var valid_entities = _get_valid_entities_for_corruption(level_config.entity_spawn_table, corruption)
+	if valid_entities.is_empty():
+		return  # No entities can spawn at this corruption level
+
+	# Spawn entities
+	for _i in range(entity_count):
 		var spawn_pos = _find_random_walkable_in_chunk(chunk_world_pos, occupied_positions)
-		if spawn_pos == Vector2i(-99999, -99999):
-			continue  # Couldn't find a position
+		if spawn_pos == INVALID_POSITION:
+			continue
 
 		occupied_positions.append(spawn_pos)
 
-		# Create WorldEntity object
+		# Select entity type via weighted random (uses threat_level for corruption scaling)
+		var entity_entry = _select_weighted_entity(valid_entities, corruption)
+		if entity_entry.is_empty():
+			continue
+
+		# Calculate HP with corruption scaling
+		var base_hp = entity_entry.get("base_hp", 50.0)
+		var hp_scale = entity_entry.get("hp_scale", 0.0)
+		var final_hp = base_hp * (1.0 + corruption * hp_scale)
+
+		# Create WorldEntity
 		var entity = WorldEntity.new(
-			"debug_enemy",
+			entity_entry.get("entity_type", "debug_enemy"),
 			spawn_pos,
-			50.0,  # max_hp - lower for faster testing (was 1100)
-			0      # spawn_turn
+			final_hp,
+			0  # spawn_turn
 		)
 
-		# Find the subchunk containing this position and add entity
+		# Find subchunk and add entity
 		var local_pos = spawn_pos - chunk_world_pos
 		var subchunk_x = local_pos.x / SubChunk.SIZE
 		var subchunk_y = local_pos.y / SubChunk.SIZE
@@ -458,8 +510,70 @@ func _spawn_debug_enemy_in_chunk(chunk: Chunk, _chunk_key: Vector3i) -> void:
 			spawned_count += 1
 
 	if spawned_count > 0:
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d DebugEnemies in chunk %s" % [spawned_count, chunk.position])
+		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d entities in chunk %s (corruption: %.2f)" % [
+			spawned_count, chunk.position, corruption
+		])
 
+func _get_valid_entities_for_corruption(spawn_table: Array, corruption: float) -> Array:
+	"""Filter spawn table to entities valid at current corruption level."""
+	var valid: Array = []
+	for entry in spawn_table:
+		var threshold = entry.get("corruption_threshold", 0.0)
+		if corruption >= threshold:
+			valid.append(entry)
+	return valid
+
+func _get_effective_weight(entry: Dictionary, corruption: float) -> float:
+	"""Calculate effective spawn weight based on threat_level and corruption.
+
+	Threat levels shift spawn distribution as corruption increases:
+	- Threat 1 (weak): weight decreases with corruption
+	- Threat 2 (moderate): weight stays stable
+	- Threat 3 (dangerous): weight increases with corruption
+	- Threat 4 (elite): weight increases faster
+	- Threat 5 (boss): weight increases much faster
+
+	Formula: effective_weight = base_weight * (1 + corruption * threat_modifier)
+	Where threat_modifier = (threat_level - 2) * 0.5
+	  - Threat 1: -0.5 (decreases by 50% per corruption point)
+	  - Threat 2: 0.0 (stable)
+	  - Threat 3: +0.5 (increases by 50% per corruption point)
+	  - Threat 4: +1.0 (doubles per corruption point)
+	  - Threat 5: +1.5 (triples per corruption point)
+	"""
+	var base_weight: float = entry.get("weight", 1.0)
+	var threat_level: int = entry.get("threat_level", 2)  # Default to moderate
+
+	# Calculate threat modifier: shifts weight distribution over time
+	var threat_modifier: float = (threat_level - 2) * 0.5
+
+	# Apply corruption scaling (corruption is unbounded: 0.0, 0.5, 1.0, 2.0, ...)
+	var effective_weight: float = base_weight * (1.0 + corruption * threat_modifier)
+
+	# Clamp to minimum of 0.1 (weak enemies never completely disappear)
+	return maxf(effective_weight, 0.1)
+
+func _select_weighted_entity(valid_entities: Array, corruption: float) -> Dictionary:
+	"""Select an entity type using weighted random selection with threat scaling."""
+	# Calculate total effective weight (accounts for threat_level)
+	var total_weight: float = 0.0
+	for entry in valid_entities:
+		total_weight += _get_effective_weight(entry, corruption)
+
+	var roll = randf() * total_weight
+	var cumulative = 0.0
+
+	for entry in valid_entities:
+		cumulative += _get_effective_weight(entry, corruption)
+		if roll <= cumulative:
+			return entry
+
+	# Fallback to last entry
+	return valid_entities[-1] if not valid_entities.is_empty() else {}
+
+
+## Invalid position sentinel (project-wide standard)
+const INVALID_POSITION := Vector2i(-999999, -999999)
 
 func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[Vector2i]) -> Vector2i:
 	"""Find a random walkable position in the chunk that isn't already occupied.
@@ -469,7 +583,7 @@ func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[V
 		occupied: Positions already used for spawning
 
 	Returns:
-		Walkable position, or Vector2i(-99999, -99999) if none found
+		Walkable position, or INVALID_POSITION if none found
 	"""
 	const MAX_ATTEMPTS = 50
 
@@ -479,15 +593,56 @@ func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[V
 		var local_y = randi_range(2, CHUNK_SIZE - 3)
 		var test_pos = chunk_world_pos + Vector2i(local_x, local_y)
 
-		# Skip if already occupied
+		# Skip if already occupied by pending spawn
 		if test_pos in occupied:
 			continue
 
 		# Check if walkable
-		if grid_3d.is_walkable(test_pos):
-			return test_pos
+		if not grid_3d.is_walkable(test_pos):
+			continue
 
-	return Vector2i(-99999, -99999)  # Failed to find position
+		# Check if existing entity already at this position
+		if grid_3d.entity_renderer and grid_3d.entity_renderer.has_entity_at(test_pos):
+			continue
+
+		return test_pos
+
+	return INVALID_POSITION  # Failed to find position
+
+# ============================================================================
+# ENTITY AI PROCESSING
+# ============================================================================
+
+func process_entity_ai() -> void:
+	"""Process AI for all living entities in loaded chunks
+
+	Called once per turn after player acts (from ExecutingTurnState).
+	All entities act every turn.
+	"""
+	var player_pos := _get_player_position()
+	var entities_processed := 0
+
+	# Get Grid3D reference for spatial queries
+	if not grid_3d:
+		return
+
+	# Iterate through all loaded chunks
+	for chunk_key in loaded_chunks:
+		var chunk: Chunk = loaded_chunks[chunk_key]
+
+		# Process all subchunks in this chunk
+		for subchunk in chunk.sub_chunks:
+			# Process living entities
+			for entity in subchunk.world_entities:
+				if entity.is_dead:
+					continue
+
+				# Process this entity's turn
+				_EntityAI.process_entity_turn(entity, player_pos, grid_3d)
+				entities_processed += 1
+
+	if entities_processed > 0:
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Processed AI for %d entities" % entities_processed)
 
 # ============================================================================
 # ITEM DISCOVERY
@@ -575,6 +730,12 @@ func _unload_distant_chunks() -> void:
 func _unload_chunk(chunk_key: Vector3i) -> void:
 	"""Unload a chunk from memory"""
 	var chunk: Chunk = loaded_chunks[chunk_key]
+
+	# Remove from pathfinding graph BEFORE unloading (so paths don't use stale data)
+	# Note: autoload is named "Pathfinding" in project.godot
+	var pathfinder = get_node_or_null("/root/Pathfinding")
+	if pathfinder:
+		pathfinder.remove_chunk(chunk)
 
 	# Remove from Grid3D render (use cached reference)
 	if grid_3d:

@@ -11,6 +11,7 @@ class_name WorldEntity extends RefCounted
 ## - Track current HP and status (authoritative)
 ## - Emit signals on state changes
 ## - Provide spawn metadata
+## - Track AI state (move budget, cooldowns, wait flags)
 
 # ============================================================================
 # SIGNALS
@@ -22,8 +23,13 @@ signal hp_changed(current_hp: float, max_hp: float)
 ## Emitted when entity dies (for VFX, EXP rewards, cleanup)
 signal died(entity: WorldEntity)
 
+## Emitted when entity moves (for billboard position updates)
+## old_pos: Previous world tile position
+## new_pos: New world tile position
+signal moved(old_pos: Vector2i, new_pos: Vector2i)
+
 # ============================================================================
-# PROPERTIES
+# PROPERTIES - Core
 # ============================================================================
 
 var entity_type: String  ## Entity type ID (e.g., "debug_enemy", "bacteria_spawn")
@@ -41,6 +47,34 @@ var current_hp: float = 0.0:
 
 ## Dead flag - once true, entity is permanently dead
 var is_dead: bool = false
+
+# ============================================================================
+# PROPERTIES - AI State
+# ============================================================================
+
+## Moves remaining this turn (reset at turn start based on entity type)
+var moves_remaining: int = 0
+
+## Attack cooldown (turns until can attack again, 0 = ready)
+var attack_cooldown: int = 0
+
+## Must wait this turn (post-attack wait, post-spawn wait, etc.)
+var must_wait: bool = false
+
+## Turns until can spawn minions again (Motherload only)
+var spawn_cooldown: int = 0
+
+## Last known player position (for pathfinding, null if never seen)
+var last_seen_player_pos: Variant = null  # Vector2i or null
+
+## Current path to target (array of Vector2i positions)
+var current_path: Array[Vector2i] = []
+
+## Attack damage for this entity
+var attack_damage: float = 5.0
+
+## Attack range in tiles
+var attack_range: float = 1.5
 
 # ============================================================================
 # INITIALIZATION
@@ -118,6 +152,22 @@ func mark_dead() -> void:
 	is_dead = true
 	current_hp = 0.0
 
+func move_to(new_pos: Vector2i) -> void:
+	"""Move entity to new position
+
+	Emits moved signal for EntityRenderer to update billboard position.
+
+	Args:
+		new_pos: New world tile coordinates
+	"""
+	if new_pos == world_position:
+		return  # No movement
+
+	var old_pos = world_position
+	world_position = new_pos
+	moved.emit(old_pos, new_pos)
+	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "%s moved from %s to %s" % [entity_type, old_pos, new_pos])
+
 # ============================================================================
 # SERIALIZATION
 # ============================================================================
@@ -128,14 +178,25 @@ func to_dict() -> Dictionary:
 	Returns:
 		Dictionary with entity state (for saving/loading chunks)
 	"""
-	return {
+	var data = {
 		"entity_type": entity_type,
 		"world_position": {"x": world_position.x, "y": world_position.y},
 		"current_hp": current_hp,
 		"max_hp": max_hp,
 		"is_dead": is_dead,
-		"spawn_turn": spawn_turn
+		"spawn_turn": spawn_turn,
+		# AI state
+		"moves_remaining": moves_remaining,
+		"attack_cooldown": attack_cooldown,
+		"must_wait": must_wait,
+		"spawn_cooldown": spawn_cooldown,
+		"attack_damage": attack_damage,
+		"attack_range": attack_range,
 	}
+	# Serialize last_seen_player_pos if set
+	if last_seen_player_pos != null:
+		data["last_seen_player_pos"] = {"x": last_seen_player_pos.x, "y": last_seen_player_pos.y}
+	return data
 
 static func from_dict(data: Dictionary) -> WorldEntity:
 	"""Deserialize from dictionary
@@ -158,6 +219,19 @@ static func from_dict(data: Dictionary) -> WorldEntity:
 
 	world_entity.current_hp = data.get("current_hp", world_entity.max_hp)
 	world_entity.is_dead = data.get("is_dead", false)
+
+	# Restore AI state
+	world_entity.moves_remaining = data.get("moves_remaining", 0)
+	world_entity.attack_cooldown = data.get("attack_cooldown", 0)
+	world_entity.must_wait = data.get("must_wait", false)
+	world_entity.spawn_cooldown = data.get("spawn_cooldown", 0)
+	world_entity.attack_damage = data.get("attack_damage", 5.0)
+	world_entity.attack_range = data.get("attack_range", 1.5)
+
+	# Restore last_seen_player_pos if present
+	if data.has("last_seen_player_pos"):
+		var lsp = data["last_seen_player_pos"]
+		world_entity.last_seen_player_pos = Vector2i(lsp.get("x", 0), lsp.get("y", 0))
 
 	return world_entity
 

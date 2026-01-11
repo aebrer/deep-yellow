@@ -13,7 +13,7 @@ This document outlines the implementation plan for the remaining core gameplay s
 The game currently has:
 - ✅ Turn-based movement system
 - ✅ Stats system (BODY, MIND, NULL)
-- ✅ Item system with pools (BODY, MIND, NULL, LIGHT)
+- ✅ Item system with pools (BODY, MIND, NULL)
 - ✅ Corruption tracking and escalation
 - ✅ Chunk streaming and generation
 - ✅ Level progression (EXP, Level, Clearance)
@@ -23,7 +23,7 @@ The game currently has:
 - ✅ **Combat visual feedback** (NEW!)
 
 What we need to add:
-- ❌ **Real enemy entities** (Bacteria Brood Mother, Bacteria Spawn with actual AI)
+- ❌ **Real enemy entities** (Bacteria Motherload, Bacteria Spawn with actual AI)
 - ❌ **Enemy AI system** (pathfinding, behavior trees, target acquisition)
 - ❌ **Enemy attacks** (enemies attack player back)
 - ❌ **More items** (variety for Level 0)
@@ -123,13 +123,13 @@ What we need to add:
 3. **Enemy Attack System**
    - Enemies use same attack system as player
    - Bacteria Spawn: weak BODY attacks, high frequency
-   - Bacteria Brood Mother: strong BODY attacks, spawns minions
+   - Bacteria Motherload: strong BODY attacks, spawns minions
    - **Dependencies**: AI Controller, Pathfinding
 
 4. **Entity Templates**
    - Data-driven entity definitions
    - `assets/entities/bacteria_spawn.tres`
-   - `assets/entities/bacteria_brood_mother.tres`
+   - `assets/entities/bacteria_motherload.tres`
    - Stats, attack patterns, spawn weights
 
 ### Phase 3: Entity Spawning System (Priority: MEDIUM)

@@ -43,8 +43,11 @@ var entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
 ## Maps world tile position to health bar Node3D
 var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
 
-## Currently highlighted entity positions (for attack preview)
-var _highlighted_positions: Array[Vector2i] = []
+## Reverse lookup: WorldEntity -> Vector2i (for O(1) entity position lookup)
+var entity_to_pos: Dictionary = {}  # WorldEntity -> Vector2i
+
+## Project-wide invalid position sentinel
+const INVALID_POSITION := Vector2i(-999999, -999999)
 
 # ============================================================================
 # SIGNALS
@@ -59,24 +62,39 @@ signal entity_died(entity: WorldEntity)
 # ============================================================================
 
 ## Billboard size (world units)
-const BILLBOARD_SIZE = 0.5
+const BILLBOARD_SIZE = 1.0
 
 ## Billboard height above floor (world units)
 ## Matches player Y position (1.0) so entities float at same height
 const BILLBOARD_HEIGHT = 1.0
 
-## Entity type colors (until we have sprites)
+## Entity type colors (fallback when no texture)
 const ENTITY_COLORS = {
 	"debug_enemy": Color(1.0, 0.0, 1.0),       # Magenta
 	"bacteria_spawn": Color(0.5, 1.0, 0.5),    # Light green
-	"bacteria_brood_mother": Color(0.0, 0.8, 0.0),  # Dark green
+	"bacteria_motherload": Color(0.0, 0.8, 0.0),  # Dark green
+}
+
+## Entity textures (loaded on demand)
+const ENTITY_TEXTURES = {
+	"bacteria_spawn": "res://assets/textures/entities/bacteria_spawn.png",
+	"bacteria_motherload": "res://assets/textures/entities/bacteria_motherload.png",
+}
+
+## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
+const ENTITY_SCALE_OVERRIDES = {
+	"bacteria_motherload": 2.0,  # Boss-sized
+}
+
+## Per-entity height overrides (world units above floor)
+## Larger entities need higher placement so their bottom doesn't clip floor
+const ENTITY_HEIGHT_OVERRIDES = {
+	"bacteria_motherload": 2.0,  # Raised to match 2x size scale
 }
 
 ## Default entity color
 const DEFAULT_ENTITY_COLOR = Color(1.0, 0.0, 0.0)  # Red
 
-## Highlight color for attack targets (red glow)
-const ATTACK_TARGET_HIGHLIGHT = Color(1.0, 0.4, 0.4)  # Bright red tint
 
 ## Hit emoji VFX configuration
 const HIT_EMOJI_RISE_HEIGHT = 1.2  # World units to rise (more visible travel)
@@ -127,9 +145,17 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				add_child(health_bar)
 				entity_health_bars[world_pos] = health_bar
 
+				# Add reverse lookup for O(1) entity position finding
+				entity_to_pos[entity] = world_pos
+
 				# Connect to WorldEntity signals
-				entity.hp_changed.connect(_on_entity_hp_changed.bind(world_pos))
-				entity.died.connect(_on_entity_died_signal)
+				# Bind to entity (not position) so callbacks remain valid after entity moves
+				if not entity.hp_changed.is_connected(_on_entity_hp_changed):
+					entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
+				if not entity.died.is_connected(_on_entity_died_signal):
+					entity.died.connect(_on_entity_died_signal)
+				if not entity.moved.is_connected(_on_entity_moved):
+					entity.moved.connect(_on_entity_moved)
 
 				# Check if entity is already damaged
 				var hp_percent = entity.get_hp_percentage()
@@ -161,17 +187,20 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 
 			if entity_billboards.has(world_pos):
 				# Disconnect signals before cleanup
-				# hp_changed was connected with .bind(world_pos), so disconnect needs matching callable
-				var hp_callback = _on_entity_hp_changed.bind(world_pos)
+				# hp_changed is bound to entity, so we need to check with that binding
+				var hp_callback = _on_entity_hp_changed.bind(entity)
 				if entity.hp_changed.is_connected(hp_callback):
 					entity.hp_changed.disconnect(hp_callback)
 				if entity.died.is_connected(_on_entity_died_signal):
 					entity.died.disconnect(_on_entity_died_signal)
+				if entity.moved.is_connected(_on_entity_moved):
+					entity.moved.disconnect(_on_entity_moved)
 
 				var billboard = entity_billboards[world_pos]
 				billboard.queue_free()
 				entity_billboards.erase(world_pos)
 				entity_cache.erase(world_pos)
+				entity_to_pos.erase(entity)
 
 				# Also remove health bar
 				if entity_health_bars.has(world_pos):
@@ -186,6 +215,102 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 			removed_count,
 			chunk.position
 		])
+
+# ============================================================================
+# DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
+# ============================================================================
+
+func add_entity_billboard(entity: WorldEntity) -> void:
+	"""Add a billboard for a newly spawned entity (mid-game spawn)
+
+	Used when entities spawn during gameplay (e.g., Motherload spawning minions).
+
+	Args:
+		entity: WorldEntity to create billboard for
+	"""
+	if entity.is_dead:
+		return
+
+	var world_pos = entity.world_position
+
+	# Skip if billboard already exists
+	if entity_billboards.has(world_pos):
+		Log.warn(Log.Category.ENTITY, "Billboard already exists at %s" % world_pos)
+		return
+
+	# Create billboard
+	var billboard = _create_billboard_for_entity(entity)
+	if billboard:
+		add_child(billboard)
+		entity_billboards[world_pos] = billboard
+		entity_cache[world_pos] = entity
+
+		# Create health bar
+		var health_bar = _create_health_bar(billboard.position)
+		add_child(health_bar)
+		entity_health_bars[world_pos] = health_bar
+		health_bar.visible = false  # Hidden at full HP
+
+		# Add reverse lookup
+		entity_to_pos[entity] = world_pos
+
+		# Connect to WorldEntity signals
+		# Bind to entity (not position) so callbacks remain valid after entity moves
+		if not entity.hp_changed.is_connected(_on_entity_hp_changed):
+			entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
+		if not entity.died.is_connected(_on_entity_died_signal):
+			entity.died.connect(_on_entity_died_signal)
+		if not entity.moved.is_connected(_on_entity_moved):
+			entity.moved.connect(_on_entity_moved)
+
+		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Added billboard for spawned entity at %s" % world_pos)
+
+func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
+	"""Handle WorldEntity moved signal - update billboard position
+
+	Args:
+		old_pos: Previous world tile position
+		new_pos: New world tile position
+	"""
+	if not entity_billboards.has(old_pos):
+		# This is normal for entities in unloaded chunks - they still process AI
+		# but don't have billboards. Only warn at TRACE level.
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity moved from %s but no billboard (chunk unloaded?)" % old_pos)
+		return
+
+	# Get billboard and health bar
+	var billboard = entity_billboards[old_pos]
+	var entity = entity_cache[old_pos]
+	var health_bar = entity_health_bars.get(old_pos, null)
+
+	# No signal reconnection needed - hp_changed is bound to entity reference,
+	# not position. The callback looks up current position via entity_to_pos.
+
+	# Update cache keys
+	entity_billboards.erase(old_pos)
+	entity_billboards[new_pos] = billboard
+	entity_cache.erase(old_pos)
+	entity_cache[new_pos] = entity
+	entity_to_pos[entity] = new_pos  # Update reverse lookup
+	if health_bar:
+		entity_health_bars.erase(old_pos)
+		entity_health_bars[new_pos] = health_bar
+
+	# Calculate new 3D position
+	var new_world_3d = grid_3d.grid_to_world_centered(new_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
+		new_pos.x * 2.0 + 1.0,
+		BILLBOARD_HEIGHT,
+		new_pos.y * 2.0 + 1.0
+	)
+
+	# Update billboard position (instant for now, can add lerp later)
+	billboard.position = new_world_3d
+
+	# Update health bar position
+	if health_bar:
+		health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
+
+	Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity billboard moved from %s to %s" % [old_pos, new_pos])
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -210,25 +335,37 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	sprite.shaded = true
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_OPAQUE_PREPASS
 
+	# Get height override for this entity type (default BILLBOARD_HEIGHT)
+	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+
 	# Position at world coordinates (centered in cell)
-	var world_3d = grid_3d.grid_to_world_centered(world_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
+	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,  # Fallback if no grid
-		BILLBOARD_HEIGHT,
+		entity_height,
 		world_pos.y * 2.0 + 1.0
 	)
 	sprite.position = world_3d
 
-	# Create placeholder white square and use modulate for color
-	# This allows us to change modulate for highlighting effects
-	var color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
-	var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	image.fill(Color.WHITE)
-	sprite.texture = ImageTexture.create_from_image(image)
-	sprite.pixel_size = BILLBOARD_SIZE / 16.0
-	sprite.modulate = color  # Base color via modulate (can be changed for highlights)
+	# Get scale override for this entity type (default 1.0)
+	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+	var final_size = BILLBOARD_SIZE * scale_mult
 
-	# Store original color for highlight restoration
-	sprite.set_meta("base_color", color)
+	# Load texture if available, otherwise use colored square fallback
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		# Use actual sprite texture
+		var texture = load(texture_path) as Texture2D
+		if texture:
+			sprite.texture = texture
+			sprite.pixel_size = final_size / texture.get_width()
+			sprite.modulate = Color.WHITE  # Don't tint the texture
+			sprite.set_meta("base_color", Color.WHITE)
+		else:
+			# Texture load failed, use colored square fallback
+			_apply_fallback_texture(sprite, entity_type, scale_mult)
+	else:
+		# No texture defined, use colored square fallback
+		_apply_fallback_texture(sprite, entity_type, scale_mult)
 
 	# Store entity position for collision queries
 	sprite.set_meta("grid_position", world_pos)
@@ -247,14 +384,30 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	examinable.entity_type = Examinable.EntityType.ENTITY_HOSTILE  # Default to hostile for enemies
 	exam_body.add_child(examinable)
 
-	# Add collision shape to StaticBody3D
+	# Add collision shape to StaticBody3D (scaled to match billboard)
 	var collision_shape = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(BILLBOARD_SIZE, BILLBOARD_SIZE, 0.1)
+	box.size = Vector3(final_size, final_size, 0.1)
 	collision_shape.shape = box
 	exam_body.add_child(collision_shape)
 
 	return sprite
+
+func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: float = 1.0) -> void:
+	"""Apply colored square fallback texture when no sprite texture is available.
+
+	Args:
+		sprite: Sprite3D to apply texture to
+		entity_type: Entity type for color lookup
+		scale_mult: Scale multiplier (default 1.0)
+	"""
+	var color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
+	var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	sprite.texture = ImageTexture.create_from_image(image)
+	sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / 16.0
+	sprite.modulate = color  # Base color via modulate
+	sprite.set_meta("base_color", color)
 
 func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
 	"""Create a health bar using a shader for proper fill behavior.
@@ -409,14 +562,20 @@ func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
 # SIGNAL HANDLERS (WorldEntity signals)
 # ============================================================================
 
-func _on_entity_hp_changed(current_hp: float, max_hp: float, world_pos: Vector2i) -> void:
+func _on_entity_hp_changed(current_hp: float, max_hp: float, entity: WorldEntity) -> void:
 	"""Handle WorldEntity hp_changed signal - update health bar
 
 	Args:
 		current_hp: New current HP
 		max_hp: Maximum HP
-		world_pos: Entity position (bound parameter)
+		entity: WorldEntity reference (bound parameter, remains valid after entity moves)
 	"""
+	# Look up current position from reverse lookup (always current, even after move)
+	var world_pos = entity_to_pos.get(entity, INVALID_POSITION)
+	if world_pos == INVALID_POSITION:
+		# Entity not rendered (chunk unloaded) - skip health bar update
+		return
+
 	var hp_percent = current_hp / max_hp if max_hp > 0 else 0.0
 	_update_health_bar(world_pos, hp_percent)
 
@@ -426,32 +585,114 @@ func _on_entity_died_signal(entity: WorldEntity) -> void:
 	Args:
 		entity: WorldEntity that died
 	"""
-	var world_pos = entity.world_position
+	# Find entity in cache using O(1) reverse lookup
+	var cache_pos = _find_entity_in_cache(entity)
+	if cache_pos == INVALID_POSITION:
+		# Entity not in cache - either already removed or in unloaded chunk
+		Log.msg(Log.Category.ENTITY, Log.Level.TRACE, "Entity died but not in cache (already processed?): %s" % entity.entity_type)
+		return
 
-	# Spawn death skull emoji (2x size of hit emoji)
-	_spawn_death_emoji(world_pos)
+	# Spawn death skull emoji at current position
+	_spawn_death_emoji(cache_pos)
 
 	# Emit our death signal for EXP rewards etc.
 	entity_died.emit(entity)
 
-	# Delay removal slightly so VFX is visible
-	_remove_entity_delayed(world_pos, HIT_EMOJI_DURATION)
+	# Remove billboard immediately (not delayed) to prevent ghost billboards
+	# The death VFX (skull emoji) floats independently, so billboard can go now
+	_remove_entity_immediately(cache_pos, entity)
+
+	# Remove dead entity from SubChunk to prevent memory leaks
+	_remove_dead_entity_from_subchunk(entity)
+
+	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Entity died and removed at %s" % cache_pos)
+
+func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null) -> void:
+	"""Remove entity billboard immediately (no delay)
+
+	Args:
+		world_pos: Position to remove
+		entity: Optional entity reference for cleanup (avoids second lookup)
+	"""
+	if not entity_billboards.has(world_pos):
+		return
+
+	# Get entity if not provided
+	if entity == null:
+		entity = entity_cache.get(world_pos, null)
+
+	# Remove billboard
+	var billboard = entity_billboards[world_pos]
+	if is_instance_valid(billboard):
+		billboard.queue_free()
+	entity_billboards.erase(world_pos)
+	entity_cache.erase(world_pos)
+
+	# Remove from reverse lookup
+	if entity:
+		entity_to_pos.erase(entity)
+
+	# Remove health bar
+	if entity_health_bars.has(world_pos):
+		var health_bar = entity_health_bars[world_pos]
+		if is_instance_valid(health_bar):
+			health_bar.queue_free()
+		entity_health_bars.erase(world_pos)
+
+func _find_entity_in_cache(entity: WorldEntity) -> Vector2i:
+	"""Find entity's position in cache using O(1) reverse lookup
+
+	Args:
+		entity: WorldEntity to find
+
+	Returns:
+		Cache position, or INVALID_POSITION if not found
+	"""
+	# Use O(1) reverse lookup instead of linear search
+	return entity_to_pos.get(entity, INVALID_POSITION)
+
+func _remove_dead_entity_from_subchunk(entity: WorldEntity) -> void:
+	"""Remove dead entity from SubChunk storage to prevent memory leaks
+
+	Args:
+		entity: Dead entity to remove from storage
+	"""
+	if not grid_3d:
+		return
+
+	var chunk_manager = grid_3d.get_node_or_null("ChunkManager")
+	if not chunk_manager:
+		return
+
+	var chunk = chunk_manager.get_chunk_at_tile(entity.world_position, 0)
+	if not chunk:
+		return
+
+	var subchunk = chunk.get_sub_chunk_at_tile(entity.world_position)
+	if subchunk:
+		subchunk.remove_world_entity(entity.world_position)
 
 # ============================================================================
-# VFX SPAWNING (called by AttackExecutor)
+# VFX SPAWNING (called by AttackExecutor and EntityAI)
 # ============================================================================
 
 func spawn_hit_vfx(world_pos: Vector2i, emoji: String, damage: float) -> void:
-	"""Spawn floating hit VFX at entity position
+	"""Spawn floating hit VFX at world position
 
-	Called by AttackExecutor when damage is dealt. Does NOT modify entity state.
+	Called by AttackExecutor when player attacks an entity, or by EntityAI
+	when entities attack the player. Does NOT modify entity state.
 
 	Args:
 		world_pos: World tile position
 		emoji: Emoji to display
 		damage: Damage amount to show
 	"""
-	_spawn_hit_emoji(world_pos, emoji, damage)
+	# Check if target is an entity billboard
+	if entity_billboards.has(world_pos):
+		_spawn_hit_emoji(world_pos, emoji, damage)
+	else:
+		# Target isn't an entity (likely the player) - spawn VFX at world position
+		_spawn_hit_emoji_at_world_pos(world_pos, emoji, damage)
 
 # ============================================================================
 # BILLBOARD REMOVAL
@@ -467,61 +708,32 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 		true if entity was found and removed
 	"""
 	if not entity_billboards.has(world_pos):
+		Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "remove_entity_at(%s): No billboard found (already removed?)" % world_pos)
 		return false
+
+	# Get entity for reverse lookup cleanup
+	var entity = entity_cache.get(world_pos, null)
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
-	billboard.queue_free()
+	if is_instance_valid(billboard):
+		billboard.queue_free()
 	entity_billboards.erase(world_pos)
 	entity_cache.erase(world_pos)
+
+	# Remove from reverse lookup
+	if entity:
+		entity_to_pos.erase(entity)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
 		var health_bar = entity_health_bars[world_pos]
-		health_bar.queue_free()
+		if is_instance_valid(health_bar):
+			health_bar.queue_free()
 		entity_health_bars.erase(world_pos)
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Removed entity billboard at %s" % world_pos)
 	return true
-
-# ============================================================================
-# ATTACK TARGET HIGHLIGHTING
-# ============================================================================
-
-func highlight_attack_targets(target_positions: Array) -> void:
-	"""Highlight entities that will be attacked next turn.
-
-	Clears previous highlights and applies new ones.
-	Used by action preview to show what WILL happen.
-
-	Args:
-		target_positions: Array of Vector2i positions to highlight
-	"""
-	# Clear previous highlights first
-	clear_attack_highlights()
-
-	# Apply new highlights
-	for pos in target_positions:
-		if not pos is Vector2i:
-			continue
-
-		var world_pos = pos as Vector2i
-		if entity_billboards.has(world_pos):
-			var sprite = entity_billboards[world_pos] as Sprite3D
-			if sprite:
-				sprite.modulate = ATTACK_TARGET_HIGHLIGHT
-				_highlighted_positions.append(world_pos)
-
-func clear_attack_highlights() -> void:
-	"""Clear all attack target highlights, restoring original colors."""
-	for world_pos in _highlighted_positions:
-		if entity_billboards.has(world_pos):
-			var sprite = entity_billboards[world_pos] as Sprite3D
-			if sprite:
-				var base_color = sprite.get_meta("base_color", Color.WHITE)
-				sprite.modulate = base_color  # Restore original color
-
-	_highlighted_positions.clear()
 
 # ============================================================================
 # HIT VFX
@@ -620,6 +832,90 @@ func _spawn_hit_emoji(world_pos: Vector2i, emoji: String, damage: float = 0.0) -
 	# Remove when done
 	tween.chain().tween_callback(label.queue_free)
 
+func _spawn_hit_emoji_at_world_pos(world_pos: Vector2i, emoji: String, damage: float = 0.0) -> void:
+	"""Spawn a floating emoji with damage number at a world position (not an entity).
+
+	Used for damage VFX on the player (who doesn't have an entity billboard).
+
+	Args:
+		world_pos: Grid position to spawn VFX at
+		emoji: Emoji character to display
+		damage: Damage amount to show (0 = don't show number)
+	"""
+	# Convert grid position to 3D world position
+	var world_3d: Vector3
+	if grid_3d:
+		world_3d = grid_3d.grid_to_world_centered(world_pos, 1.0)  # Player height
+	else:
+		world_3d = Vector3(world_pos.x * 2.0 + 1.0, 1.0, world_pos.y * 2.0 + 1.0)
+
+	# Calculate scaled font size
+	var base_size = HIT_EMOJI_BASE_SIZE
+	if UIScaleManager:
+		base_size = UIScaleManager.get_scaled_font_size(base_size)
+
+	# Scale with camera zoom
+	var tactical_camera: Node = null
+	var first_person_camera: Node = null
+	if grid_3d:
+		var game_3d = grid_3d.get_parent()
+		if game_3d:
+			var player = game_3d.get_node_or_null("Player3D")
+			if player:
+				tactical_camera = player.get_node_or_null("CameraRig")
+				first_person_camera = player.get_node_or_null("FirstPersonCamera")
+
+	# Determine scaling based on active camera
+	if first_person_camera and first_person_camera.get("camera") and first_person_camera.camera.current:
+		var fov = first_person_camera.camera.fov
+		var fov_ratio = clampf((fov - 60.0) / 30.0, 0.0, 1.0)
+		var zoom_scale = lerp(0.125, 0.1875, fov_ratio)
+		base_size = int(base_size * zoom_scale)
+	elif tactical_camera and "current_zoom" in tactical_camera:
+		var zoom = tactical_camera.current_zoom
+		var zoom_ratio = clampf((zoom - 8.0) / 17.0, 0.0, 1.0)
+		var zoom_scale = lerp(0.9, 2.7, zoom_ratio)
+		base_size = int(base_size * zoom_scale)
+
+	# Create floating emoji label with damage number
+	var label = Label3D.new()
+	if damage > 0:
+		label.text = "%s %.0f" % [emoji, damage]
+	else:
+		label.text = emoji
+	label.font = _EMOJI_FONT
+	label.font_size = base_size
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.modulate = Color.WHITE
+
+	# Position slightly above target with random jitter
+	var jitter = Vector3(
+		randf_range(-HIT_EMOJI_JITTER, HIT_EMOJI_JITTER),
+		0,
+		randf_range(-HIT_EMOJI_JITTER, HIT_EMOJI_JITTER)
+	)
+	var start_pos = world_3d + Vector3(0, 0.3, 0) + jitter
+	label.position = start_pos
+
+	add_child(label)
+
+	# Animate rise and fade
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_QUAD)
+
+	# Rise upward
+	var end_pos = start_pos + Vector3(0, HIT_EMOJI_RISE_HEIGHT, 0)
+	tween.tween_property(label, "position", end_pos, HIT_EMOJI_DURATION)
+
+	# Fade out
+	tween.tween_property(label, "modulate:a", 0.0, HIT_EMOJI_DURATION)
+
+	# Remove when done
+	tween.chain().tween_callback(label.queue_free)
+
 func _spawn_death_emoji(world_pos: Vector2i) -> void:
 	"""Spawn a skull emoji when entity dies (2x size of hit emoji).
 
@@ -687,16 +983,6 @@ func _spawn_death_emoji(world_pos: Vector2i) -> void:
 
 	tween.chain().tween_callback(label.queue_free)
 
-func _remove_entity_delayed(world_pos: Vector2i, delay: float) -> void:
-	"""Remove entity after a delay (allows VFX to play on death).
-
-	Args:
-		world_pos: Position of entity to remove
-		delay: Delay in seconds before removal
-	"""
-	# Create a timer to delay removal
-	var timer = get_tree().create_timer(delay)
-	timer.timeout.connect(func(): remove_entity_at(world_pos))
 
 # ============================================================================
 # CLEANUP
@@ -713,6 +999,7 @@ func clear_all_entities() -> void:
 	entity_billboards.clear()
 	entity_cache.clear()
 	entity_health_bars.clear()
+	entity_to_pos.clear()
 
 	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "EntityRenderer: Cleared all entity billboards")
 

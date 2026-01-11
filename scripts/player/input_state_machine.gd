@@ -39,6 +39,10 @@ func _ready() -> void:
 		var first_state_name = states.keys()[0]
 		change_state(first_state_name)
 
+	# Connect to PauseManager to exit LookModeState when paused
+	if PauseManager:
+		PauseManager.pause_toggled.connect(_on_pause_toggled)
+
 	Log.system("InputStateMachine ready with %d states" % states.size())
 
 func _register_state(state: PlayerInputState) -> void:
@@ -98,3 +102,14 @@ func process_frame(delta: float) -> void:
 func _on_state_transition_requested(new_state_name: String) -> void:
 	"""Handle state transition requests from states"""
 	change_state(new_state_name)
+
+func _on_pause_toggled(is_paused: bool) -> void:
+	"""Handle pause state changes - exit LookModeState when paused
+
+	LookModeState activates the first-person camera which requires get_tree().root
+	access. If the player dies while in LookModeState and game over triggers pause,
+	the scene may be in a transitional state. Exit to IdleState to prevent errors.
+	"""
+	if is_paused and current_state and current_state.name == "LookModeState":
+		Log.state("Pause activated while in LookModeState - exiting to IdleState")
+		change_state("IdleState")

@@ -86,7 +86,8 @@ func get_entity_info(entity_id: String) -> Dictionary:
 		"name": "Unknown",
 		"description": "[ENTITY NOT REGISTERED IN DATABASE]",
 		"object_class": "Unknown",
-		"threat_level": 0
+		"threat_level": 0,
+		"threat_level_name": EntityInfo.threat_level_to_name(0)
 	}
 
 func examine_item(item_id: String, item_rarity: String = "common") -> void:

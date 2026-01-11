@@ -7,6 +7,22 @@ extends CharacterBody3D
 ## No smooth interpolation - this is Caves of Qud style!
 
 # ============================================================================
+# HEALTH/SANITY BAR CONFIGURATION
+# ============================================================================
+
+## Bar dimensions (match entity health bars)
+const BAR_WIDTH = 0.5  # World units
+const BAR_HEIGHT = 0.08  # World units
+const HP_BAR_OFFSET_Y = 2.0  # Above player head
+const SANITY_BAR_OFFSET_Y = 1.9  # Below HP bar
+const BAR_OFFSET_X = -0.15  # Shift left to center above player model
+
+## Bar colors
+const HP_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Red for health
+const SANITY_BAR_FG_COLOR = Color(0.6, 0.2, 0.8, 1.0)  # Purple for sanity
+const BAR_BG_COLOR = Color(0.0, 0.0, 0.0, 0.9)  # Black background
+
+# ============================================================================
 # SIGNALS
 # ============================================================================
 
@@ -34,11 +50,14 @@ var turn_count: int = 0
 # Stats (NEW)
 var stats: StatBlock = null
 
-# Item pools (4 pools: BODY, MIND, NULL, LIGHT)
+# Health/Sanity bar nodes
+var hp_bar: MeshInstance3D = null
+var sanity_bar: MeshInstance3D = null
+
+# Item pools (3 pools: BODY, MIND, NULL)
 var body_pool: ItemPool = null
 var mind_pool: ItemPool = null
 var null_pool: ItemPool = null
-var light_pool: ItemPool = null
 
 # Combat system
 const AttackExecutorClass = preload("res://scripts/combat/attack_executor.gd")
@@ -245,15 +264,10 @@ func _initialize_stats() -> void:
 	"""Initialize player stats from template (or defaults)"""
 	stats = StatBlock.new()
 
-	# Initialize item pools (3 slots each for BODY/MIND/NULL, 1 slot for LIGHT)
+	# Initialize item pools (3 slots each)
 	body_pool = ItemPool.new(Item.PoolType.BODY, 3)
 	mind_pool = ItemPool.new(Item.PoolType.MIND, 3)
 	null_pool = ItemPool.new(Item.PoolType.NULL, 3)
-	light_pool = ItemPool.new(Item.PoolType.LIGHT, 1)
-
-	# DEBUG: Add DEBUG_ITEM to NULL pool for testing
-	var debug_item = DebugItem.new()
-	null_pool.add_item(debug_item, 0, self)  # Add to slot 0, enabled by default
 
 	# Connect KnowledgeDB signals for EXP rewards
 	KnowledgeDB.discovery_made.connect(_on_discovery_made)
@@ -264,14 +278,17 @@ func _initialize_stats() -> void:
 	# Connect StatBlock signals
 	stats.level_increased.connect(_on_level_increased)  # Triggers perk selection (TODO)
 	stats.clearance_increased.connect(_on_clearance_increased)  # Syncs KnowledgeDB
+	stats.resource_changed.connect(_on_resource_changed)  # Updates HP/Sanity bars
+
+	# Create health and sanity bars above player
+	_create_player_bars()
 
 	# Log for debugging
 	Log.system("Player stats initialized: %s" % str(stats))
-	Log.system("Item pools initialized: BODY=%s, MIND=%s, NULL=%s, LIGHT=%s" % [
+	Log.system("Item pools initialized: BODY=%s, MIND=%s, NULL=%s" % [
 		body_pool,
 		mind_pool,
-		null_pool,
-		light_pool
+		null_pool
 	])
 
 func _on_discovery_made(_subject_type: String, _subject_id: String, exp_reward: int) -> void:
@@ -331,6 +348,109 @@ func _on_clearance_increased(old_level: int, new_level: int) -> void:
 	KnowledgeDB.set_clearance_level(new_level)
 	Log.player("Player Clearance increased: %d → %d (knowledge unlocked)" % [old_level, new_level])
 
+func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
+	"""Called when HP, Sanity, or Mana changes - update visual bars"""
+	var percent = current / maximum if maximum > 0 else 0.0
+
+	match resource_name:
+		"hp":
+			_update_bar(hp_bar, percent)
+		"sanity":
+			_update_bar(sanity_bar, percent)
+		# mana doesn't have a visual bar (yet)
+
+func _create_player_bars() -> void:
+	"""Create HP and Sanity bars above player"""
+	hp_bar = _create_bar(HP_BAR_OFFSET_Y, HP_BAR_FG_COLOR)
+	sanity_bar = _create_bar(SANITY_BAR_OFFSET_Y, SANITY_BAR_FG_COLOR)
+
+	# Add bars as children of this node (they follow player position)
+	add_child(hp_bar)
+	add_child(sanity_bar)
+
+	# Initialize with current values
+	if stats:
+		_update_bar(hp_bar, stats.current_hp / stats.max_hp if stats.max_hp > 0 else 1.0)
+		_update_bar(sanity_bar, stats.current_sanity / stats.max_sanity if stats.max_sanity > 0 else 1.0)
+
+func _create_bar(y_offset: float, fg_color: Color) -> MeshInstance3D:
+	"""Create a billboard health/sanity bar using a shader.
+
+	Uses same approach as entity health bars - a quad mesh with custom shader.
+	Bar billboards to always face the camera.
+
+	Args:
+		y_offset: Height above player origin
+		fg_color: Foreground color for the bar fill
+
+	Returns:
+		MeshInstance3D with bar shader
+	"""
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.position = Vector3(BAR_OFFSET_X, y_offset, 0)
+
+	# Create quad mesh
+	var quad = QuadMesh.new()
+	quad.size = Vector2(BAR_WIDTH, BAR_HEIGHT)
+	mesh_instance.mesh = quad
+
+	# Create shader material
+	var shader = Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled;
+
+uniform vec4 fg_color : source_color = vec4(0.9, 0.15, 0.15, 1.0);
+uniform vec4 bg_color : source_color = vec4(0.0, 0.0, 0.0, 0.9);
+uniform float fill : hint_range(0.0, 1.0) = 1.0;
+
+void vertex() {
+	// Billboard: make quad always face camera
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(
+		INV_VIEW_MATRIX[0],
+		INV_VIEW_MATRIX[1],
+		INV_VIEW_MATRIX[2],
+		MODEL_MATRIX[3]
+	);
+}
+
+void fragment() {
+	// UV.x goes 0.0 (left) to 1.0 (right)
+	// Show foreground color where UV.x < fill
+	if (UV.x < fill) {
+		ALBEDO = fg_color.rgb;
+		ALPHA = fg_color.a;
+	} else {
+		ALBEDO = bg_color.rgb;
+		ALPHA = bg_color.a;
+	}
+}
+"""
+
+	var material = ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("fg_color", fg_color)
+	material.set_shader_parameter("bg_color", BAR_BG_COLOR)
+	material.set_shader_parameter("fill", 1.0)
+
+	mesh_instance.material_override = material
+
+	return mesh_instance
+
+func _update_bar(bar: MeshInstance3D, fill_percent: float) -> void:
+	"""Update bar fill amount.
+
+	Args:
+		bar: The bar MeshInstance3D to update
+		fill_percent: Fill amount from 0.0 to 1.0
+	"""
+	if not bar:
+		return
+
+	var material = bar.material_override as ShaderMaterial
+	if material:
+		material.set_shader_parameter("fill", clamp(fill_percent, 0.0, 1.0))
+
 # ============================================================================
 # ITEM SYSTEM
 # ============================================================================
@@ -340,7 +460,7 @@ func execute_item_pools() -> void:
 
 	Execution order:
 	1. Auto-attacks (BODY → MIND → NULL via AttackExecutor)
-	2. Item on_turn() effects (BODY → MIND → NULL → LIGHT pools)
+	2. Item on_turn() effects (BODY → MIND → NULL pools)
 
 	This is an auto-battler: attacks happen automatically based on cooldowns.
 	Items modify attack properties, then run their own on_turn() effects.
@@ -355,5 +475,3 @@ func execute_item_pools() -> void:
 		mind_pool.execute_turn(self, turn_count)
 	if null_pool:
 		null_pool.execute_turn(self, turn_count)
-	if light_pool:
-		light_pool.execute_turn(self, turn_count)

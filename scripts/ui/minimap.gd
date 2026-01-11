@@ -351,22 +351,32 @@ func _draw_trail(player_pos: Vector2i) -> void:
 		map_image.set_pixelv(screen_pos, color)
 
 func _draw_discovered_items(player_pos: Vector2i) -> void:
-	"""Draw discovered items as yellow pixels on minimap"""
+	"""Draw discovered items as yellow pixels on minimap (within PERCEPTION range)"""
 	if not grid or not grid.item_renderer:
 		return
+
+	# Get perception range: base 10 tiles + 3 per PERCEPTION stat
+	var perception_range: float = 10.0
+	if player and player.stats:
+		perception_range = 10.0 + (player.stats.perception * 3.0)
 
 	# Get all discovered item positions from ItemRenderer
 	var discovered_items = grid.item_renderer.get_discovered_item_positions()
 
-	# Draw each discovered item as a yellow pixel
+	# Draw each discovered item as a yellow pixel (if within perception range)
 	for item_pos in discovered_items:
+		# Check if within perception range
+		var distance: float = Vector2(item_pos).distance_to(Vector2(player_pos))
+		if distance > perception_range:
+			continue
+
 		var screen_pos := _world_to_screen(item_pos, player_pos)
 
 		if _is_valid_screen_pos(screen_pos):
 			map_image.set_pixelv(screen_pos, COLOR_ITEM)
 
 func _draw_entities(player_pos: Vector2i) -> void:
-	"""Draw entities as magenta pixels on minimap
+	"""Draw entities as magenta pixels on minimap (within PERCEPTION range)
 
 	Uses EntityRenderer to get entity positions (data-driven, like items).
 	"""
@@ -374,11 +384,21 @@ func _draw_entities(player_pos: Vector2i) -> void:
 	if not grid or not grid.entity_renderer:
 		return
 
+	# Get perception range: base 10 tiles + 3 per PERCEPTION stat
+	var perception_range: float = 10.0
+	if player and player.stats:
+		perception_range = 10.0 + (player.stats.perception * 3.0)
+
 	# Get all entity positions from renderer
 	var entity_positions = grid.entity_renderer.get_all_entity_positions()
 
-	# Draw each entity as a magenta pixel
+	# Draw each entity as a magenta pixel (if within perception range)
 	for entity_pos in entity_positions:
+		# Check if within perception range
+		var distance: float = Vector2(entity_pos).distance_to(Vector2(player_pos))
+		if distance > perception_range:
+			continue
+
 		var screen_pos := _world_to_screen(entity_pos, player_pos)
 
 		if _is_valid_screen_pos(screen_pos):

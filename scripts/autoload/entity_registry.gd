@@ -74,6 +74,34 @@ func _load_entities() -> void:
 	ceiling.threat_level = 0
 	_entities["level_0_ceiling"] = ceiling
 
+	# Bacteria Spawn (Level 0 basic enemy)
+	# threat_level 1 matches level_00_config.gd entity_spawn_table
+	var bacteria_spawn = EntityInfo.new()
+	bacteria_spawn.entity_id = "bacteria_spawn"
+	bacteria_spawn.entity_name = "Bacteria Spawn"
+	bacteria_spawn.visual_description = "A translucent green mass roughly the size of a basketball. Pseudopods extend and retract as it creeps across the damp carpet."
+	bacteria_spawn.clearance_info[0] = ""  # No additional info at clearance 0
+	bacteria_spawn.clearance_info[1] = "Swarms toward detected movement. Can sense disturbances from considerable distance."
+	bacteria_spawn.clearance_info[2] = "Melee attacker. Weak individually but dangerous in groups. Often spawned by larger organisms."
+	bacteria_spawn.clearance_info[3] = "--- FIELD DATA ---\nDamage: 1 HP per attack\nSpeed: 1 move per turn\nSense range: 80 tiles"
+	bacteria_spawn.object_class = "Euclid"
+	bacteria_spawn.threat_level = 1  # White (weakest) - common early, rarer later
+	_entities["bacteria_spawn"] = bacteria_spawn
+
+	# Bacteria Motherload (Level 0 dangerous enemy)
+	# threat_level 3 matches level_00_config.gd entity_spawn_table
+	var bacteria_motherload = EntityInfo.new()
+	bacteria_motherload.entity_id = "bacteria_motherload"
+	bacteria_motherload.entity_name = "Bacteria Motherload"
+	bacteria_motherload.visual_description = "A massive greenish-black organism. Internal bioluminescent glow pulses rhythmically. Much larger than its spawn."
+	bacteria_motherload.clearance_info[0] = ""  # No additional info at clearance 0
+	bacteria_motherload.clearance_info[1] = "Moves faster when it senses prey. Highly aggressive."
+	bacteria_motherload.clearance_info[2] = "Periodically spawns Bacteria Spawn from its mass. The glow intensifies before spawning."
+	bacteria_motherload.clearance_info[3] = "--- FIELD DATA ---\nDamage: 8 HP per attack\nSpeed: 2 moves per turn (when aware)\nSpawn cooldown: 10 turns\nSense range: 32 tiles"
+	bacteria_motherload.object_class = "Keter"
+	bacteria_motherload.threat_level = 3  # Dangerous (Yellow) - rare early, common later
+	_entities["bacteria_motherload"] = bacteria_motherload
+
 	# Debug Enemy (testing entity)
 	var debug_enemy = EntityInfo.new()
 	debug_enemy.entity_id = "debug_enemy"
@@ -129,7 +157,8 @@ func _get_unknown_entity_info() -> Dictionary:
 		"name": "Unknown",
 		"description": "[ENTITY NOT REGISTERED IN DATABASE]",
 		"object_class": "Unknown",
-		"threat_level": 0
+		"threat_level": 0,
+		"threat_level_name": EntityInfo.threat_level_to_name(0)
 	}
 
 # ============================================================================
