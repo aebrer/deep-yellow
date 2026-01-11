@@ -7,20 +7,16 @@ extends Control
 # ============================================================================
 
 ## Base font sizes (scaled by UIScaleManager)
-const FONT_SIZE_HEADER := 16
-const FONT_SIZE_ENTITY_NAME := 18
-const FONT_SIZE_INFO := 14
-const FONT_SIZE_DESCRIPTION := 14
-
-## Scroll settings
-const SCROLL_SPEED: float = 50.0
+const FONT_SIZE_HEADER := 14
+const FONT_SIZE_ENTITY_NAME := 14
+const FONT_SIZE_INFO := 12
+const FONT_SIZE_DESCRIPTION := 11
 
 # ============================================================================
 # NODE REFERENCES
 # ============================================================================
 
 var panel: PanelContainer
-var scroll_container: ScrollContainer
 var header_label: Label
 var entity_name_label: Label
 var threat_level_label: Label
@@ -40,8 +36,9 @@ func _ready() -> void:
 	# Load emoji font (project setting doesn't auto-apply to programmatic Labels)
 	emoji_font = load("res://assets/fonts/default_font.tres")
 
-	# Fill screen for positioning
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Fill remaining available space in RightSide VBoxContainer
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_build_panel()
@@ -58,55 +55,40 @@ func _ready() -> void:
 		UIScaleManager.scale_changed.connect(_on_scale_changed)
 
 func _build_panel() -> void:
-	"""Build examination panel (left third of screen)"""
+	"""Build examination panel (embedded in RightSide VBoxContainer, below inventory)"""
 	panel = PanelContainer.new()
-	panel.name = "ExaminationPanel"
+	panel.name = "ExaminationPanelInner"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Use anchors to fill parent Control (size_flags don't work for non-container parents)
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(panel)
 
-	# Position on left side, full height, 1/3 width
-	panel.anchor_left = 0.0
-	panel.anchor_top = 0.0
-	panel.anchor_right = 0.33
-	panel.anchor_bottom = 1.0
-	panel.offset_left = 16
-	panel.offset_top = 16
-	panel.offset_right = -16
-	panel.offset_bottom = -16
-
-	# Style panel (SCP aesthetic)
+	# Style panel (SCP aesthetic - tight margins for embedded use)
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0.9)
 	style.border_color = Color(1, 1, 1, 1)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
 	panel.add_theme_stylebox_override("panel", style)
 
-	# ScrollContainer for overflow
-	scroll_container = ScrollContainer.new()
-	scroll_container.name = "ScrollContainer"
-	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll_container.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_child(scroll_container)
-
-	# Content container
+	# Content container (no scroll - text will auto-fit)
 	var vbox = VBoxContainer.new()
 	vbox.name = "ContentVBox"
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 4)
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll_container.add_child(vbox)
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_child(vbox)
 
 	# Header
 	header_label = Label.new()
 	header_label.text = "OBJECT EXAMINATION REPORT"
+	header_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
 	header_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	if emoji_font:
@@ -155,46 +137,17 @@ func _build_panel() -> void:
 		description_label.add_theme_font_override("normal_font", emoji_font)
 	vbox.add_child(description_label)
 
-func _unhandled_input(event: InputEvent) -> void:
-	"""Handle scroll inputs when panel is visible"""
-	if not panel.visible:
-		return
-
-	# Scroll wheel
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_scroll_panel(-SCROLL_SPEED)
-			get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			_scroll_panel(SCROLL_SPEED)
-			get_viewport().set_input_as_handled()
-
-	# RB/LB for scrolling
-	if event.is_action_pressed("camera_zoom_in"):
-		_scroll_panel(-SCROLL_SPEED)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("camera_zoom_out"):
-		_scroll_panel(SCROLL_SPEED)
-		get_viewport().set_input_as_handled()
-
-func _scroll_panel(amount: float) -> void:
-	"""Scroll the panel"""
-	if scroll_container:
-		var new_scroll = scroll_container.scroll_vertical + amount
-		scroll_container.scroll_vertical = max(0, new_scroll)
-
 func show_panel(target: Examinable) -> void:
 	"""Display examination info for target"""
 	if not target:
 		hide_panel()
 		return
 
-	# Reset scroll
-	if scroll_container:
-		scroll_container.scroll_vertical = 0
-
 	# Get entity info
 	var info = KnowledgeDB.get_entity_info(target.entity_id)
+
+	# Reset header to default (stats_panel may have changed it to "STAT INFO")
+	header_label.text = "OBJECT EXAMINATION REPORT"
 
 	# Update labels
 	entity_name_label.text = "Entity: " + info.get("name", "Unknown")
@@ -225,52 +178,13 @@ func hide_panel() -> void:
 	panel.visible = false
 
 func set_portrait_mode(is_portrait: bool) -> void:
-	"""Switch between portrait (dynamic positioning) and landscape (left side) positioning"""
+	"""Track portrait mode state (layout now handled by parent container)"""
 	_is_portrait_mode = is_portrait
-
-	if is_portrait:
-		# Portrait mode: Position based on pause state (top half paused, bottom half unpaused)
-		_update_portrait_position()
-	else:
-		# Landscape mode: Left 1/3, full height
-		panel.anchor_left = 0.0
-		panel.anchor_top = 0.0
-		panel.anchor_right = 0.33
-		panel.anchor_bottom = 1.0
-		panel.offset_left = 16
-		panel.offset_top = 16
-		panel.offset_right = -16
-		panel.offset_bottom = -16
-
-func _update_portrait_position() -> void:
-	"""Update portrait mode position based on pause state"""
-	if not _is_portrait_mode:
-		return
-
-	var is_paused = PauseManager and PauseManager.is_paused
-
-	if is_paused:
-		# Paused: Top half of screen
-		panel.anchor_left = 0.0
-		panel.anchor_top = 0.0
-		panel.anchor_right = 1.0
-		panel.anchor_bottom = 0.5
-	else:
-		# Unpaused: Bottom half of screen
-		panel.anchor_left = 0.0
-		panel.anchor_top = 0.5
-		panel.anchor_right = 1.0
-		panel.anchor_bottom = 1.0
-
-	# Same offsets for both paused/unpaused
-	panel.offset_left = 8
-	panel.offset_top = 8
-	panel.offset_right = -8
-	panel.offset_bottom = -8
+	# Panel is now embedded in RightSide VBoxContainer, so no repositioning needed
 
 func _on_pause_toggled(_is_paused: bool) -> void:
-	"""Update position when pause state changes (portrait mode only)"""
-	_update_portrait_position()
+	"""Handle pause state changes (no repositioning needed when embedded)"""
+	pass  # Panel position is managed by parent container
 
 func set_target(target: Examinable) -> void:
 	current_target = target

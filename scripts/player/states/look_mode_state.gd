@@ -37,9 +37,9 @@ func enter() -> void:
 		var game_3d = player.get_parent()
 		examination_crosshair = game_3d.get_node_or_null("ViewportUILayer/ExaminationCrosshair")
 	if not examination_panel:
-		examination_panel = get_node_or_null("/root/Game/TextUIOverlay/ExaminationPanel")
+		examination_panel = get_node_or_null("/root/Game/MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/ExaminationPanel")
 		if not examination_panel:
-			Log.warn(Log.Category.STATE, "ExaminationPanel NOT found at /root/Game/TextUIOverlay/ExaminationPanel")
+			Log.warn(Log.Category.STATE, "ExaminationPanel NOT found in RightSide VBoxContainer")
 
 	if not first_person_camera:
 		push_error("[LookModeState] FirstPersonCamera not found!")

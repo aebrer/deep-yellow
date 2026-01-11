@@ -72,7 +72,7 @@ var bonus_anomaly: float = 0.0
 # Regeneration happens in PreTurnState before action execution.
 # Formula: regen_amount = max_resource * (regen_percent / 100.0)
 
-var hp_regen_percent: float = 0.0      # % of max HP regenerated per turn
+var hp_regen_percent: float = 0.1      # % of max HP regenerated per turn (0.1% base, perks add more)
 var sanity_regen_percent: float = 0.0  # % of max Sanity regenerated per turn
 var mana_regen_percent: float = 0.0    # % of max Mana regenerated per turn (adds to base NULL/2 regen)
 

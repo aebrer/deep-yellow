@@ -91,9 +91,10 @@ func _get_examination_panel() -> void:
 	if not game_root:
 		return
 
-	var text_ui_overlay = game_root.get_node_or_null("TextUIOverlay")
-	if text_ui_overlay:
-		examination_panel = text_ui_overlay.get_node_or_null("ExaminationPanel")
+	# ExaminationPanel is now embedded in RightSide VBoxContainer (sibling node)
+	var right_side_vbox = game_root.get_node_or_null("MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer")
+	if right_side_vbox:
+		examination_panel = right_side_vbox.get_node_or_null("ExaminationPanel")
 
 func set_player(p: Player3D) -> void:
 	"""Called by Game node to set player reference"""
@@ -409,9 +410,13 @@ func _highlight_slot(slot: Control) -> void:
 	if examination_panel and slot in tooltip_texts:
 		# Directly set examination panel content with item info
 		var item_name = label.text.split(" (")[0]  # Extract just the item name
+		examination_panel.header_label.text = "ITEM INFO"
+		examination_panel.header_label.visible = true
 		examination_panel.entity_name_label.text = item_name
+		examination_panel.entity_name_label.visible = true
 		examination_panel.threat_level_label.visible = false  # Hide threat for items
 		examination_panel.description_label.text = tooltip_texts[slot]
+		examination_panel.description_label.visible = true
 		examination_panel.panel.visible = true
 
 func _unhighlight_slot(slot: Control) -> void:

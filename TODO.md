@@ -1,8 +1,8 @@
 # Backrooms Power Crawl - Core Gameplay Implementation TODO
 
 **Created**: 2026-01-08
-**Last Updated**: 2026-01-10
-**Status**: Phase 1 COMPLETE - Combat System Fully Functional
+**Last Updated**: 2026-01-11
+**Status**: Phase 1 COMPLETE - Combat System Fully Functional, UI Polish In Progress
 
 This document outlines the implementation plan for the remaining core gameplay systems needed to make Backrooms Power Crawl a complete, playable game.
 
@@ -100,6 +100,28 @@ What we need to add:
 - Integrates with chunk loading/unloading
 - Examination support (Examinable component)
 - Minimap integration (entities shown as dots)
+
+### 11. HUD & UI Improvements ✅ (Recent)
+- **EXP Bar**: Vertical progress bar along left edge of game viewport
+  - Fills bottom-to-top as EXP accumulates toward next level
+  - Shows current level number in center
+  - Glows when close to level up (≥80% progress)
+  - Smooth fill animation on EXP gain
+- **SCORE Metric**: Composite score on game over screen
+  - Formula: `(corruption × 500 × kills × 10) + (EXP / (turns × 0.025))`
+  - Uses banker's rounding (round half to even, unbiased)
+  - Rewards risk-taking and efficient progression
+- **Corruption Display**: Stats panel shows current level corruption
+  - Color-coded by severity (gray → purple → magenta)
+  - Updates each turn as player explores
+- **Utilities Autoload**: Shared functions (banker's rounding) in `scripts/autoload/utilities.gd`
+
+### 12. Balance Adjustments ✅ (Recent)
+- **Motherload Damage Halved**: Direct damage reduced from 8 → 4
+- **Starting HP Regen**: Base 0.1% HP regen per turn (tiny passive recovery)
+  - Perks add +0.3% each for meaningful stacking
+- **Logging Cleanup**: ~90% of debug logs removed for cleaner output
+  - Turn start/end markers preserved for debugging
 
 ---
 
@@ -220,7 +242,11 @@ What we need to add:
 
 ## 🚀 Next Steps
 
-**Immediate Priority**: Phase 2 - Enemy AI
+**Immediate Priority**: UI Polish
+- Move/shrink examination panel (right side under inventory)
+- Any other HUD adjustments as needed
+
+**Then**: Phase 2 - Enemy AI
 - Enemies currently just stand there
 - Need movement toward player
 - Need enemy attacks (player takes damage)
