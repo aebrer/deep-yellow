@@ -125,12 +125,16 @@ class_name LevelConfig
 
 @export_group("Entity Spawning")
 
-## Entity spawn rules: [{"entity_scene": path, "weight": float, "min_distance": int}]
-## Weight determines spawn probability (higher = more common)
+## Entity spawn rules: [{"entity_type": str, "weight": float, "base_hp": float, ...}]
+## Fields:
+##   - entity_type: string identifier (e.g., "bacteria_spawn")
+##   - weight: base spawn probability (higher = more common)
+##   - base_hp: HP at 0 corruption
+##   - hp_scale: HP multiplier per corruption point
+##   - threat_level: difficulty tier 1-5 (shifts spawn distribution with corruption)
+##     1=weak (decreases), 2=moderate (stable), 3=dangerous, 4=elite, 5=boss (increases)
+##   - corruption_threshold: minimum corruption to spawn (0.0 = always)
 @export var entity_spawn_table: Array[Dictionary] = []
-
-## Maximum entities active at once
-@export var max_entities: int = 50
 
 ## Minimum distance between entity spawns (in tiles)
 @export var min_entity_distance: int = 10

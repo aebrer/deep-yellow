@@ -25,6 +25,9 @@ const FONT_SIZE_HEADER := 20
 const FONT_SIZE_ITEM_NAME := 16
 const FONT_SIZE_INFO := 14
 
+## Delay before accepting input (prevents accidental clicks from held buttons)
+const INPUT_ACCEPT_DELAY := 0.5  # seconds
+
 # ============================================================================
 # NODE REFERENCES
 # ============================================================================
@@ -388,8 +391,12 @@ func _on_pause_toggled(is_paused: bool) -> void:
 			elif cancel_button:
 				cancel_button.grab_focus()
 
-		# Enable input acceptance after panel is fully set up
-		_accepting_input = true
+		# Enable input acceptance after delay (prevents accidental activation
+		# from held buttons like RT when picking up items)
+		_accepting_input = false
+		get_tree().create_timer(INPUT_ACCEPT_DELAY).timeout.connect(
+			func(): _accepting_input = true if visible else false
+		)
 	else:
 		# Disable input acceptance when unpausing
 		_accepting_input = false

@@ -261,7 +261,6 @@ func _highlight_label(label: Label) -> void:
 		# Extract stat name from label text
 		var stat_name = label.text.split(":")[0]  # Get the part before the colon
 		examination_panel.entity_name_label.text = stat_name
-		examination_panel.object_class_label.visible = false  # Hide class for stats
 		examination_panel.threat_level_label.visible = false  # Hide threat for stats
 		examination_panel.description_label.text = tooltip_texts[label]
 		examination_panel.panel.visible = true

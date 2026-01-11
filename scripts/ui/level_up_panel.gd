@@ -67,14 +67,14 @@ const PERK_DATA: Dictionary = {
 		"color": Color.GOLD,
 	},
 	PerkType.CORRUPTION_PLUS_5: {
-		"name": "+5% Corruption",
-		"description": "Increase current level's corruption by 5% (more enemies, better loot)",
+		"name": "+0.05 Corruption",
+		"description": "Increase current level's corruption (more enemies, better loot)",
 		"icon": "☠️",
 		"color": Color.DARK_RED,
 	},
 	PerkType.CORRUPTION_MINUS_5: {
-		"name": "-5% Corruption",
-		"description": "Decrease current level's corruption by 5% (safer exploration)",
+		"name": "-0.05 Corruption",
+		"description": "Decrease current level's corruption (safer exploration)",
 		"icon": "✨",
 		"color": Color.LIGHT_GREEN,
 	},
@@ -88,6 +88,9 @@ const FONT_SIZE_HEADER := 24
 const FONT_SIZE_LEVEL := 18
 const FONT_SIZE_PERK_NAME := 16
 const FONT_SIZE_PERK_DESC := 14
+
+## Delay before accepting input (prevents accidental clicks from held buttons)
+const INPUT_ACCEPT_DELAY := 0.5  # seconds
 
 # ============================================================================
 # NODE REFERENCES
@@ -409,13 +412,13 @@ func _apply_perk(perk_type: PerkType) -> void:
 			stats.increase_clearance()
 
 		PerkType.CORRUPTION_PLUS_5:
-			_modify_corruption(0.05)  # +5%
+			_modify_corruption(0.05)
 
 		PerkType.CORRUPTION_MINUS_5:
-			_modify_corruption(-0.05)  # -5%
+			_modify_corruption(-0.05)
 
-func _modify_corruption(percent_change: float) -> void:
-	"""Modify corruption of current level by a percentage of current value"""
+func _modify_corruption(delta: float) -> void:
+	"""Modify corruption of current level by a flat amount (corruption is unbounded: 0.0, 0.5, 1.0, ...)"""
 	if not ChunkManager or not ChunkManager.corruption_tracker:
 		Log.error(Log.Category.SYSTEM, "Cannot modify corruption - no ChunkManager!")
 		return
@@ -424,11 +427,10 @@ func _modify_corruption(percent_change: float) -> void:
 	var current_level_id: int = 0  # TODO: Get actual current level from player/game state
 
 	var current_corruption: float = ChunkManager.corruption_tracker.get_corruption(current_level_id)
-	var change_amount: float = current_corruption * percent_change
-	var new_corruption: float = maxf(0.0, current_corruption + change_amount)
+	var new_corruption: float = maxf(0.0, current_corruption + delta)
 
 	ChunkManager.corruption_tracker.set_corruption(current_level_id, new_corruption)
-	Log.player("Corruption changed: %.2f → %.2f (%+.1f%%)" % [current_corruption, new_corruption, percent_change * 100])
+	Log.player("Corruption changed: %.2f → %.2f (%+.2f)" % [current_corruption, new_corruption, delta])
 
 func _close_panel() -> void:
 	"""Hide panel and either show next queued level-up or unpause game"""
@@ -468,7 +470,12 @@ func _on_pause_toggled(is_paused: bool) -> void:
 			if perk_buttons.size() > 0:
 				perk_buttons[0].grab_focus()
 
-		_accepting_input = true
+		# Enable input acceptance after delay (prevents accidental activation
+		# from held buttons like RT)
+		_accepting_input = false
+		get_tree().create_timer(INPUT_ACCEPT_DELAY).timeout.connect(
+			func(): _accepting_input = true if visible else false
+		)
 	else:
 		_accepting_input = false
 		for button in perk_buttons:

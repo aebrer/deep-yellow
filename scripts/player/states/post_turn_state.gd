@@ -30,6 +30,13 @@ func handle_input(_event: InputEvent) -> void:
 
 func _on_chunk_updates_complete() -> void:
 	"""Called when ChunkManager finishes chunk generation"""
+	# Don't transition if player is dead (game over screen is handling things)
+	# Death occurs when HP or Sanity reaches 0
+	if player and player.stats:
+		if player.stats.current_hp <= 0.0 or player.stats.current_sanity <= 0.0:
+			Log.state("Chunk updates complete, but player is dead - not transitioning")
+			return
+
 	var target_state = "IdleState"
 	if player and player.return_state:
 		target_state = player.return_state

@@ -86,7 +86,7 @@ static func _reset_turn_state(entity: WorldEntity) -> void:
 	match entity.entity_type:
 		TYPE_BACTERIA_SPAWN:
 			entity.moves_remaining = 1
-			entity.attack_damage = 3.0
+			entity.attack_damage = 1.0
 			entity.attack_range = ATTACK_RANGE_SPAWN
 		TYPE_BACTERIA_BROOD_MOTHER:
 			# Will be set to 2 if player is nearby, otherwise 1
@@ -539,7 +539,7 @@ static func _can_move_to(pos: Vector2i, grid) -> bool:
 	return true
 
 static func _spawn_minion(entity: WorldEntity, grid) -> void:
-	"""Spawn a Bacteria Spawn minion adjacent to the Brood Mother
+	"""Spawn a Bacteria Spawn adjacent to the Brood Mother
 
 	Args:
 		entity: Brood Mother entity
@@ -555,21 +555,19 @@ static func _spawn_minion(entity: WorldEntity, grid) -> void:
 	for dir in directions:
 		var spawn_pos = entity.world_position + dir
 		if _can_move_to(spawn_pos, grid):
-			# Create the minion
-			var minion = WorldEntity.new(
+			# Create bacteria_spawn - identical to naturally spawned ones
+			# AI state (attack_damage, attack_range) is set by _reset_turn_state
+			var spawn = WorldEntity.new(
 				TYPE_BACTERIA_SPAWN,
 				spawn_pos,
-				20.0,  # Lower HP than player-spawned
+				100.0,  # Same HP as naturally spawned bacteria_spawn
 				0
 			)
-			# Initialize AI state
-			minion.attack_damage = 3.0
-			minion.attack_range = ATTACK_RANGE_SPAWN
 
 			# Add to the appropriate subchunk
-			_add_entity_to_chunk(minion, grid)
+			_add_entity_to_chunk(spawn, grid)
 
-			Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Brood Mother spawned minion at %s" % spawn_pos)
+			Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Brood Mother spawned bacteria at %s" % spawn_pos)
 			return
 
 	Log.msg(Log.Category.ENTITY, Log.Level.DEBUG, "Brood Mother couldn't spawn - no adjacent empty tiles")

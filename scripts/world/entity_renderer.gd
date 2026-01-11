@@ -81,6 +81,12 @@ const ENTITY_SCALE_OVERRIDES = {
 	"bacteria_brood_mother": 2.0,  # Boss-sized
 }
 
+## Per-entity height overrides (world units above floor)
+## Larger entities need higher placement so their bottom doesn't clip floor
+const ENTITY_HEIGHT_OVERRIDES = {
+	"bacteria_brood_mother": 2.0,  # Raised to match 2x size scale
+}
+
 ## Default entity color
 const DEFAULT_ENTITY_COLOR = Color(1.0, 0.0, 0.0)  # Red
 
@@ -315,10 +321,13 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
 	sprite.shaded = true
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_OPAQUE_PREPASS
 
+	# Get height override for this entity type (default BILLBOARD_HEIGHT)
+	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+
 	# Position at world coordinates (centered in cell)
-	var world_3d = grid_3d.grid_to_world_centered(world_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
+	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,  # Fallback if no grid
-		BILLBOARD_HEIGHT,
+		entity_height,
 		world_pos.y * 2.0 + 1.0
 	)
 	sprite.position = world_3d

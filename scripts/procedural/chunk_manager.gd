@@ -95,8 +95,13 @@ func _on_node_added(node: Node) -> void:
 	"""Detect when game scene loads and initialize chunk generation"""
 	# The root Control node from game.tscn is named "Game"
 	# (Not "Game3D" - that's just the instance name for the nested game_3d.tscn)
-	if node.name == "Game" and node is Control and not grid_3d:
-		Log.system("Game scene detected, searching for Grid3D and starting chunk generation...")
+	if node.name == "Game" and node is Control:
+		Log.system("Game scene detected, resetting chunk state for new run...")
+		# Reset all state for new run (handles scene reload/restart)
+		# This clears loaded_chunks, generating_chunks, visited_chunks, and resets initial_load_complete
+		start_new_run()
+		# Clear grid_3d reference since we're reloading
+		grid_3d = null
 		# Search for Grid3D (deferred to ensure SubViewport content is ready)
 		call_deferred("_find_grid_3d")
 		call_deferred("_connect_to_player_signal")
@@ -426,10 +431,13 @@ func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 # ============================================================================
 
 ## Base entities per chunk at 0 corruption
-const BASE_ENTITIES_PER_CHUNK = 5
+const BASE_ENTITIES_PER_CHUNK = 3
 
-## Additional entities per corruption point (0.0-1.0 scale)
-const ENTITIES_PER_CORRUPTION = 15  # At 100% corruption: 5 + 15 = 20 per chunk
+## Additional entities per corruption point (unbounded scaling)
+## Corruption is now an unbounded value (0.0, 0.01, 0.02, ..., 1.0, 2.0, ...)
+## At corruption 1.0: 3 + 2 = 5 per chunk
+## At corruption 5.0: 3 + 10 = 13 per chunk
+const ENTITIES_PER_CORRUPTION = 2
 
 func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Spawn entities in chunk based on level config and corruption.
@@ -461,15 +469,23 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	var spawned_count = 0
 	var occupied_positions: Array[Vector2i] = []
 
+	# TESTING: Force spawn a brood mother in chunk (0,0)
+	if chunk.position == Vector2i(0, 0):
+		var test_spawn_pos = _find_random_walkable_in_chunk(chunk_world_pos, occupied_positions)
+		if test_spawn_pos != Vector2i(-99999, -99999):
+			occupied_positions.append(test_spawn_pos)
+			var test_entity = WorldEntity.new("bacteria_brood_mother", test_spawn_pos, 1000.0, 0)
+			var local_pos = test_spawn_pos - chunk_world_pos
+			var subchunk = chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
+			if subchunk:
+				subchunk.add_world_entity(test_entity)
+				spawned_count += 1
+				Log.system("TEST: Spawned brood mother at %s for testing" % test_spawn_pos)
+
 	# Get valid entity types for current corruption
 	var valid_entities = _get_valid_entities_for_corruption(level_config.entity_spawn_table, corruption)
 	if valid_entities.is_empty():
 		return  # No entities can spawn at this corruption level
-
-	# Calculate total weight for weighted random selection
-	var total_weight = 0.0
-	for entry in valid_entities:
-		total_weight += entry.get("weight", 1.0)
 
 	# Spawn entities
 	for _i in range(entity_count):
@@ -479,8 +495,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 
 		occupied_positions.append(spawn_pos)
 
-		# Select entity type via weighted random
-		var entity_entry = _select_weighted_entity(valid_entities, total_weight)
+		# Select entity type via weighted random (uses threat_level for corruption scaling)
+		var entity_entry = _select_weighted_entity(valid_entities, corruption)
 		if entity_entry.is_empty():
 			continue
 
@@ -507,8 +523,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 			spawned_count += 1
 
 	if spawned_count > 0:
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d entities in chunk %s (corruption: %.1f%%)" % [
-			spawned_count, chunk.position, corruption * 100
+		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d entities in chunk %s (corruption: %.2f)" % [
+			spawned_count, chunk.position, corruption
 		])
 
 func _get_valid_entities_for_corruption(spawn_table: Array, corruption: float) -> Array:
@@ -520,13 +536,48 @@ func _get_valid_entities_for_corruption(spawn_table: Array, corruption: float) -
 			valid.append(entry)
 	return valid
 
-func _select_weighted_entity(valid_entities: Array, total_weight: float) -> Dictionary:
-	"""Select an entity type using weighted random selection."""
+func _get_effective_weight(entry: Dictionary, corruption: float) -> float:
+	"""Calculate effective spawn weight based on threat_level and corruption.
+
+	Threat levels shift spawn distribution as corruption increases:
+	- Threat 1 (weak): weight decreases with corruption
+	- Threat 2 (moderate): weight stays stable
+	- Threat 3 (dangerous): weight increases with corruption
+	- Threat 4 (elite): weight increases faster
+	- Threat 5 (boss): weight increases much faster
+
+	Formula: effective_weight = base_weight * (1 + corruption * threat_modifier)
+	Where threat_modifier = (threat_level - 2) * 0.5
+	  - Threat 1: -0.5 (decreases by 50% per corruption point)
+	  - Threat 2: 0.0 (stable)
+	  - Threat 3: +0.5 (increases by 50% per corruption point)
+	  - Threat 4: +1.0 (doubles per corruption point)
+	  - Threat 5: +1.5 (triples per corruption point)
+	"""
+	var base_weight: float = entry.get("weight", 1.0)
+	var threat_level: int = entry.get("threat_level", 2)  # Default to moderate
+
+	# Calculate threat modifier: shifts weight distribution over time
+	var threat_modifier: float = (threat_level - 2) * 0.5
+
+	# Apply corruption scaling (corruption is unbounded: 0.0, 0.5, 1.0, 2.0, ...)
+	var effective_weight: float = base_weight * (1.0 + corruption * threat_modifier)
+
+	# Clamp to minimum of 0.1 (weak enemies never completely disappear)
+	return maxf(effective_weight, 0.1)
+
+func _select_weighted_entity(valid_entities: Array, corruption: float) -> Dictionary:
+	"""Select an entity type using weighted random selection with threat scaling."""
+	# Calculate total effective weight (accounts for threat_level)
+	var total_weight: float = 0.0
+	for entry in valid_entities:
+		total_weight += _get_effective_weight(entry, corruption)
+
 	var roll = randf() * total_weight
 	var cumulative = 0.0
 
 	for entry in valid_entities:
-		cumulative += entry.get("weight", 1.0)
+		cumulative += _get_effective_weight(entry, corruption)
 		if roll <= cumulative:
 			return entry
 

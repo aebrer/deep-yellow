@@ -76,8 +76,8 @@ entity density: very low"""
 	# ========================================================================
 	# ENTITY SPAWNING
 	# ========================================================================
-	# Very low entity count - isolation is the horror
-	max_entities = 10
+	# Entity count is per-chunk (see ChunkManager.BASE_ENTITIES_PER_CHUNK)
+	# Isolation is the horror - low density, slow escalation
 	min_entity_distance = 30
 	spawn_interval = 50  # Very slow spawning
 	escalation_rate = 0.05  # Minimal escalation
@@ -85,29 +85,27 @@ entity density: very low"""
 	# Entity spawn table - uses entity_type strings (WorldEntity pattern)
 	# weight: spawn probability (higher = more common)
 	# base_hp: HP at 0 corruption
-	# hp_scale: HP multiplier per corruption point
-	# corruption_threshold: minimum corruption to spawn (0.0 = always, 0.5 = high corruption only)
+	# hp_scale: HP multiplier per corruption point (corruption is unbounded: 0.0, 0.5, 1.0, 2.0, ...)
+	# threat_level: entity difficulty tier (1=weak, 2=moderate, 3=dangerous, 4=elite, 5=boss)
+	#   Higher threat entities become MORE common as corruption rises
+	#   Lower threat entities become LESS common as corruption rises
+	# corruption_threshold: minimum corruption to spawn (0.0 = always)
 	entity_spawn_table = [
 		{
 			"entity_type": "bacteria_spawn",
 			"weight": 10.0,
 			"base_hp": 100.0,
 			"hp_scale": 0.5,  # +50% HP per corruption point
-			"corruption_threshold": 0.0,  # Spawns at any corruption
+			"threat_level": 1,  # Weak - common early, less common later
+			"corruption_threshold": 0.0,
 		},
 		{
 			"entity_type": "bacteria_brood_mother",
-			"weight": 2.0,
+			"weight": 0.5,  # Rare but possible from the start
 			"base_hp": 1000.0,
 			"hp_scale": 1.0,  # +100% HP per corruption point
-			"corruption_threshold": 0.3,  # Only spawns at 30%+ corruption
-		},
-		{
-			"entity_type": "debug_enemy",
-			"weight": 5.0,
-			"base_hp": 50.0,
-			"hp_scale": 0.0,  # No scaling
-			"corruption_threshold": 0.0,  # Always available (for testing)
+			"threat_level": 3,  # Dangerous - rare early, more common later
+			"corruption_threshold": 0.0,  # Can spawn at any corruption
 		},
 	]
 
@@ -126,7 +124,7 @@ entity density: very low"""
 	item_density = 0.05  # Sparse items
 
 	# Permitted items for Level 0 (rarity-based spawning)
-	add_permitted_item(DebugItem.new())  # DEBUG rarity - always spawns for testing
+	add_permitted_item(DebugItem.new())  # UNCOMMON rarity (2% spawn chance)
 
 	# ========================================================================
 	# EXIT CONFIGURATION

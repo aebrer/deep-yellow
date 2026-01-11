@@ -1,9 +1,17 @@
 class_name CorruptionTracker extends RefCounted
 ## Tracks per-level corruption escalation
 ##
-## Corruption increases as chunks are loaded/explored, and modifies entity
-## spawn probabilities. This creates escalating difficulty and forces the
-## player to eventually find an exit before being overwhelmed.
+## IMPORTANT: Corruption is an UNBOUNDED scaling value (0.0, 0.01, 0.02, ..., 1.0, 2.0, ...).
+## It is NOT a percentage and has NO upper limit.
+##
+## Corruption increases as new chunks are explored and modifies:
+## - Entity spawn counts: BASE_ENTITIES_PER_CHUNK + int(corruption * ENTITIES_PER_CORRUPTION)
+## - Entity type distribution: threat_level affects spawn weight scaling
+## - Entity HP: base_hp * (1 + corruption * hp_scale)
+## - Item spawn probabilities: via corruption_multiplier in ItemRarity
+##
+## This creates escalating difficulty and forces the player to eventually
+## find an exit before being overwhelmed.
 
 # Per-level corruption values
 var corruption_by_level: Dictionary = {}  # level_id (int) -> corruption (float)
@@ -17,8 +25,8 @@ func increase_corruption(level_id: int, amount: float, max_value: float) -> void
 
 	Args:
 		level_id: Which Backrooms level (0, 1, 2...)
-		amount: How much to increase (typically 0.1 per chunk)
-		max_value: Maximum corruption value (typically 10.0)
+		amount: How much to increase (e.g., 0.01 per new chunk explored)
+		max_value: Maximum corruption value (0.0 = no max, which is the default)
 	"""
 	var current: float = corruption_by_level.get(level_id, 0.0)
 	var new_value := current + amount
@@ -54,16 +62,22 @@ func calculate_spawn_probability(
 ) -> float:
 	"""Calculate final spawn probability with corruption modifier
 
+	Used by ItemSpawner for item rarity calculations.
 	Formula: final_prob = base_prob × (1 + corruption × multiplier)
 
-	Examples:
+	Args:
+		base_prob: Base spawn probability (0.0 to 1.0)
+		multiplier: Corruption scaling factor (positive = more common, negative = rarer)
+		corruption: Current corruption value (UNBOUNDED: 0.0, 0.5, 1.0, 2.0, ...)
+
+	Examples (corruption is unbounded, not 0-1):
 		- Positive multiplier: probability increases with corruption
-		  base=0.05, mult=1.5, corruption=5
-		  → 0.05 × (1 + 5×1.5) = 0.425 (42.5%)
+		  base=0.05, mult=0.5, corruption=2.0
+		  → 0.05 × (1 + 2.0×0.5) = 0.1 (10%)
 
 		- Negative multiplier: probability decreases with corruption
-		  base=0.05, mult=-0.3, corruption=5
-		  → 0.05 × (1 + 5×-0.3) = 0.0125 (1.25%)
+		  base=0.05, mult=-0.3, corruption=2.0
+		  → 0.05 × (1 + 2.0×-0.3) = 0.02 (2%)
 
 	Result is clamped to [0.0, 1.0] range.
 	"""

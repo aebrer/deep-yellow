@@ -410,7 +410,6 @@ func _highlight_slot(slot: Control) -> void:
 		# Directly set examination panel content with item info
 		var item_name = label.text.split(" (")[0]  # Extract just the item name
 		examination_panel.entity_name_label.text = item_name
-		examination_panel.object_class_label.visible = false  # Hide class for items
 		examination_panel.threat_level_label.visible = false  # Hide threat for items
 		examination_panel.description_label.text = tooltip_texts[slot]
 		examination_panel.panel.visible = true
