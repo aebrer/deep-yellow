@@ -132,6 +132,7 @@ entity density: very low"""
 	add_permitted_item(Binoculars.new())  # UNCOMMON rarity
 	add_permitted_item(CoachsWhistle.new())  # UNCOMMON rarity
 	add_permitted_item(LuckyRabbitsFoot.new())  # UNCOMMON rarity
+	add_permitted_item(RomanCoin.new())  # COMMON rarity
 
 	# ========================================================================
 	# EXIT CONFIGURATION
