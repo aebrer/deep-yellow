@@ -23,7 +23,7 @@ Design Intent:
 const ITEM_ID = "brass_knuckles"
 const ITEM_NAME = "Brass Knuckles"
 const POOL = Item.PoolType.BODY
-const RARITY_TYPE = ItemRarity.Tier.COMMON
+const RARITY_TYPE = ItemRarity.Tier.RARE
 
 # Extra attacks per level
 const EXTRA_ATTACKS_PER_LEVEL = 1

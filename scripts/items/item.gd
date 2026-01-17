@@ -240,6 +240,33 @@ func get_turn_effect_info() -> Dictionary:
 	return {}
 
 # ============================================================================
+# COOLDOWN INTERFACE (for items with internal cooldowns)
+# ============================================================================
+
+func has_cooldown() -> bool:
+	"""Return true if this item has an internal cooldown that can be reset.
+
+	Override in subclasses that have cooldowns (e.g., Lucky Rabbit's Foot).
+	Used by cooldown manipulation effects.
+	"""
+	return false
+
+func get_cooldown_remaining() -> int:
+	"""Return remaining turns on internal cooldown (0 = ready).
+
+	Override in subclasses with cooldowns.
+	"""
+	return 0
+
+func reset_cooldown() -> void:
+	"""Reset internal cooldown to 0 (ready to fire).
+
+	Override in subclasses with cooldowns.
+	Called by effects like Lucky Rabbit's Foot.
+	"""
+	pass
+
+# ============================================================================
 # UTILITY
 # ============================================================================
 

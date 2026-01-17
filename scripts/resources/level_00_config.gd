@@ -131,6 +131,7 @@ entity density: very low"""
 	add_permitted_item(TrailMix.new())  # RARE rarity
 	add_permitted_item(Binoculars.new())  # UNCOMMON rarity
 	add_permitted_item(CoachsWhistle.new())  # UNCOMMON rarity
+	add_permitted_item(LuckyRabbitsFoot.new())  # UNCOMMON rarity
 
 	# ========================================================================
 	# EXIT CONFIGURATION
