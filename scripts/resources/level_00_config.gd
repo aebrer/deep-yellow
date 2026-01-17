@@ -127,6 +127,7 @@ entity density: very low"""
 	add_permitted_item(DebugItem.new())  # UNCOMMON rarity (2% spawn chance)
 	add_permitted_item(BrassKnuckles.new())  # COMMON rarity
 	add_permitted_item(BaseballBat.new())  # COMMON rarity
+	add_permitted_item(WheatieOs.new())  # COMMON rarity
 
 	# ========================================================================
 	# EXIT CONFIGURATION
