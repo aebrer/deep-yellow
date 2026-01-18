@@ -266,6 +266,27 @@ func reset_cooldown() -> void:
 	"""
 	pass
 
+func get_status_display() -> Dictionary:
+	"""Return info for action preview UI status display.
+
+	Override in subclasses with reactive effects or important cooldowns.
+	Used to show items in the action preview (e.g., shield ready, cooldown ticking).
+
+	Returns:
+		Dictionary with:
+		- show: bool (true to display in action preview)
+		- type: String ("ready" or "cooldown")
+		- mana_cost: float (mana required when triggered, for ready type)
+		- description: String (brief status description)
+
+		Empty dict or show=false = don't display in action preview
+
+	Example (Antigonous Notebook):
+		Ready: {"show": true, "type": "ready", "mana_cost": 5, "description": "Blocks next hit"}
+		Cooldown: {"show": true, "type": "cooldown", "description": "3 turns"}
+	"""
+	return {}
+
 # ============================================================================
 # UTILITY
 # ============================================================================

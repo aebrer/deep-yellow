@@ -418,9 +418,10 @@ const BASE_ENTITIES_PER_CHUNK = 3
 
 ## Additional entities per corruption point (unbounded scaling)
 ## Corruption is now an unbounded value (0.0, 0.01, 0.02, ..., 1.0, 2.0, ...)
-## At corruption 1.0: 3 + 2 = 5 per chunk
-## At corruption 5.0: 3 + 10 = 13 per chunk
-const ENTITIES_PER_CORRUPTION = 2
+## At corruption 0.5: 3 + 7 = 10 per chunk (swarm feels imminent)
+## At corruption 1.0: 3 + 14 = 17 per chunk (overwhelming)
+## At corruption 2.0: 3 + 28 = 31 per chunk (absolute chaos)
+const ENTITIES_PER_CORRUPTION = 14
 
 func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Spawn entities in chunk based on level config and corruption.
@@ -446,7 +447,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 	var corruption = get_corruption(chunk_key.z)
 
 	# Calculate entity count based on corruption
-	var entity_count = BASE_ENTITIES_PER_CHUNK + int(corruption * ENTITIES_PER_CORRUPTION)
+	# Using roundi() for smoother scaling (no truncation plateaus)
+	var entity_count = BASE_ENTITIES_PER_CHUNK + roundi(corruption * ENTITIES_PER_CORRUPTION)
 
 	var chunk_world_pos = chunk.position * CHUNK_SIZE
 	var spawned_count = 0

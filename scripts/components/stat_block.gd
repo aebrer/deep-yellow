@@ -28,6 +28,26 @@ signal exp_gained(amount: int, new_total: int)
 signal level_increased(old_level: int, new_level: int)  # Auto-increases, triggers perk selection
 signal clearance_increased(old_level: int, new_level: int)  # Manual only, unlocks knowledge
 signal entity_died(cause: String)
+signal damage_negated(source: String, amount: float)
+
+# ============================================================================
+# DAMAGE SHIELDS (absorb next damage instance)
+# ============================================================================
+# Shields negate the next damage instance completely, then expire.
+# Multiple shields stack - each one can block one hit.
+# Format: Array of {source: String, remaining_uses: int}
+
+var damage_shields: Array = []
+
+# ============================================================================
+# DAMAGE INTERCEPTORS (reactive damage prevention)
+# ============================================================================
+# Interceptors are called when damage is about to be taken. They can
+# prevent damage by returning true (and handling their own mana costs, etc.)
+# Format: Array of {source: String, callback: Callable}
+# Callback signature: func(amount: float) -> bool (return true to block damage)
+
+var damage_interceptors: Array = []
 
 # ============================================================================
 # BASE STATS
@@ -313,7 +333,24 @@ func get_modifiers_for_stat(stat_name: String) -> Array[StatModifier]:
 # ============================================================================
 
 func take_damage(amount: float) -> void:
-	"""Reduce HP by amount."""
+	"""Reduce HP by amount, unless blocked by a damage shield or interceptor."""
+	# Check for reactive damage interceptors first (e.g., Antigonous Notebook)
+	# These are called when damage is received and can spend resources to block
+	for interceptor in damage_interceptors:
+		if interceptor["callback"].call(amount):
+			emit_signal("damage_negated", interceptor["source"], amount)
+			return  # Damage was intercepted
+
+	# Check for pre-activated damage shields
+	if damage_shields.size() > 0:
+		var shield = damage_shields[0]
+		shield["remaining_uses"] -= 1
+		if shield["remaining_uses"] <= 0:
+			damage_shields.remove_at(0)
+		emit_signal("damage_negated", shield["source"], amount)
+		Log.player("DAMAGE NEGATED by %s! (%.0f damage blocked)" % [shield["source"], amount])
+		return
+
 	var old_hp = current_hp
 	current_hp -= amount
 
@@ -391,6 +428,61 @@ func get_mana_after_regen() -> float:
 	Used for previewing attack affordability in UI.
 	"""
 	return minf(current_mana + get_mana_regen_amount(), max_mana)
+
+# ============================================================================
+# DAMAGE SHIELDS
+# ============================================================================
+
+func add_damage_shield(source: String, uses: int = 1) -> void:
+	"""Add a damage shield that blocks the next N damage instances.
+
+	Args:
+		source: Name of shield source (e.g., "Antigonous Notebook")
+		uses: Number of hits this shield can block (default 1)
+	"""
+	damage_shields.append({"source": source, "remaining_uses": uses})
+	Log.player("%s: Damage shield active! (%d hit%s)" % [source, uses, "s" if uses > 1 else ""])
+
+func has_damage_shield() -> bool:
+	"""Check if any damage shield is active."""
+	return damage_shields.size() > 0
+
+func get_damage_shield_count() -> int:
+	"""Get total number of hits that can be blocked by active shields."""
+	var total = 0
+	for shield in damage_shields:
+		total += shield["remaining_uses"]
+	return total
+
+func remove_damage_shields_by_source(source: String) -> int:
+	"""Remove all damage shields from a specific source. Returns count removed."""
+	var count = 0
+	for i in range(damage_shields.size() - 1, -1, -1):
+		if damage_shields[i]["source"] == source:
+			count += damage_shields[i]["remaining_uses"]
+			damage_shields.remove_at(i)
+	return count
+
+# ============================================================================
+# DAMAGE INTERCEPTORS
+# ============================================================================
+
+func add_damage_interceptor(source: String, callback: Callable) -> void:
+	"""Register a reactive damage interceptor.
+
+	Args:
+		source: Name of interceptor source (e.g., "Antigonous Notebook")
+		callback: Function that takes damage amount and returns true to block
+	"""
+	damage_interceptors.append({"source": source, "callback": callback})
+
+func remove_damage_interceptor_by_source(source: String) -> bool:
+	"""Remove damage interceptor by source. Returns true if found."""
+	for i in range(damage_interceptors.size() - 1, -1, -1):
+		if damage_interceptors[i]["source"] == source:
+			damage_interceptors.remove_at(i)
+			return true
+	return false
 
 # ============================================================================
 # PROGRESSION

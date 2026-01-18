@@ -21,9 +21,10 @@ func execute(player) -> void:
 
 func get_preview_info(player) -> Dictionary:
 	"""Get preview info for UI display"""
+	# Use control hint style icon with control hints
 	return {
 		"name": "Wait",
-		"target": "(%d, %d)" % [player.grid_position.x, player.grid_position.y],
-		"icon": "⏸",
+		"target": "[RT/LMB]",
+		"icon": "🖱️",
 		"cost": ""
 	}

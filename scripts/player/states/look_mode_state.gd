@@ -6,6 +6,7 @@ extends PlayerInputState
 ## Turn progression is PAUSED during look mode.
 
 const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
+const _ItemStatusAction = preload("res://scripts/actions/item_status_action.gd")
 
 # NOTE: These will be initialized in enter() since they depend on player node
 var first_person_camera: FirstPersonCamera = null
@@ -197,6 +198,9 @@ func _update_action_preview() -> void:
 	# Add cooldown displays at the bottom
 	_add_cooldown_previews(actions)
 
+	# Add item status displays (ready shields, item cooldowns)
+	_add_item_status_previews(actions)
+
 	# Add mana-blocked item effects
 	_add_item_mana_blocked_previews(actions)
 
@@ -326,5 +330,61 @@ func _add_item_mana_blocked_previews(actions: Array[Action]) -> void:
 				mana_after_regen
 			)
 			actions.append(mana_blocked)
+
+func _add_item_status_previews(actions: Array[Action]) -> void:
+	"""Add status displays for items with reactive effects or cooldowns.
+
+	Shows items that have get_status_display() returning show=true.
+	Examples:
+	- "🛡 Protective Ward READY (5 mana)" - shield ready to block damage
+	- "🕐 Lucky Reset 3 → 2" - item cooldown ticking down
+	"""
+	if not player:
+		return
+
+	# Check all equipped items in all pools
+	var pools = [player.body_pool, player.mind_pool, player.null_pool]
+
+	for pool in pools:
+		if not pool:
+			continue
+
+		for i in range(pool.max_slots):
+			var item = pool.items[i]
+			var is_enabled = pool.enabled[i]
+
+			if not item or not is_enabled:
+				continue
+
+			# Check if item has status to display
+			var status = item.get_status_display()
+			if status.is_empty() or not status.get("show", false):
+				continue
+
+			var status_type = status.get("type", "")
+
+			if status_type == "ready":
+				# Show ready status (e.g., shield ready to block)
+				var status_action = _ItemStatusAction.new(
+					item.item_name,
+					_ItemStatusAction.StatusType.READY,
+					0, 0,  # No cooldown values
+					status.get("mana_cost", 0.0),
+					status.get("description", "")
+				)
+				actions.append(status_action)
+
+			elif status_type == "cooldown":
+				# Show cooldown countdown
+				var cd_current = status.get("cooldown_current", 1)
+				var cd_after = status.get("cooldown_after", 0)
+				var status_action = _ItemStatusAction.new(
+					item.item_name,
+					_ItemStatusAction.StatusType.COOLDOWN,
+					cd_current, cd_after,
+					0.0,
+					status.get("description", "")
+				)
+				actions.append(status_action)
 
 # All target handling now unified - no special cases for grid tiles vs entities
