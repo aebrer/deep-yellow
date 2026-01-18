@@ -159,7 +159,7 @@ func _get_cooldown_targets(player: Player3D) -> Array:
 			_AttackTypes.Type.NULL
 		]
 		for attack_type in attack_types:
-			if player.attack_executor._cooldowns[attack_type] > 0:
+			if player.attack_executor.get_cooldown(attack_type) > 0:
 				targets.append({
 					"type": "attack",
 					"target": attack_type,
@@ -181,7 +181,7 @@ func _reset_random_cooldown_from_targets(player: Player3D, targets: Array) -> vo
 		chosen["target"].reset_cooldown()
 		Log.player("LUCKY RABBIT'S FOOT: Reset %s cooldown!" % chosen["name"])
 	else:
-		player.attack_executor._cooldowns[chosen["target"]] = 0
+		player.attack_executor.reset_cooldown(chosen["target"])
 		Log.player("LUCKY RABBIT'S FOOT: Reset %s cooldown!" % chosen["name"])
 
 # ============================================================================

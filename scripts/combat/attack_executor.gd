@@ -642,6 +642,30 @@ func _get_pool_for_type(player, attack_type: int) -> ItemPool:
 	return null
 
 # ============================================================================
+# PUBLIC COOLDOWN ACCESS
+# ============================================================================
+
+func get_cooldown(attack_type: int) -> int:
+	"""Get current cooldown for an attack type.
+
+	Args:
+		attack_type: AttackTypes.Type enum value
+
+	Returns:
+		Remaining cooldown turns (0 = ready)
+	"""
+	return _cooldowns.get(attack_type, 0)
+
+func reset_cooldown(attack_type: int) -> void:
+	"""Reset cooldown for an attack type to 0.
+
+	Args:
+		attack_type: AttackTypes.Type enum value
+	"""
+	if _cooldowns.has(attack_type):
+		_cooldowns[attack_type] = 0
+
+# ============================================================================
 # DEBUG
 # ============================================================================
 

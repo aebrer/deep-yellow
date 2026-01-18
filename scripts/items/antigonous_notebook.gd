@@ -154,8 +154,8 @@ func _try_intercept_damage(amount: float) -> bool:
 	if _current_cooldown > 0:
 		return false  # On cooldown, can't block
 
-	# Check mana
-	if not _player_ref or not _player_ref.stats:
+	# Check player reference is still valid (could be freed during unequip edge cases)
+	if not _player_ref or not is_instance_valid(_player_ref) or not _player_ref.stats:
 		return false
 
 	var mana_cost = SHIELD_MANA_COST_PER_LEVEL * level

@@ -480,9 +480,10 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 		if entity_entry.is_empty():
 			continue
 
-		# Calculate HP and damage with corruption scaling (per 0.05 corruption)
+		# Calculate HP and damage with corruption scaling
+		# Scale factors are applied per 0.05 corruption ("corruption steps")
+		# Example: corruption=0.5 → 10 steps, hp_scale=0.1 → +100% HP
 		# Formula: final = base * (1 + corruption_steps * scale)
-		# where corruption_steps = corruption / 0.05
 		var corruption_steps = corruption / 0.05
 
 		var base_hp = entity_entry.get("base_hp", 50.0)

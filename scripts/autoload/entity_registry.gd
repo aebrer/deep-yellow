@@ -10,6 +10,21 @@ extends Node
 ##   var info = EntityRegistry.get_info("skin_stealer", clearance)
 
 # ============================================================================
+# THREAT LEVEL CONSTANTS
+# ============================================================================
+
+## Threat level weights for sanity calculations and kill rewards
+## Higher threat enemies cause more sanity pressure / grant more sanity on kill
+const THREAT_WEIGHTS: Dictionary = {
+	0: 0,   # Gimel (environment) - no impact
+	1: 1,   # Daleth (weak)
+	2: 3,   # Epsilon (moderate)
+	3: 5,   # Keter (dangerous)
+	4: 13,  # Aleph (elite)
+	5: 25,  # Boss/Apex
+}
+
+# ============================================================================
 # ENTITY REGISTRY
 # ============================================================================
 

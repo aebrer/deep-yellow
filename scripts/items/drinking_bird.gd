@@ -112,7 +112,7 @@ func get_description(clearance_level: int) -> String:
 	if clearance_level >= 4:
 		desc += "\n\n--- SYSTEM DATA (CLEARANCE OMEGA) ---"
 		desc += "\nclass_name: DrinkingBird extends Item"
-		desc += "\npool: MIND, rarity: RARE"
+		desc += "\npool: MIND, rarity: COMMON"
 		desc += "\n\nget_passive_modifiers():"
 		desc += "\n  cooldown_multiply: 1.0 - %.1f * (1.0 - exp(-level * %.2f))" % [MAX_REDUCTION, DECAY_RATE]
 		desc += "\n  # Asymptotically approaches %.0f%% reduction" % (MAX_REDUCTION * 100)

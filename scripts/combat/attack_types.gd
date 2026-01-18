@@ -111,10 +111,27 @@ const BASE_ATTACK_EMOJIS = {
 	Type.NULL: "✨",  # Anomaly/magic
 }
 
+# ============================================================================
+# ATTACK TAGS (centralized string constants to avoid typos)
+# ============================================================================
+
+## Tag constants for attack type classification
+## Use these instead of raw strings to prevent typos and enable refactoring
+class Tags:
+	# Damage type tags
+	const PHYSICAL = "physical"  # Standard physical damage
+	const SOUND = "sound"        # Sound-based (Smiler weakness)
+	const PSYCHIC = "psychic"    # Mental/sanity damage
+	const ANOMALY = "anomaly"    # Anomalous/supernatural
+
+	# Range/pattern tags
+	const MELEE = "melee"        # Close range attack
+	const RANGED = "ranged"      # Distance attack
+
 # Tags for each attack type (items can check these for conditional effects)
 # Tags describe the nature of the attack: "physical", "sound", "psychic", "anomaly", etc.
 const BASE_ATTACK_TAGS = {
-	Type.BODY: ["physical", "melee"],      # Physical melee attack
-	Type.MIND: ["sound", "psychic"],       # Sound-based psychic attack (whistle)
-	Type.NULL: ["anomaly", "ranged"],      # Anomalous ranged attack
+	Type.BODY: [Tags.PHYSICAL, Tags.MELEE],      # Physical melee attack
+	Type.MIND: [Tags.SOUND, Tags.PSYCHIC],       # Sound-based psychic attack (whistle)
+	Type.NULL: [Tags.ANOMALY, Tags.RANGED],      # Anomalous ranged attack
 }

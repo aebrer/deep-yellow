@@ -7,10 +7,10 @@ class_name SmilerBehavior extends EntityBehavior
 ## - Only takes damage from "sound" tagged attacks (instant kill)
 ## - Immune to all other damage types
 
-const SENSE_RANGE: float = 20.0
-const PREFERRED_DISTANCE: float = 5.0
-const MOVE_DISTANCE: int = 5
-const MOVE_COOLDOWN: int = 4
+const SENSE_RANGE: float = 20.0        # Tiles - range at which Smiler detects player
+const PREFERRED_DISTANCE: float = 5.0  # Tiles - ideal stalking distance from player
+const MOVE_DISTANCE: int = 5           # Tiles - teleport range per movement
+const MOVE_COOLDOWN: int = 4           # Turns between teleports
 
 func reset_turn_state(entity: WorldEntity) -> void:
 	# Smiler doesn't attack but tracks move cooldown via spawn_cooldown
@@ -43,7 +43,7 @@ func take_damage(entity: WorldEntity, amount: float, tags: Array = []) -> void:
 	if entity.is_dead:
 		return
 
-	if "sound" in tags:
+	if AttackTypes.Tags.SOUND in tags:
 		# Sound attack - instant kill regardless of HP
 		entity.current_hp = 0.0
 		entity.is_dead = true

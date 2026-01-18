@@ -151,9 +151,13 @@ func _find_spawn_location(chunk, item: Item) -> Vector2i:
 		if not subchunk:
 			continue
 
+		# Skip empty tile data
+		if subchunk.tile_data.is_empty() or subchunk.tile_data[0].is_empty():
+			continue
+
 		# Pick random tile in subchunk
-		var local_x = randi() % subchunk.tile_data.size()
-		var local_y = randi() % subchunk.tile_data[0].size()
+		var local_y = randi() % subchunk.tile_data.size()
+		var local_x = randi() % subchunk.tile_data[0].size()
 
 		# Check if 3x3 area is clear (centered on this tile)
 		var center_world_pos = subchunk.world_position + Vector2i(local_x, local_y)
@@ -219,10 +223,16 @@ func _get_tile_at_world_pos(chunk, world_pos: Vector2i):
 		var local_x = world_pos.x - subchunk.world_position.x
 		var local_y = world_pos.y - subchunk.world_position.y
 
+		# Skip empty tile data
+		if subchunk.tile_data.is_empty():
+			continue
+
 		# Check if position is in this subchunk
 		# CRITICAL: tile_data is stored as [y][x] (row-major), not [x][y]
 		if local_y >= 0 and local_y < subchunk.tile_data.size():
-			if local_x >= 0 and local_x < subchunk.tile_data[0].size():
+			if subchunk.tile_data[local_y].is_empty():
+				continue
+			if local_x >= 0 and local_x < subchunk.tile_data[local_y].size():
 				return subchunk.tile_data[local_y][local_x]
 
 	return null

@@ -62,11 +62,12 @@ func get_preview_info(_player) -> Dictionary:
 				"icon": "🕐",
 				"cost": ""
 			}
-
-	# Fallback
-	return {
-		"name": item_name,
-		"target": description,
-		"icon": "📦",
-		"cost": ""
-	}
+		_:
+			# Exhaustive match - all StatusType values handled above
+			# This branch exists for GDScript's match exhaustiveness
+			return {
+				"name": item_name,
+				"target": description,
+				"icon": "📦",
+				"cost": ""
+			}

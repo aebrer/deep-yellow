@@ -345,16 +345,6 @@ func _on_clearance_increased(old_level: int, new_level: int) -> void:
 	KnowledgeDB.set_clearance_level(new_level)
 	Log.player("Player Clearance increased: %d → %d (knowledge unlocked)" % [old_level, new_level])
 
-## Threat level weights for sanity restore on kill (same as SanityDamageAction)
-const THREAT_WEIGHTS: Dictionary = {
-	0: 0,   # Gimel (environment) - no sanity restore
-	1: 1,   # Daleth (weak)
-	2: 3,   # Epsilon (moderate)
-	3: 5,   # Keter (dangerous)
-	4: 13,  # Aleph (elite)
-	5: 25,  # Boss/Apex
-}
-
 func _get_sanity_restore_for_entity(entity_type: String) -> float:
 	"""Get sanity restore amount for killing an entity based on its threat level.
 
@@ -373,7 +363,7 @@ func _get_sanity_restore_for_entity(entity_type: String) -> float:
 		if info and info.has("threat_level"):
 			threat_level = info["threat_level"]
 
-	return float(THREAT_WEIGHTS.get(threat_level, 1))
+	return float(EntityRegistry.THREAT_WEIGHTS.get(threat_level, 1))
 
 func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
 	"""Called when HP, Sanity, or Mana changes - update visual bars"""
@@ -501,7 +491,8 @@ func get_cooldown_multiply() -> float:
 			var is_enabled = pool.enabled[i]
 			if item and is_enabled:
 				var mods = item.get_passive_modifiers()
-				multiplier *= mods.get("cooldown_multiply", 1.0)
+				if mods:  # Defensive null check
+					multiplier *= mods.get("cooldown_multiply", 1.0)
 
 	return multiplier
 

@@ -69,8 +69,8 @@ func get_attack_modifiers() -> Dictionary:
 
 	return {
 		# Transform to sound-based attack
-		"add_tags": ["sound"],
-		"remove_tags": ["melee"],  # No longer melee - it's a scream
+		"add_tags": [AttackTypes.Tags.SOUND],
+		"remove_tags": [AttackTypes.Tags.MELEE],  # No longer melee - it's a scream
 
 		# Change to AOE around player (like whistle)
 		"area": _AttackTypes.Area.AOE_AROUND,

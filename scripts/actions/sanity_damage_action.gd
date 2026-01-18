@@ -19,17 +19,6 @@ const SANITY_DAMAGE_INTERVAL: int = 13
 ## Base sanity damage
 const BASE_SANITY_DAMAGE: float = 1.0
 
-## Threat level weights for sanity calculation
-## Higher threat enemies cause more sanity pressure
-const THREAT_WEIGHTS: Dictionary = {
-	0: 0,   # Gimel (environment) - no sanity impact
-	1: 1,   # Daleth (weak) - minimal impact
-	2: 3,   # Epsilon (moderate)
-	3: 5,   # Keter (dangerous)
-	4: 13,  # Aleph (elite)
-	5: 25,  # Boss/Apex
-}
-
 ## Entity types with bonus sanity damage (psychological horror enemies)
 ## These are added ON TOP of their threat level weight
 const SANITY_BONUS_ENTITIES: Dictionary = {
@@ -132,8 +121,11 @@ static func calculate_sanity_damage(player, grid) -> Dictionary:
 		result["turns_until"] = 1
 		result["is_damage_turn"] = true
 	else:
-		# Damage happens N turns from now (N = remaining turns + current turn we're previewing)
-		result["turns_until"] = SANITY_DAMAGE_INTERVAL - turns_since_last + 1
+		# Calculate turns until next damage event
+		# Formula: remaining turns in interval + 1 (to account for "next turn" being turn 1)
+		# Example: interval=13, turns_since_last=5 → 13-5+1=9 turns until damage
+		var turns_remaining_in_interval = SANITY_DAMAGE_INTERVAL - turns_since_last
+		result["turns_until"] = turns_remaining_in_interval + 1
 		result["is_damage_turn"] = false
 
 	# Get perception range (same as minimap uses)
@@ -158,7 +150,7 @@ static func calculate_sanity_damage(player, grid) -> Dictionary:
 			if entity:
 				# Get threat level from entity type
 				var threat_level = _get_threat_level_for_entity(entity.entity_type)
-				weighted_count += THREAT_WEIGHTS.get(threat_level, 1)
+				weighted_count += EntityRegistry.THREAT_WEIGHTS.get(threat_level, 1)
 
 				# Add bonus for psychological horror entities (e.g., Smiler)
 				if SANITY_BONUS_ENTITIES.has(entity.entity_type):

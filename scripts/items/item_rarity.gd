@@ -10,6 +10,7 @@ class_name ItemRarity
 ## - legendary: ~0.01% base spawn chance
 ## - anomaly: ~0.001% base spawn chance (corruption-dependent)
 
+## NOTE: Named "Tier" not "Type" to distinguish from Item.PoolType and AttackTypes.Type
 enum Tier {
 	DEBUG,      ## Always spawns (testing only)
 	COMMON,     ## Standard items

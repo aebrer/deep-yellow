@@ -62,7 +62,7 @@ func get_attack_modifiers() -> Dictionary:
 
 	return {
 		"tag_damage_multiply": {
-			"sound": total_mult
+			AttackTypes.Tags.SOUND: total_mult
 		}
 	}
 
