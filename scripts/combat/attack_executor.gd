@@ -343,6 +343,10 @@ func _find_targets(player, attack) -> Array[Vector2i]:
 			# Return enemies in a cone in player's facing direction
 			return _filter_cone_targets(player, candidates)
 
+		_AttackTypes.Area.SWEEP:
+			# Target nearest + perpendicular neighbors (shovel swing)
+			return _filter_sweep_targets(player.grid_position, candidates)
+
 		_:
 			# Default: nearest
 			candidates.sort_custom(func(a, b):
@@ -403,6 +407,10 @@ func _find_targets_from_position(player, attack, from_pos: Vector2i) -> Array[Ve
 			# Return enemies in a cone aimed at nearest enemy
 			return _filter_cone_targets_from_position(candidates, from_pos)
 
+		_AttackTypes.Area.SWEEP:
+			# Target nearest + perpendicular neighbors (shovel swing)
+			return _filter_sweep_targets(from_pos, candidates)
+
 		_:
 			# Default: nearest
 			candidates.sort_custom(func(a, b):
@@ -461,6 +469,74 @@ func _filter_cone_targets_from_position(candidates: Array[Vector2i], from_pos: V
 			in_cone.append(pos)
 
 	return in_cone
+
+
+func _filter_sweep_targets(from_pos: Vector2i, candidates: Array[Vector2i]) -> Array[Vector2i]:
+	"""Filter candidates to those hit by a sweeping attack (target + perpendicular neighbors).
+
+	The shovel swing pattern:
+	1. Find the nearest enemy (primary target)
+	2. Calculate the direction from player to target
+	3. Include any enemies on the two tiles perpendicular to that direction
+
+	Example: If player is at (0,0) and target is at (1,0) (east):
+	- Primary target: (1,0)
+	- Perpendicular tiles: (1,-1) and (1,1) (north and south of target)
+
+	Args:
+		from_pos: Player position
+		candidates: Array of potential target positions (already filtered by range/LOS)
+
+	Returns:
+		Array of positions hit by the sweep (primary + perpendicular neighbors)
+	"""
+	if candidates.is_empty():
+		return []
+
+	# Find nearest enemy (primary target)
+	var nearest_pos = candidates[0]
+	var nearest_dist = from_pos.distance_to(nearest_pos)
+	for pos in candidates:
+		var dist = from_pos.distance_to(pos)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest_pos = pos
+
+	# Calculate direction from player to target
+	var delta = nearest_pos - from_pos
+	if delta == Vector2i.ZERO:
+		return [nearest_pos]  # Edge case: on same tile
+
+	# Perpendicular directions: rotate 90 degrees
+	# If delta is (dx, dy), perpendicular is (-dy, dx) and (dy, -dx)
+	var perp1 = Vector2i(-delta.y, delta.x)
+	var perp2 = Vector2i(delta.y, -delta.x)
+
+	# Normalize to unit length (for adjacent tile check)
+	if perp1.x != 0:
+		perp1.x = perp1.x / abs(perp1.x)
+	if perp1.y != 0:
+		perp1.y = perp1.y / abs(perp1.y)
+	if perp2.x != 0:
+		perp2.x = perp2.x / abs(perp2.x)
+	if perp2.y != 0:
+		perp2.y = perp2.y / abs(perp2.y)
+
+	# Perpendicular tile positions (adjacent to target, not player)
+	var sweep_pos1 = nearest_pos + perp1
+	var sweep_pos2 = nearest_pos + perp2
+
+	# Collect all positions that are hit
+	var hit_positions: Array[Vector2i] = [nearest_pos]
+
+	# Check if any candidates are on the perpendicular tiles
+	for pos in candidates:
+		if pos == nearest_pos:
+			continue
+		if pos == sweep_pos1 or pos == sweep_pos2:
+			hit_positions.append(pos)
+
+	return hit_positions
 
 
 func _filter_by_line_of_sight(grid, from_pos: Vector2i, candidates: Array[Vector2i]) -> Array[Vector2i]:

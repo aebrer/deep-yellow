@@ -26,6 +26,7 @@ enum Area {
 	CONE,         # Triangle spread in facing direction
 	AOE_3X3,      # 3x3 centered on target
 	AOE_AROUND,   # All enemies within range of player (whistle)
+	SWEEP,        # Target + perpendicular neighbors (shovel swing)
 }
 
 # ============================================================================

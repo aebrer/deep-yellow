@@ -54,7 +54,8 @@ func _init(p_corruption_tracker: CorruptionTracker, p_level_config) -> void:
 func spawn_items_for_chunk(
 	chunk,  # Chunk instance
 	turn_number: int,
-	available_items: Array[Item]
+	available_items: Array[Item],
+	player = null  # Optional: Player3D reference for item spawn rate bonuses
 ) -> Array[WorldItem]:
 	"""Spawn items in a chunk based on rarity and corruption
 
@@ -65,6 +66,7 @@ func spawn_items_for_chunk(
 		chunk: Chunk to spawn items in
 		turn_number: Current turn number
 		available_items: All items that could spawn (filtered by level allowlist)
+		player: Optional player reference for spawn rate bonuses from equipped items
 
 	Returns:
 		Array of WorldItem instances that were spawned
@@ -73,6 +75,9 @@ func spawn_items_for_chunk(
 
 	# Get current corruption level for this chunk's level
 	var corruption = corruption_tracker.get_corruption(chunk.level_id)
+
+	# Get item spawn rate bonus from player's equipped items
+	var spawn_rate_bonus = _get_player_spawn_rate_bonus(player)
 
 	# Roll for each rarity tier (highest to lowest)
 	var rarity_order = [
@@ -99,6 +104,9 @@ func spawn_items_for_chunk(
 			corruption_mult,
 			corruption
 		)
+
+		# Apply item spawn rate bonus from equipped items (additive)
+		final_prob = final_prob + spawn_rate_bonus
 
 		# Roll for spawn
 		if randf() < final_prob:
@@ -218,6 +226,38 @@ func _get_tile_at_world_pos(chunk, world_pos: Vector2i):
 				return subchunk.tile_data[local_y][local_x]
 
 	return null
+
+# ============================================================================
+# PLAYER MODIFIERS
+# ============================================================================
+
+func _get_player_spawn_rate_bonus(player) -> float:
+	"""Calculate total item spawn rate bonus from player's equipped items.
+
+	Args:
+		player: Player3D reference (or null)
+
+	Returns:
+		Total additive spawn rate bonus (e.g., 0.1 = +10% to spawn probability)
+	"""
+	if not player:
+		return 0.0
+
+	var total_bonus: float = 0.0
+	var pools = [player.body_pool, player.mind_pool, player.null_pool]
+
+	for pool in pools:
+		if not pool:
+			continue
+		for i in range(pool.max_slots):
+			var item = pool.items[i]
+			var is_enabled = pool.enabled[i]
+			if item and is_enabled:
+				var mods = item.get_passive_modifiers()
+				total_bonus += mods.get("item_spawn_rate_add", 0.0)
+
+	return total_bonus
+
 
 # ============================================================================
 # UTILITY

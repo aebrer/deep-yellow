@@ -239,6 +239,22 @@ func get_turn_effect_info() -> Dictionary:
 	"""
 	return {}
 
+
+func get_passive_modifiers() -> Dictionary:
+	"""Return passive modifiers that affect gameplay systems beyond attacks.
+
+	Override in subclasses that provide non-attack bonuses.
+	These modifiers are queried by various game systems:
+
+	Supported modifiers:
+	- item_spawn_rate_add: float (additive bonus to item spawn probability, e.g., 0.1 = +10%)
+
+	Returns:
+		Dictionary of modifiers (empty dict = no modifications)
+	"""
+	return {}
+
+
 # ============================================================================
 # COOLDOWN INTERFACE (for items with internal cooldowns)
 # ============================================================================

@@ -340,11 +340,13 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 				level_config.permitted_items
 			)
 		else:
-			# Normal spawning
+			# Normal spawning (with player for spawn rate bonuses)
+			var player = _find_player()
 			spawned_items = item_spawner.spawn_items_for_chunk(
 				chunk,
 				0,  # Turn number (will be updated later with actual turn tracking)
-				level_config.permitted_items
+				level_config.permitted_items,
+				player
 			)
 
 		# Store spawned items in subchunks for persistence

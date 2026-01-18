@@ -135,6 +135,7 @@ entity density: very low"""
 	add_permitted_item(RomanCoin.new())  # COMMON rarity
 	add_permitted_item(AntigonousNotebook.new())  # LEGENDARY rarity
 	add_permitted_item(SirensCords.new())  # EPIC rarity
+	add_permitted_item(Shovel.new())  # UNCOMMON rarity
 
 	# ========================================================================
 	# EXIT CONFIGURATION
