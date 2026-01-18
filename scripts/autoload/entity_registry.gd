@@ -116,6 +116,21 @@ func _load_entities() -> void:
 	smiler.threat_level = 2  # Epsilon (moderate) - but extra sanity contribution
 	_entities["smiler"] = smiler
 
+	# Bacteria Spreader (Level 0 support enemy)
+	# threat_level 2 (Epsilon) matches level_00_config.gd entity_spawn_table
+	var bacteria_spreader = EntityInfo.new()
+	bacteria_spreader.entity_id = "bacteria_spreader"
+	bacteria_spreader.entity_name = "Bacteria Spreader"
+	bacteria_spreader.visual_description = "A dark green bulbous mass with tendrils extending outward. A cloud of golden-green spores drifts lazily around it, occasionally settling on nearby surfaces."
+	bacteria_spreader.clearance_info[0] = ""  # No additional info at clearance 0
+	bacteria_spreader.clearance_info[1] = "The spore cloud appears to have a restorative effect on nearby bacterial organisms."
+	bacteria_spreader.clearance_info[2] = "SUPPORT ENTITY. Heals nearby bacteria each turn. Eliminating spreaders should be a priority to prevent swarm regeneration."
+	bacteria_spreader.clearance_info[3] = "Attacks in a burst pattern, damaging anything within close proximity. The healing aura scales with the entity's overall power."
+	bacteria_spreader.clearance_info[4] = "--- FIELD DATA ---\nDamage: 3 HP (AOE burst)\nSpeed: 1 move per turn\nHealing: [DAMAGE]% max HP to nearby bacteria (scales with corruption)\nHeal range: 3 tiles\nSense range: 40 tiles"
+	bacteria_spreader.object_class = "Euclid"
+	bacteria_spreader.threat_level = 2  # Epsilon (moderate) - support role
+	_entities["bacteria_spreader"] = bacteria_spreader
+
 	# Debug Enemy (testing entity)
 	var debug_enemy = EntityInfo.new()
 	debug_enemy.entity_id = "debug_enemy"

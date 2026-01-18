@@ -73,6 +73,7 @@ const ENTITY_COLORS = {
 	"debug_enemy": Color(1.0, 0.0, 1.0),       # Magenta
 	"bacteria_spawn": Color(0.5, 1.0, 0.5),    # Light green
 	"bacteria_motherload": Color(0.0, 0.8, 0.0),  # Dark green
+	"bacteria_spreader": Color(0.3, 0.6, 0.2),   # Darker green with yellow tint
 	"smiler": Color(1.0, 1.0, 0.8),             # Pale yellow/white (eerie glow)
 }
 
@@ -80,6 +81,7 @@ const ENTITY_COLORS = {
 const ENTITY_TEXTURES = {
 	"bacteria_spawn": "res://assets/textures/entities/bacteria_spawn.png",
 	"bacteria_motherload": "res://assets/textures/entities/bacteria_motherload.png",
+	"bacteria_spreader": "res://assets/textures/entities/bacteria_spreader.png",
 	"smiler": "res://assets/textures/entities/smiler.png",
 }
 

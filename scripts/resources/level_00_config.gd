@@ -129,6 +129,16 @@ entity density: very low"""
 			"threat_level": 2,  # Epsilon - moderate threat (but extra sanity drain)
 			"corruption_threshold": 0.0,  # Can spawn at any corruption
 		},
+		{
+			"entity_type": "bacteria_spreader",
+			"weight": 2.0,  # Uncommon support enemy
+			"base_hp": 300.0,  # Tanky support
+			"hp_scale": 0.1,  # +10% HP per 0.05 corruption
+			"base_damage": 3.0,  # AOE attack damage
+			"damage_scale": 0.05,  # +5% damage per 0.05 corruption (also scales healing!)
+			"threat_level": 2,  # Epsilon - moderate threat
+			"corruption_threshold": 0.0,  # Can spawn at any corruption
+		},
 	]
 
 	# ========================================================================
