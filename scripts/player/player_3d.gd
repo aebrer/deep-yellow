@@ -362,8 +362,10 @@ func _get_sanity_restore_for_entity(entity_type: String) -> float:
 		var info = EntityRegistry.get_info(entity_type, 0)
 		if info and info.has("threat_level"):
 			threat_level = info["threat_level"]
+		return float(EntityRegistry.THREAT_WEIGHTS.get(threat_level, 1))
 
-	return float(EntityRegistry.THREAT_WEIGHTS.get(threat_level, 1))
+	# Fallback if EntityRegistry not available
+	return 1.0
 
 func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
 	"""Called when HP, Sanity, or Mana changes - update visual bars"""

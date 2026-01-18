@@ -337,7 +337,9 @@ func take_damage(amount: float) -> void:
 	# Check for reactive damage interceptors first (e.g., Antigonous Notebook)
 	# These are called when damage is received and can spend resources to block
 	for interceptor in damage_interceptors:
-		if interceptor["callback"].call(amount):
+		var callback: Callable = interceptor["callback"]
+		# Validate callable is still valid (item could be unequipped during same frame)
+		if callback.is_valid() and callback.call(amount):
 			emit_signal("damage_negated", interceptor["source"], amount)
 			return  # Damage was intercepted
 
