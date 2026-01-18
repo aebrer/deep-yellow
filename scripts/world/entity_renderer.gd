@@ -73,23 +73,27 @@ const ENTITY_COLORS = {
 	"debug_enemy": Color(1.0, 0.0, 1.0),       # Magenta
 	"bacteria_spawn": Color(0.5, 1.0, 0.5),    # Light green
 	"bacteria_motherload": Color(0.0, 0.8, 0.0),  # Dark green
+	"smiler": Color(1.0, 1.0, 0.8),             # Pale yellow/white (eerie glow)
 }
 
 ## Entity textures (loaded on demand)
 const ENTITY_TEXTURES = {
 	"bacteria_spawn": "res://assets/textures/entities/bacteria_spawn.png",
 	"bacteria_motherload": "res://assets/textures/entities/bacteria_motherload.png",
+	"smiler": "res://assets/textures/entities/smiler.png",
 }
 
 ## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
 const ENTITY_SCALE_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Boss-sized
+	"smiler": 2.0,  # Large, imposing presence
 }
 
 ## Per-entity height overrides (world units above floor)
 ## Larger entities need higher placement so their bottom doesn't clip floor
 const ENTITY_HEIGHT_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Raised to match 2x size scale
+	"smiler": 3.0,  # Floats ominously above the floor
 }
 
 ## Default entity color
@@ -281,10 +285,11 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		entity_health_bars.erase(old_pos)
 		entity_health_bars[new_pos] = health_bar
 
-	# Calculate new 3D position
-	var new_world_3d = grid_3d.grid_to_world_centered(new_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
+	# Calculate new 3D position (use height override for this entity type)
+	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity.entity_type, BILLBOARD_HEIGHT)
+	var new_world_3d = grid_3d.grid_to_world_centered(new_pos, entity_height) if grid_3d else Vector3(
 		new_pos.x * 2.0 + 1.0,
-		BILLBOARD_HEIGHT,
+		entity_height,
 		new_pos.y * 2.0 + 1.0
 	)
 

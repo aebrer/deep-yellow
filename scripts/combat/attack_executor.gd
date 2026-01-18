@@ -288,8 +288,9 @@ func _execute_attack(player, attack) -> bool:
 	for target_pos in targets:
 		var entity = player.grid.get_entity_at(target_pos)
 		if entity and entity.is_alive():
-			# Apply damage to WorldEntity (emits signals for health bar / death VFX)
-			entity.take_damage(attack.damage)
+			# Apply damage to WorldEntity with attack tags (for immunities/vulnerabilities)
+			# Tags like "sound" trigger instant kill on Smiler, "physical" is blocked, etc.
+			entity.take_damage(attack.damage, attack.tags)
 
 			# Spawn hit VFX via renderer (render-only)
 			player.grid.entity_renderer.spawn_hit_vfx(target_pos, attack.attack_emoji, attack.damage)

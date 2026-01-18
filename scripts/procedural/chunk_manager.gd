@@ -242,6 +242,12 @@ func _process_generation_queue() -> void:
 			if has_all_chunks or (generation_thread and generation_thread.get_pending_count() == 0):
 				initial_load_complete = true
 				initial_load_completed.emit()
+				Log.system("Initial load complete - %d chunks loaded" % loaded_chunks.size())
+
+				# DEBUG: Spawn test entity near player after initial load
+				if Utilities.DEBUG_SPAWN_ENTITY != "":
+					Log.system("DEBUG: Attempting to spawn %s near player" % Utilities.DEBUG_SPAWN_ENTITY)
+					_spawn_debug_entity_near_player(Utilities.DEBUG_SPAWN_ENTITY)
 
 		return
 
@@ -509,6 +515,56 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "Spawned %d entities in chunk %s (corruption: %.2f)" % [
 			spawned_count, chunk.position, corruption
 		])
+
+
+func _spawn_debug_entity_near_player(entity_type: String) -> void:
+	"""Spawn a debug entity near the player (called after initial load).
+
+	Args:
+		entity_type: Entity type string to spawn
+	"""
+	# Get player position
+	var player_pos := _get_player_position()
+
+	# Find a walkable tile 3 tiles away from player
+	var spawn_pos := INVALID_POSITION
+	for offset in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3),
+				   Vector2i(2, 2), Vector2i(-2, 2), Vector2i(2, -2), Vector2i(-2, -2)]:
+		var test_pos = player_pos + offset
+		if grid_3d and grid_3d.is_walkable(test_pos):
+			spawn_pos = test_pos
+			break
+
+	if spawn_pos == INVALID_POSITION:
+		Log.system("DEBUG: Could not find walkable tile near player for debug entity")
+		return
+
+	# Create entity with default stats
+	var entity = WorldEntity.new(
+		entity_type,
+		spawn_pos,
+		100.0,  # Default HP (doesn't matter for smiler)
+		0  # spawn_turn
+	)
+
+	# Find the correct chunk for this position
+	var target_chunk = get_chunk_at_tile(spawn_pos, 0)
+	if not target_chunk:
+		Log.system("DEBUG: No chunk loaded at %s for debug entity" % spawn_pos)
+		return
+
+	# Find subchunk and add entity
+	var chunk_world_pos = target_chunk.position * CHUNK_SIZE
+	var local_pos = spawn_pos - chunk_world_pos
+	var subchunk_x = local_pos.x / SubChunk.SIZE
+	var subchunk_y = local_pos.y / SubChunk.SIZE
+	var subchunk = target_chunk.get_sub_chunk(Vector2i(subchunk_x, subchunk_y))
+	if subchunk:
+		subchunk.add_world_entity(entity)
+		# Also render the entity immediately (entity renderer needs to know about it)
+		if grid_3d and grid_3d.entity_renderer:
+			grid_3d.entity_renderer.add_entity_billboard(entity)
+		Log.system("DEBUG: Spawned %s at %s for testing" % [entity_type, spawn_pos])
 
 func _get_valid_entities_for_corruption(spawn_table: Array, corruption: float) -> Array:
 	"""Filter spawn table to entities valid at current corruption level."""

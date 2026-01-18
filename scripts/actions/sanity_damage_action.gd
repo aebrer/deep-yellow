@@ -30,6 +30,12 @@ const THREAT_WEIGHTS: Dictionary = {
 	5: 25,  # Boss/Apex
 }
 
+## Entity types with bonus sanity damage (psychological horror enemies)
+## These are added ON TOP of their threat level weight
+const SANITY_BONUS_ENTITIES: Dictionary = {
+	"smiler": 5,  # Smiler causes extra psychological damage just by existing nearby
+}
+
 # ============================================================================
 # PROPERTIES
 # ============================================================================
@@ -145,7 +151,7 @@ static func calculate_sanity_damage(player, grid) -> Dictionary:
 		var entities_in_range = grid.entity_renderer.get_entities_in_range(player.grid_position, perception_range)
 		result["enemy_count"] = entities_in_range.size()
 
-		# Calculate weighted count based on threat levels
+		# Calculate weighted count based on threat levels + entity-specific bonuses
 		var weighted_count: int = 0
 		for entity_pos in entities_in_range:
 			var entity = grid.entity_renderer.get_entity_at(entity_pos)
@@ -153,6 +159,10 @@ static func calculate_sanity_damage(player, grid) -> Dictionary:
 				# Get threat level from entity type
 				var threat_level = _get_threat_level_for_entity(entity.entity_type)
 				weighted_count += THREAT_WEIGHTS.get(threat_level, 1)
+
+				# Add bonus for psychological horror entities (e.g., Smiler)
+				if SANITY_BONUS_ENTITIES.has(entity.entity_type):
+					weighted_count += SANITY_BONUS_ENTITIES[entity.entity_type]
 
 		result["weighted_count"] = weighted_count
 

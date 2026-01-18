@@ -166,7 +166,7 @@ func get_look_raycast() -> Dictionary:
 
 	var ray_origin = camera.project_ray_origin(screen_center)
 	var ray_direction = camera.project_ray_normal(screen_center)
-	var ray_length = 5.0  # Close examination distance (too long causes distant hits)
+	var ray_length = 10.0  # Examination distance
 
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(
@@ -224,7 +224,7 @@ func get_current_target() -> Examinable:
 	var pitch = v_pivot.rotation_degrees.x
 	var tile_type := ""
 	var target_pos := Vector3.ZERO
-	var max_distance = 5.0  # Maximum examination distance
+	var max_distance = 10.0  # Maximum examination distance
 
 	if pitch < -10:  # Looking down at floor (negative pitch = looking down)
 		tile_type = "floor"
@@ -322,7 +322,7 @@ func _raycast_gridmap() -> Dictionary:
 	# Offset ray origin forward by camera near plane distance to avoid starting inside collision
 	ray_origin += ray_direction * camera.near
 
-	var ray_length = 5.0  # Close examination distance (too long causes distant hits)
+	var ray_length = 10.0  # Examination distance
 
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(

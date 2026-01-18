@@ -119,6 +119,16 @@ entity density: very low"""
 			"threat_level": 3,  # Dangerous - rare early, more common later
 			"corruption_threshold": 0.0,  # Can spawn at any corruption
 		},
+		{
+			"entity_type": "smiler",
+			"weight": 1.0,  # Uncommon - psychological horror
+			"base_hp": 1.0,  # Dies instantly to sound, HP doesn't matter
+			"hp_scale": 0.0,  # No HP scaling (sound = instant kill)
+			"base_damage": 0.0,  # No direct damage (sanity drain only)
+			"damage_scale": 0.0,  # No damage scaling
+			"threat_level": 2,  # Epsilon - moderate threat (but extra sanity drain)
+			"corruption_threshold": 0.0,  # Can spawn at any corruption
+		},
 	]
 
 	# ========================================================================
