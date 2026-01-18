@@ -137,6 +137,7 @@ entity density: very low"""
 	add_permitted_item(SirensCords.new())  # EPIC rarity
 	add_permitted_item(Shovel.new())  # UNCOMMON rarity
 	add_permitted_item(DrinkingBird.new())  # COMMON rarity
+	add_permitted_item(AlmondWater.new())  # RARE rarity
 
 	# ========================================================================
 	# EXIT CONFIGURATION
