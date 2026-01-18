@@ -119,23 +119,18 @@ func get_hp_percentage() -> float:
 # STATE CHANGES
 # ============================================================================
 
-func take_damage(amount: float) -> void:
-	"""Apply damage to entity
+func take_damage(amount: float, tags: Array = []) -> void:
+	"""Apply damage to entity via behavior system
 
-	Emits hp_changed signal. If HP reaches 0, sets is_dead and emits died signal.
+	Delegates to EntityAI.apply_damage() which routes to the appropriate
+	EntityBehavior subclass. This allows entity-specific damage handling
+	(immunities, vulnerabilities, instant kills, etc.)
 
 	Args:
 		amount: Damage to apply (positive value)
+		tags: Array of attack tags (e.g., ["physical", "melee"] or ["sound", "psychic"])
 	"""
-	if is_dead:
-		return  # Already dead, ignore further damage
-
-	current_hp = max(0.0, current_hp - amount)  # Setter emits hp_changed
-
-	if current_hp <= 0 and not is_dead:
-		is_dead = true
-		died.emit(self)
-		Log.msg(Log.Category.ENTITY, Log.Level.INFO, "WorldEntity '%s' at %s died" % [entity_type, world_position])
+	EntityAI.apply_damage(self, amount, tags)
 
 func heal(amount: float) -> void:
 	"""Heal entity"""

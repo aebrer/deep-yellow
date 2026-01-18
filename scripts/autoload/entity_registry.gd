@@ -101,6 +101,21 @@ func _load_entities() -> void:
 	bacteria_motherload.threat_level = 3  # Dangerous (Yellow) - rare early, common later
 	_entities["bacteria_motherload"] = bacteria_motherload
 
+	# Smiler (Level 0 psychological horror enemy)
+	# threat_level 2 (Epsilon) but contributes EXTRA sanity damage
+	var smiler = EntityInfo.new()
+	smiler.entity_id = "smiler"
+	smiler.entity_name = "Smiler"
+	smiler.visual_description = "Two glowing eyes and a wide, toothy grin float in the darkness. The smile never wavers. It watches."
+	smiler.clearance_info[0] = ""  # No additional info at clearance 0
+	smiler.clearance_info[1] = "Appears in darker areas. Does not attack directly but its presence erodes sanity rapidly."
+	smiler.clearance_info[2] = "VULNERABLE TO SOUND. Loud noises cause it to disperse instantly. The Whistle is particularly effective."
+	smiler.clearance_info[3] = "Maintains distance from prey. Teleports short distances every few turns. Looking directly at it accelerates sanity loss."
+	smiler.clearance_info[4] = "--- FIELD DATA ---\nDamage: None (psychological only)\nSpeed: 5 tiles every 4th turn\nWeakness: Sound-based attacks (instant kill)\nSense range: 20 tiles\nPreferred distance: ~5 tiles"
+	smiler.object_class = "Euclid"
+	smiler.threat_level = 2  # Epsilon (moderate) - but extra sanity contribution
+	_entities["smiler"] = smiler
+
 	# Debug Enemy (testing entity)
 	var debug_enemy = EntityInfo.new()
 	debug_enemy.entity_id = "debug_enemy"
