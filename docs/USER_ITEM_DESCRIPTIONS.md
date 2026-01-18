@@ -23,6 +23,21 @@ Design specifications for items to implement. These are the source of truth for 
 - Improve hp regen
 - Rarest of the bunch
 
+### Shovel
+- Changes BODY attack to "Shovel Hit" (physical)
+- Sweeping attack that hits an adjacent enemy AND the two tiles next to it (perpendicular to the line between the player and the target)
+- Also improves item spawn rate
+- Item spawn rate improvement scales with item level
+
+### Siren's Cords
+- EPIC rarity BODY item
+- Transforms BODY attack to "Siren Scream" (sound-based AOE)
+- Adds "sound" tag, removes "melee" tag
+- Changes attack pattern to AOE_AROUND (like whistle)
+- +0.5 range per level
+- Synergizes with Coach's Whistle (sound damage multiplier applies!)
+- Example combo: Brass Knuckles + Siren's Cords + Coach's Whistle = multiple sound AOE attacks per turn
+
 ---
 
 ## MIND Items
@@ -36,11 +51,14 @@ Design specifications for items to implement. These are the source of truth for 
 - Need to add tags to attacks for this
 - Scales as it levels up
 
-### Siren's Lungs
-- Transforms BODY attacks to be sound-based (adds "sound" tag)
-- Changes attack to AOE_AROUND pattern like whistle
-- Synergizes with Coach's Whistle (sound damage multiplier applies!)
-- Example combo: Brass Knuckles + Siren's Lungs + Coach's Whistle = multiple sound-based AOE attacks per turn
+### Siren's Cords (MOVED TO BODY)
+- See BODY section
+
+### Drinking Bird
+- One of those water sipping bird toys, as featured on the Simpsons
+- Description: "For the thinking man, now with Verve!"
+- Gives a %-based reduction to all cooldowns
+- % scales with item level (asymptotically reaches 50% reduction around level 20)
 
 ### Telepathic Punching Item (TBD)
 - Something that turns the MIND attack from a whistle to telepathic punching

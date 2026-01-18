@@ -134,10 +134,11 @@ func _build_attack(player, pool: ItemPool, attack_type: int):
 	var cooldown_add: int = 0
 	var mana_cost_multiply: float = 1.0
 	var extra_attacks: int = 0
-	var tag_damage_multipliers: Dictionary = {}  # tag -> multiplier
+	var tag_damage_multipliers: Dictionary = {}  # tag -> multiplier (collected from ALL pools!)
 	var tags_to_add: Array[String] = []
 	var tags_to_remove: Array[String] = []
 
+	# First pass: collect pool-specific modifiers from this attack's pool only
 	if pool:
 		for i in range(pool.max_slots):
 			var item = pool.items[i]
@@ -165,15 +166,7 @@ func _build_attack(player, pool: ItemPool, attack_type: int):
 						if tag not in tags_to_remove:
 							tags_to_remove.append(tag)
 
-				# Tag-based damage multipliers (e.g., {"sound": 2.0} doubles sound damage)
-				# These apply to ANY attack with the tag, regardless of pool
-				if mods.has("tag_damage_multiply"):
-					var tag_mults = mods["tag_damage_multiply"]
-					for tag in tag_mults:
-						if tag_damage_multipliers.has(tag):
-							tag_damage_multipliers[tag] *= tag_mults[tag]
-						else:
-							tag_damage_multipliers[tag] = tag_mults[tag]
+				# NOTE: tag_damage_multiply is collected from ALL pools in second pass below
 
 				# Attack name override (last one wins - most recently equipped item names the attack)
 				if mods.has("attack_name"):
@@ -197,6 +190,27 @@ func _build_attack(player, pool: ItemPool, attack_type: int):
 	for tag in tags_to_add:
 		if tag not in attack.tags:
 			attack.tags.append(tag)
+
+	# Second pass: collect tag_damage_multiply from ALL pools
+	# This enables cross-pool synergies like Coach's Whistle (MIND) boosting
+	# Siren's Cords (BODY) when it adds the "sound" tag
+	if player:
+		var all_pools = [player.body_pool, player.mind_pool, player.null_pool]
+		for p in all_pools:
+			if not p:
+				continue
+			for i in range(p.max_slots):
+				var item = p.items[i]
+				var is_enabled = p.enabled[i]
+				if item and is_enabled:
+					var mods = item.get_attack_modifiers()
+					if mods.has("tag_damage_multiply"):
+						var tag_mults = mods["tag_damage_multiply"]
+						for tag in tag_mults:
+							if tag_damage_multipliers.has(tag):
+								tag_damage_multipliers[tag] *= tag_mults[tag]
+							else:
+								tag_damage_multipliers[tag] = tag_mults[tag]
 
 	# Apply modifiers to base stats
 	attack.damage = (attack.damage + damage_add) * damage_multiply
