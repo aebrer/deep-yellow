@@ -6,6 +6,7 @@ extends PlayerInputState
 
 const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
 const _ItemStatusAction = preload("res://scripts/actions/item_status_action.gd")
+const _SanityDamageAction = preload("res://scripts/actions/sanity_damage_action.gd")
 
 ## RT/Click hold-to-repeat system
 var rt_held: bool = false
@@ -195,6 +196,9 @@ func _update_action_preview() -> void:
 
 	# Add mana-blocked item effects
 	_add_item_mana_blocked_previews(actions)
+
+	# Add sanity damage preview (shows when next sanity drain will occur)
+	_add_sanity_damage_preview(actions)
 
 	# Emit preview signal
 	player.action_preview_changed.emit(actions)
@@ -403,6 +407,32 @@ func _add_item_mana_blocked_previews(actions: Array[Action]) -> void:
 				mana_after_regen
 			)
 			actions.append(mana_blocked)
+
+func _add_sanity_damage_preview(actions: Array[Action]) -> void:
+	"""Add sanity damage preview showing when next sanity drain will occur.
+
+	Shows:
+	- "🧠 Sanity Drain → -X NOW" when damage happens this turn
+	- "🧠 Sanity Drain -X in N turns" as warning
+	"""
+	if not player or not player.grid:
+		return
+
+	# Calculate sanity damage info
+	var damage_info = _SanityDamageAction.calculate_sanity_damage(player, player.grid)
+
+	# Only show if damage is coming within 4 turns (turns_until uses 1-indexed: 1=next turn, 4=in 4 turns)
+	if damage_info["turns_until"] > 4:
+		return
+
+	var sanity_action = _SanityDamageAction.new(
+		damage_info["damage"],
+		damage_info["turns_until"],
+		damage_info["enemy_count"],
+		damage_info["weighted_count"],
+		damage_info["corruption"]
+	)
+	actions.append(sanity_action)
 
 func _get_item_at_position(grid_pos: Vector2i) -> Dictionary:
 	"""Check if there's an item at the given grid position

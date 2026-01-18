@@ -474,10 +474,18 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 		if entity_entry.is_empty():
 			continue
 
-		# Calculate HP with corruption scaling
+		# Calculate HP and damage with corruption scaling (per 0.05 corruption)
+		# Formula: final = base * (1 + corruption_steps * scale)
+		# where corruption_steps = corruption / 0.05
+		var corruption_steps = corruption / 0.05
+
 		var base_hp = entity_entry.get("base_hp", 50.0)
 		var hp_scale = entity_entry.get("hp_scale", 0.0)
-		var final_hp = base_hp * (1.0 + corruption * hp_scale)
+		var final_hp = base_hp * (1.0 + corruption_steps * hp_scale)
+
+		var base_damage = entity_entry.get("base_damage", 5.0)
+		var damage_scale = entity_entry.get("damage_scale", 0.0)
+		var final_damage = base_damage * (1.0 + corruption_steps * damage_scale)
 
 		# Create WorldEntity
 		var entity = WorldEntity.new(
@@ -486,6 +494,7 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 			final_hp,
 			0  # spawn_turn
 		)
+		entity.attack_damage = final_damage
 
 		# Find subchunk and add entity
 		var local_pos = spawn_pos - chunk_world_pos

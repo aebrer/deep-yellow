@@ -7,8 +7,13 @@ class_name CorruptionTracker extends RefCounted
 ## Corruption increases as new chunks are explored and modifies:
 ## - Entity spawn counts: BASE_ENTITIES_PER_CHUNK + int(corruption * ENTITIES_PER_CORRUPTION)
 ## - Entity type distribution: threat_level affects spawn weight scaling
-## - Entity HP: base_hp * (1 + corruption * hp_scale)
+## - Entity HP: base_hp * (1 + (corruption / 0.05) * hp_scale)
+## - Entity damage: base_damage * (1 + (corruption / 0.05) * damage_scale)
 ## - Item spawn probabilities: via corruption_multiplier in ItemRarity
+##
+## Scaling uses 0.05 as the corruption step size. At corruption 0.25 (5 steps):
+##   - HP: 100 * (1 + 5 * 0.1) = 150 HP (with hp_scale=0.1)
+##   - Damage: 3 * (1 + 5 * 0.05) = 3.75 (with damage_scale=0.05)
 ##
 ## This creates escalating difficulty and forces the player to eventually
 ## find an exit before being overwhelmed.

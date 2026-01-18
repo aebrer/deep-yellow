@@ -294,7 +294,7 @@ func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 		Log.turn("Entered new chunk %s" % Vector2i(chunk_position.x, chunk_position.y))
 
 func _on_entity_died(entity: WorldEntity) -> void:
-	"""Called when an entity is killed - award EXP and track kill"""
+	"""Called when an entity is killed - award EXP, restore sanity, and track kill"""
 	if not stats:
 		return
 
@@ -304,8 +304,14 @@ func _on_entity_died(entity: WorldEntity) -> void:
 	# EXP reward based on entity max HP (no level scaling - kills become more frequent with corruption)
 	# Base: max_hp / 10, minimum 10 EXP
 	var exp_reward = max(10, int(entity.max_hp / 10.0))
-
 	stats.gain_exp(exp_reward)
+
+	# Restore sanity based on enemy threat level (same weights used for sanity damage)
+	# Killing enemies is the primary way to maintain sanity
+	var sanity_restore = _get_sanity_restore_for_entity(entity.entity_type)
+	if sanity_restore > 0:
+		stats.restore_sanity(sanity_restore)
+		Log.player("🧠 +%.1f sanity (killed %s)" % [sanity_restore, entity.entity_type])
 
 func _on_level_increased(old_level: int, new_level: int) -> void:
 	"""Called when Level increases - trigger perk selection"""
@@ -338,6 +344,36 @@ func _on_clearance_increased(old_level: int, new_level: int) -> void:
 	"""Called when Clearance increases (via perk choice) - sync with KnowledgeDB"""
 	KnowledgeDB.set_clearance_level(new_level)
 	Log.player("Player Clearance increased: %d → %d (knowledge unlocked)" % [old_level, new_level])
+
+## Threat level weights for sanity restore on kill (same as SanityDamageAction)
+const THREAT_WEIGHTS: Dictionary = {
+	0: 0,   # Gimel (environment) - no sanity restore
+	1: 1,   # Daleth (weak)
+	2: 3,   # Epsilon (moderate)
+	3: 5,   # Keter (dangerous)
+	4: 13,  # Aleph (elite)
+	5: 25,  # Boss/Apex
+}
+
+func _get_sanity_restore_for_entity(entity_type: String) -> float:
+	"""Get sanity restore amount for killing an entity based on its threat level.
+
+	Uses the same threat weight system as sanity damage - killing enemies
+	restores sanity equal to how much they would contribute to sanity pressure.
+
+	Args:
+		entity_type: Entity type ID (e.g., "bacteria_spawn")
+
+	Returns:
+		Sanity restore amount (threat weight as float)
+	"""
+	var threat_level = 1  # Default to Daleth (weak)
+	if EntityRegistry:
+		var info = EntityRegistry.get_info(entity_type, 0)
+		if info and info.has("threat_level"):
+			threat_level = info["threat_level"]
+
+	return float(THREAT_WEIGHTS.get(threat_level, 1))
 
 func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
 	"""Called when HP, Sanity, or Mana changes - update visual bars"""
