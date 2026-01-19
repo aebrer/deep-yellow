@@ -384,7 +384,7 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 					else:
 						Log.system("Pity timer: Forced item spawn after %d empty chunks" % chunks_without_items)
 
-		# Update pity timer
+		# Update pity timer (if forced spawn fails, counter keeps incrementing so we try again next chunk)
 		if spawned_items.is_empty():
 			chunks_without_items += 1
 		else:
@@ -933,10 +933,17 @@ func _get_border_key(pos_a: Vector2i, pos_b: Vector2i, level_id: int) -> String:
 	return "%d,%d|%d,%d|%d" % [min_pos.x, min_pos.y, max_pos.x, max_pos.y, level_id]
 
 
+## Border hallway configuration
+const HALLWAY_DEPTH := 10  # Tiles extending into each chunk (20 total across border)
+const HALLWAY_MARGIN := 10  # Distance from chunk corners to avoid edge issues
+const HALLWAY_WIDTH_SINGLE_CHANCE := 0.80  # 80% single tile width
+const HALLWAY_WIDTH_DOUBLE_CHANCE := 0.95  # 15% double (0.80-0.95), 5% triple (0.95-1.0)
+
+
 func _cut_single_border_hallway(chunk_a: Chunk, chunk_b: Chunk, pos_a: Vector2i, pos_b: Vector2i, level_id: int) -> void:
 	"""Cut a hallway across the border between two adjacent chunks.
 
-	Creates a straight hallway perpendicular to the border, extending 10 tiles
+	Creates a straight hallway perpendicular to the border, extending HALLWAY_DEPTH tiles
 	into each chunk (20 tiles total length). Position is deterministic based
 	on chunk coordinates and world seed.
 
@@ -951,12 +958,12 @@ func _cut_single_border_hallway(chunk_a: Chunk, chunk_b: Chunk, pos_a: Vector2i,
 	var rng := RandomNumberGenerator.new()
 	rng.seed = border_seed
 
-	# Determine hallway width (80% single, 15% double, 5% triple)
+	# Determine hallway width based on probability thresholds
 	var width_roll := rng.randf()
 	var hallway_width: int
-	if width_roll < 0.80:
+	if width_roll < HALLWAY_WIDTH_SINGLE_CHANCE:
 		hallway_width = 1
-	elif width_roll < 0.95:
+	elif width_roll < HALLWAY_WIDTH_DOUBLE_CHANCE:
 		hallway_width = 2
 	else:
 		hallway_width = 3
@@ -965,11 +972,7 @@ func _cut_single_border_hallway(chunk_a: Chunk, chunk_b: Chunk, pos_a: Vector2i,
 	var is_horizontal := pos_a.y == pos_b.y  # Same Y = horizontal border (chunks side by side)
 
 	# Pick random position along the border (avoid edges)
-	var margin := 10  # Stay away from chunk corners
-	var hallway_pos := rng.randi_range(margin, CHUNK_SIZE - margin - hallway_width)
-
-	# Calculate world positions for the hallway
-	const HALLWAY_DEPTH := 10  # 10 tiles into each chunk
+	var hallway_pos := rng.randi_range(HALLWAY_MARGIN, CHUNK_SIZE - HALLWAY_MARGIN - hallway_width)
 
 	# Determine which chunk is the "new" one (chunk_a) vs the "existing" one (chunk_b)
 	# chunk_a is always the newly generated chunk, chunk_b is the existing neighbor
