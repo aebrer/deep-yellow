@@ -276,6 +276,29 @@ func unload_chunk(chunk: Chunk) -> void:
 		entity_renderer.unload_chunk_entities(chunk)
 
 
+func update_tile(world_tile_pos: Vector2i, tile_type: int, ceiling_type: int = -1) -> void:
+	"""Update a single tile in the GridMap (used for post-generation modifications).
+
+	Args:
+		world_tile_pos: World tile position to update
+		tile_type: TileType for layer 0 (FLOOR or WALL)
+		ceiling_type: TileType for layer 1, or -1 to skip ceiling update
+	"""
+	var grid_pos := Vector3i(world_tile_pos.x, 0, world_tile_pos.y)
+
+	# Update floor/wall layer
+	if tile_type == TileType.WALL:
+		grid_map.set_cell_item(grid_pos, TileType.WALL)
+		walkable_cells.erase(world_tile_pos)
+	elif tile_type == TileType.FLOOR:
+		grid_map.set_cell_item(grid_pos, TileType.FLOOR)
+		walkable_cells[world_tile_pos] = true
+
+	# Update ceiling layer if requested
+	if ceiling_type >= 0:
+		grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_type)
+
+
 func _cache_wall_materials() -> void:
 	"""Cache wall materials from MeshLibrary for player position updates"""
 	wall_materials.clear()

@@ -22,15 +22,15 @@ enum Tier {
 }
 
 ## Base spawn probabilities per rarity (before corruption modifiers)
-## NOTE: Quadrupled for testing (original values in comments)
+## NOTE: 8× original values for balance testing (original values in comments)
 const BASE_SPAWN_PROBABILITY = {
 	Tier.DEBUG: 1.0,       # 100% - always spawns
-	Tier.COMMON: 0.20,     # 20% (was 5%)
-	Tier.UNCOMMON: 0.08,   # 8% (was 2%)
-	Tier.RARE: 0.02,       # 2% (was 0.5%)
-	Tier.EPIC: 0.004,      # 0.4% (was 0.1%)
-	Tier.LEGENDARY: 0.0004,   # 0.04% (was 0.01%)
-	Tier.ANOMALY: 0.00004     # 0.004% (was 0.001%)
+	Tier.COMMON: 0.40,     # 40% (original 5%)
+	Tier.UNCOMMON: 0.16,   # 16% (original 2%)
+	Tier.RARE: 0.04,       # 4% (original 0.5%)
+	Tier.EPIC: 0.008,      # 0.8% (original 0.1%)
+	Tier.LEGENDARY: 0.0008,   # 0.08% (original 0.01%)
+	Tier.ANOMALY: 0.00008     # 0.008% (original 0.001%)
 }
 
 ## Default corruption multipliers per rarity

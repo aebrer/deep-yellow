@@ -365,6 +365,35 @@ func spawn_all_items_for_debug(
 	return spawned_items
 
 
+func spawn_forced_item(
+	chunk,
+	turn_number: int,
+	available_items: Array[Item],
+	player = null
+) -> WorldItem:
+	"""Force spawn a single item (pity timer triggered).
+
+	Repeatedly attempts the normal spawn process until an item spawns.
+	Uses the same rarity/corruption logic as regular spawning.
+
+	Args:
+		chunk: Chunk to spawn item in
+		turn_number: Current turn number
+		available_items: All items that could spawn
+		player: Optional player reference for spawn rate bonuses
+
+	Returns:
+		WorldItem if spawned successfully, null otherwise
+	"""
+	# Retry normal spawn logic up to 20 times
+	for _attempt in range(20):
+		var spawned = spawn_items_for_chunk(chunk, turn_number, available_items, player)
+		if not spawned.is_empty():
+			return spawned[0]
+
+	return null
+
+
 func _find_nearby_valid_location(chunk, target: Vector2i, max_attempts: int = 20, occupied_positions: Array[Vector2i] = []) -> Vector2i:
 	"""Find a valid spawn location near the target position
 

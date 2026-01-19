@@ -45,6 +45,11 @@ var last_player_chunk: Vector3i = Vector3i(-999, -999, -999)  # Track chunk chan
 var hit_chunk_limit: bool = false  # Track if we've logged hitting the limit
 var was_generating: bool = false  # Track if chunks were queued (for completion signal)
 var initial_load_complete: bool = false  # Track if initial area load is done
+var cut_borders: Dictionary = {}  # "x1,y1|x2,y2|level" -> true (tracks which chunk borders have been cut)
+var chunks_without_items: int = 0  # Pity timer: consecutive chunks without items spawned
+
+# Pity timer configuration
+const PITY_TIMER_THRESHOLD := 5  # Force item spawn after this many empty chunks
 
 # Systems (will be initialized when available)
 var corruption_tracker: CorruptionTracker
@@ -331,6 +336,9 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 	# Store chunk in loaded_chunks
 	loaded_chunks[chunk_key] = chunk
 
+	# Cut hallways to adjacent chunks that already exist (ensures connectivity)
+	_cut_border_hallways(chunk, chunk_pos, level_id)
+
 	# Spawn items (separate pass after terrain generation, on main thread)
 	var level_config: LevelConfig = level_configs.get(level_id, null)
 
@@ -346,6 +354,9 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 				level_config.permitted_items
 			)
 		else:
+			# Check if pity timer triggered (force spawn after PITY_TIMER_THRESHOLD empty chunks)
+			var force_spawn := chunks_without_items >= PITY_TIMER_THRESHOLD
+
 			# Normal spawning (with player for spawn rate bonuses)
 			var player = _find_player()
 			spawned_items = item_spawner.spawn_items_for_chunk(
@@ -354,6 +365,24 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 				level_config.permitted_items,
 				player
 			)
+
+			# If pity timer triggered and still no items, force spawn one
+			if force_spawn and spawned_items.is_empty():
+				var forced_item = item_spawner.spawn_forced_item(
+					chunk,
+					0,
+					level_config.permitted_items,
+					player
+				)
+				if forced_item:
+					spawned_items.append(forced_item)
+					Log.system("Pity timer: Forced item spawn after %d empty chunks" % chunks_without_items)
+
+		# Update pity timer
+		if spawned_items.is_empty():
+			chunks_without_items += 1
+		else:
+			chunks_without_items = 0
 
 		# Store spawned items in subchunks for persistence
 		for world_item in spawned_items:
@@ -833,6 +862,218 @@ func tile_to_local(tile_pos: Vector2i) -> Vector2i:
 	)
 
 # ============================================================================
+# BORDER HALLWAY CUTTING
+# ============================================================================
+
+func _cut_border_hallways(new_chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
+	"""Cut hallways between newly generated chunk and existing adjacent chunks.
+
+	When a chunk is generated, this function checks all 4 cardinal neighbors.
+	For each neighbor that already exists AND hasn't had a hallway cut yet,
+	it cuts a straight hallway across the border (10 tiles on each side = 20 total).
+
+	This ensures connectivity between all adjacent chunks while avoiding
+	duplicate cuts (the border key tracks which borders have been processed).
+	"""
+	# Cardinal directions: right, left, down, up
+	var directions := [
+		Vector2i(1, 0),   # East neighbor
+		Vector2i(-1, 0),  # West neighbor
+		Vector2i(0, 1),   # South neighbor
+		Vector2i(0, -1),  # North neighbor
+	]
+
+	for dir in directions:
+		var neighbor_pos: Vector2i = chunk_pos + dir
+		var neighbor_key: Vector3i = Vector3i(neighbor_pos.x, neighbor_pos.y, level_id)
+
+		# Skip if neighbor doesn't exist yet
+		if neighbor_key not in loaded_chunks:
+			continue
+
+		# Create canonical border key (sorted so A|B == B|A)
+		var border_key := _get_border_key(chunk_pos, neighbor_pos, level_id)
+
+		# Skip if this border was already cut
+		if border_key in cut_borders:
+			continue
+
+		# Mark border as cut
+		cut_borders[border_key] = true
+
+		# Get neighbor chunk
+		var neighbor_chunk: Chunk = loaded_chunks[neighbor_key]
+
+		# Cut the hallway
+		_cut_single_border_hallway(new_chunk, neighbor_chunk, chunk_pos, neighbor_pos, level_id)
+
+
+func _get_border_key(pos_a: Vector2i, pos_b: Vector2i, level_id: int) -> String:
+	"""Create a canonical key for a border between two chunks.
+
+	Sorts positions so the same border always produces the same key,
+	regardless of which chunk was generated first.
+	"""
+	var min_pos: Vector2i
+	var max_pos: Vector2i
+
+	if pos_a.x < pos_b.x or (pos_a.x == pos_b.x and pos_a.y < pos_b.y):
+		min_pos = pos_a
+		max_pos = pos_b
+	else:
+		min_pos = pos_b
+		max_pos = pos_a
+
+	return "%d,%d|%d,%d|%d" % [min_pos.x, min_pos.y, max_pos.x, max_pos.y, level_id]
+
+
+func _cut_single_border_hallway(chunk_a: Chunk, chunk_b: Chunk, pos_a: Vector2i, pos_b: Vector2i, level_id: int) -> void:
+	"""Cut a hallway across the border between two adjacent chunks.
+
+	Creates a straight hallway perpendicular to the border, extending 10 tiles
+	into each chunk (20 tiles total length). Position is deterministic based
+	on chunk coordinates and world seed.
+
+	Hallway width: 80% single, 15% double, 5% triple
+	"""
+	# Create deterministic RNG for this border
+	var border_seed := hash(Vector3i(
+		mini(pos_a.x, pos_b.x) * 1000 + maxi(pos_a.x, pos_b.x),
+		mini(pos_a.y, pos_b.y) * 1000 + maxi(pos_a.y, pos_b.y),
+		world_seed + level_id
+	))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = border_seed
+
+	# Determine hallway width (80% single, 15% double, 5% triple)
+	var width_roll := rng.randf()
+	var hallway_width: int
+	if width_roll < 0.80:
+		hallway_width = 1
+	elif width_roll < 0.95:
+		hallway_width = 2
+	else:
+		hallway_width = 3
+
+	# Determine if border is horizontal (east/west) or vertical (north/south)
+	var is_horizontal := pos_a.y == pos_b.y  # Same Y = horizontal border (chunks side by side)
+
+	# Pick random position along the border (avoid edges)
+	var margin := 10  # Stay away from chunk corners
+	var hallway_pos := rng.randi_range(margin, CHUNK_SIZE - margin - hallway_width)
+
+	# Calculate world positions for the hallway
+	const HALLWAY_DEPTH := 10  # 10 tiles into each chunk
+
+	# Determine which chunk is the "new" one (chunk_a) vs the "existing" one (chunk_b)
+	# chunk_a is always the newly generated chunk, chunk_b is the existing neighbor
+	# We need to update GridMap for chunk_b since it's already rendered
+
+	if is_horizontal:
+		# Horizontal border (chunks are east/west of each other)
+		# Hallway runs along X axis, cuts through Y at border
+		var left_chunk: Chunk
+		var right_chunk: Chunk
+		var left_needs_gridmap_update: bool
+		var right_needs_gridmap_update: bool
+
+		if pos_a.x < pos_b.x:
+			left_chunk = chunk_a
+			right_chunk = chunk_b
+			left_needs_gridmap_update = false  # chunk_a is new, not rendered yet
+			right_needs_gridmap_update = true   # chunk_b exists, already rendered
+		else:
+			left_chunk = chunk_b
+			right_chunk = chunk_a
+			left_needs_gridmap_update = true    # chunk_b exists, already rendered
+			right_needs_gridmap_update = false  # chunk_a is new, not rendered yet
+
+		# Calculate world Y position for hallway
+		var world_y_base: int = left_chunk.position.y * CHUNK_SIZE + hallway_pos
+
+		# Cut into left chunk (last HALLWAY_DEPTH columns)
+		var left_world_x_start: int = (left_chunk.position.x + 1) * CHUNK_SIZE - HALLWAY_DEPTH
+		for x in range(left_world_x_start, (left_chunk.position.x + 1) * CHUNK_SIZE):
+			for w in range(hallway_width):
+				var world_pos := Vector2i(x, world_y_base + w)
+				_set_tile_floor_with_ceiling(left_chunk, world_pos, left_needs_gridmap_update)
+
+		# Cut into right chunk (first HALLWAY_DEPTH columns)
+		var right_world_x_start: int = right_chunk.position.x * CHUNK_SIZE
+		for x in range(right_world_x_start, right_world_x_start + HALLWAY_DEPTH):
+			for w in range(hallway_width):
+				var world_pos := Vector2i(x, world_y_base + w)
+				_set_tile_floor_with_ceiling(right_chunk, world_pos, right_needs_gridmap_update)
+
+	else:
+		# Vertical border (chunks are north/south of each other)
+		# Hallway runs along Y axis, cuts through X at border
+		var top_chunk: Chunk
+		var bottom_chunk: Chunk
+		var top_needs_gridmap_update: bool
+		var bottom_needs_gridmap_update: bool
+
+		if pos_a.y < pos_b.y:
+			top_chunk = chunk_a
+			bottom_chunk = chunk_b
+			top_needs_gridmap_update = false   # chunk_a is new, not rendered yet
+			bottom_needs_gridmap_update = true  # chunk_b exists, already rendered
+		else:
+			top_chunk = chunk_b
+			bottom_chunk = chunk_a
+			top_needs_gridmap_update = true     # chunk_b exists, already rendered
+			bottom_needs_gridmap_update = false # chunk_a is new, not rendered yet
+
+		# Calculate world X position for hallway
+		var world_x_base: int = top_chunk.position.x * CHUNK_SIZE + hallway_pos
+
+		# Cut into top chunk (last HALLWAY_DEPTH rows)
+		var top_world_y_start: int = (top_chunk.position.y + 1) * CHUNK_SIZE - HALLWAY_DEPTH
+		for y in range(top_world_y_start, (top_chunk.position.y + 1) * CHUNK_SIZE):
+			for w in range(hallway_width):
+				var world_pos := Vector2i(world_x_base + w, y)
+				_set_tile_floor_with_ceiling(top_chunk, world_pos, top_needs_gridmap_update)
+
+		# Cut into bottom chunk (first HALLWAY_DEPTH rows)
+		var bottom_world_y_start: int = bottom_chunk.position.y * CHUNK_SIZE
+		for y in range(bottom_world_y_start, bottom_world_y_start + HALLWAY_DEPTH):
+			for w in range(hallway_width):
+				var world_pos := Vector2i(world_x_base + w, y)
+				_set_tile_floor_with_ceiling(bottom_chunk, world_pos, bottom_needs_gridmap_update)
+
+	Log.system("Cut border hallway between chunks %s and %s (width=%d, pos=%d, horizontal=%s)" % [
+		pos_a, pos_b, hallway_width, hallway_pos, is_horizontal
+	])
+
+
+func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_gridmap: bool = false) -> void:
+	"""Set a tile to floor and add ceiling above it.
+
+	Args:
+		chunk: The chunk to modify
+		world_pos: World tile position
+		update_gridmap: If true, also update the GridMap visuals (for already-loaded chunks)
+	"""
+	# SubChunk tile types (for chunk data)
+	const SUBCHUNK_FLOOR := 0  # SubChunk.TileType.FLOOR
+	const SUBCHUNK_CEILING := 4  # SubChunk.TileType.CEILING
+
+	# Grid3D tile types (for GridMap visuals) - these are DIFFERENT!
+	const GRID_FLOOR := 0  # Grid3D.TileType.FLOOR
+	const GRID_CEILING := 2  # Grid3D.TileType.CEILING
+
+	chunk.set_tile(world_pos, SUBCHUNK_FLOOR)
+	chunk.set_tile_at_layer(world_pos, 1, SUBCHUNK_CEILING)
+
+	# Update GridMap visuals if chunk is already rendered
+	if update_gridmap:
+		if grid_3d:
+			grid_3d.update_tile(world_pos, GRID_FLOOR, GRID_CEILING)
+		else:
+			Log.warn(Log.Category.GRID, "Cannot update GridMap - grid_3d is null")
+
+
+# ============================================================================
 # SCENE TREE QUERIES
 # ============================================================================
 
@@ -981,6 +1222,8 @@ func start_new_run(new_seed: int = -1) -> void:
 	loaded_chunks.clear()
 	generating_chunks.clear()
 	visited_chunks.clear()
+	cut_borders.clear()  # Reset border cut tracking for new run
+	chunks_without_items = 0  # Reset pity timer for new run
 	last_player_chunk = Vector3i(-999, -999, -999)
 	initial_load_complete = false  # Reset for new run
 	corruption_tracker.reset_all()
