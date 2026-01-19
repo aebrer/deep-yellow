@@ -138,6 +138,23 @@ func _is_novel(key: String) -> bool:
 	var clearances: Array = examined_at_clearance[key]
 	return not (clearance_level in clearances)
 
+func is_item_novel(item_id: String) -> bool:
+	"""Check if an item has new XP to award (public API for UI)
+
+	Returns true if examining this item would award XP (first time at current clearance).
+	Used by inventory UI to show [NEW!] indicator.
+
+	Args:
+		item_id: The item's unique identifier
+
+	Returns:
+		true if item is novel and has XP to award, false otherwise
+	"""
+	if item_id.is_empty():
+		return false
+	var key = "item:%s" % item_id
+	return _is_novel(key)
+
 func _mark_examined(key: String) -> void:
 	"""Mark subject as examined at current Clearance level"""
 	if not examined_at_clearance.has(key):

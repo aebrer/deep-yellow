@@ -180,9 +180,10 @@ func _update_slot(slot: HBoxContainer, pool: ItemPool, slot_index: int) -> void:
 		# Set icon texture from item
 		icon.texture = item.ground_sprite
 
-		# Set label text
+		# Set label text with [NEW!] indicator if item has XP to award
 		var enabled_text = "[ON]" if pool.enabled[slot_index] else "[OFF]"
-		label.text = "%s (Lvl %d) %s" % [item.item_name, item.level, enabled_text]
+		var new_indicator = "[NEW!] " if KnowledgeDB.is_item_novel(item.item_id) else ""
+		label.text = "%s%s (Lvl %d) %s" % [new_indicator, item.item_name, item.level, enabled_text]
 
 		# Store tooltip with clearance-based description
 		var clearance = player.stats.clearance_level if player.stats else 0
@@ -213,6 +214,34 @@ func _get_slot_containers(pool_type: Item.PoolType) -> Array[HBoxContainer]:
 		Item.PoolType.NULL:
 			slots = [null_slot_0, null_slot_1, null_slot_2]
 	return slots
+
+func _get_slot_info(slot: Control) -> Dictionary:
+	"""Get pool type and slot index for a slot container
+
+	Returns: {pool_type: Item.PoolType, slot_index: int} or empty dict if not found
+	"""
+	# Check BODY slots
+	if slot == body_slot_0:
+		return {pool_type = Item.PoolType.BODY, slot_index = 0}
+	if slot == body_slot_1:
+		return {pool_type = Item.PoolType.BODY, slot_index = 1}
+	if slot == body_slot_2:
+		return {pool_type = Item.PoolType.BODY, slot_index = 2}
+	# Check MIND slots
+	if slot == mind_slot_0:
+		return {pool_type = Item.PoolType.MIND, slot_index = 0}
+	if slot == mind_slot_1:
+		return {pool_type = Item.PoolType.MIND, slot_index = 1}
+	if slot == mind_slot_2:
+		return {pool_type = Item.PoolType.MIND, slot_index = 2}
+	# Check NULL slots
+	if slot == null_slot_0:
+		return {pool_type = Item.PoolType.NULL, slot_index = 0}
+	if slot == null_slot_1:
+		return {pool_type = Item.PoolType.NULL, slot_index = 1}
+	if slot == null_slot_2:
+		return {pool_type = Item.PoolType.NULL, slot_index = 2}
+	return {}
 
 # ============================================================================
 # SIGNAL HANDLERS
@@ -420,10 +449,19 @@ func _highlight_slot(slot: Control) -> void:
 		# Trigger first-look EXP bonus (same as examining item in world)
 		if item:
 			var rarity_name = ItemRarity.get_rarity_name(item.rarity)
+			var was_novel = KnowledgeDB.is_item_novel(item.item_id)
 			KnowledgeDB.examine_item(item.item_id, rarity_name)
+			# If item was novel, refresh the label to remove [NEW!] indicator
+			if was_novel:
+				var slot_info = _get_slot_info(slot)
+				if not slot_info.is_empty():
+					var pool = _get_pool(slot_info.pool_type)
+					if pool and slot_info.slot_index < pool.enabled.size():
+						var enabled_text = "[ON]" if pool.enabled[slot_info.slot_index] else "[OFF]"
+						label.text = "%s (Lvl %d) %s" % [item.item_name, item.level, enabled_text]
 
 		# Directly set examination panel content with item info
-		var item_name = label.text.split(" (")[0]  # Extract just the item name
+		var item_name = item.item_name if item else label.text.split(" (")[0]
 		examination_panel.header_label.text = "ITEM INFO"
 		examination_panel.header_label.visible = true
 		examination_panel.entity_name_label.text = item_name
