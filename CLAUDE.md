@@ -282,33 +282,6 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - Update on player movement
 - **Performance**: Scalability built in from start, not bolted on later
 
----
-
-## 3. Important Documentation Locations
-
-### Design Documents
-
-- **`/home/drew/projects/backrooms_power_crawl/docs/DESIGN.md`**
-  - Core game concept and vision
-  - Inspirations: Caves of Qud, Vampire Survivors, SCP/Backrooms
-  - Mission types (Horde vs Hunt)
-  - Progression philosophy (knowledge-based, no meta-progression)
-  - Control scheme and design philosophy
-  - Open questions and decisions still being made
-
-- **`/home/drew/projects/backrooms_power_crawl/docs/ARCHITECTURE.md`**
-  - Technical architecture and patterns
-  - **Top section (✅ Implemented)**: Current working systems
-  - **Bottom section (🔮 Planned)**: Future systems design
-  - File structure and organization
-  - Code examples and API documentation
-  - Update this when implementing new systems
-
-- **`/home/drew/projects/backrooms_power_crawl/README.md`**
-  - Project overview and setup
-  - High-level feature list
-  - Development philosophy
-  - Quick reference for new contributors
 
 ### Key Files and Their Purposes
 
@@ -345,19 +318,6 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 ---
 
 ## 4. User Preferences & Context
-
-### User Background
-
-**Python + Generative Art Expert**
-- Comfortable with OOP, functional patterns, clean architecture
-- Understands abstractions, design patterns, separation of concerns
-- **Caveat**: New to game development and Godot specifically
-
-**What This Means for You**
-- Use Python analogies when helpful ("Autoload is like a module-level singleton")
-- Don't over-explain OOP concepts, user gets those
-- DO explain game-dev-specific concepts (scene trees, nodes, signals)
-- DO explain Godot-specific patterns (resources, autoloads, exported vars)
 
 ### User's Ethos
 
@@ -458,29 +418,6 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - No list comprehensions - use loops or `map()`/`filter()` with lambdas
 - Tabs for indentation (unlike Python where spaces are standard)
 
-### Don't Skip Architecture Updates
-
-**Keep ARCHITECTURE.md current**
-- When implementing systems, update the "✅ Implemented" section
-- Move planned features from "🔮 Planned" to "✅ Implemented"
-- Keep file structure diagrams accurate
-- Document architectural decisions and rationale
-
-### Don't Add Features Not in Design Docs
-
-**Stick to the vision**
-- DESIGN.md defines the game's scope and philosophy
-- Don't add features that contradict design goals
-- If suggesting new features, reference design docs
-- Ask user before deviating from documented plans
-
-### Don't Forget Controller-First
-
-**Keyboard is fallback, not primary**
-- Every feature must work with controller
-- Test scenarios with controller in mind
-- Input mappings must have BOTH controller and keyboard
-- If designing UI, design for controller navigation first
 
 ### CRITICAL: Input Parity Between Control Schemes
 
@@ -900,47 +837,6 @@ source venv/bin/activate
 
 These scripts are part of the project's tooling infrastructure and should be committed to version control.
 
----
-
-### Stripping MeshLibrary Preview Images
-
-**Problem**: Godot MeshLibrary files (`.tres`) contain embedded preview thumbnails as `PackedByteArray` data, making them enormous:
-- With previews: ~99KB (99,117 tokens - **EXCEEDS Read tool's context window limit!**)
-- Without previews: ~3KB (readable by Claude)
-
-**This is about context window management, not version control!** Claude instances cannot read files that exceed ~30,000 tokens. The preview images make the file literally unreadable.
-
-**Solution**: `_claude_scripts/strip_mesh_library_previews.py`
-
-**What it does**:
-1. Removes `[sub_resource type="Image"]` blocks (embedded byte arrays)
-2. Removes `[sub_resource type="ImageTexture"]` blocks (reference images)
-3. Removes `item/N/preview` assignments
-4. Cleans up extra blank lines
-5. Writes back to `assets/grid_mesh_library.tres`
-
-**When to use**:
-- **When Claude needs to read the file** - Run this FIRST before asking Claude to edit grid_mesh_library.tres
-- After editing the MeshLibrary in Godot Editor (which regenerates previews and blows up file size again)
-- Anytime the file exceeds ~30,000 tokens and can't be read
-
-**How to run**:
-```bash
-# From project root:
-python3 _claude_scripts/strip_mesh_library_previews.py
-```
-
-**Output**:
-```
-✓ Stripped preview images from assets/grid_mesh_library.tres
-  Original size: 99,117 bytes
-  New size: 3,456 bytes
-  Saved: 95,661 bytes (96.5%)
-```
-
-**Note**: Godot Editor will regenerate preview images the next time you open the MeshLibrary, so you'll need to re-run this script before each commit if you've edited the file in Godot.
-
----
 
 ### Generating Textures with Sub-Agent Virtuous Cycle
 
@@ -1232,48 +1128,6 @@ python generate.py  # Outputs tileable PNG
 
 ---
 
-### Strategy for Large Godot Resource Files
-
-**General Pattern for .tres/.tscn files that blow up Claude's context window**:
-
-1. **Comments don't work** - Godot Editor strips comments (`;`) on save, so they're unreliable for marking sections
-
-2. **Externalize when possible**:
-   - Use `[ext_resource]` instead of `[sub_resource]` when you can
-   - Example: We externalized PSX materials to separate `.tres` files
-   - This keeps the main file small enough for Claude to read
-   - Makes changes easier to understand and edit
-
-3. **Strip generated data**:
-   - Preview images, thumbnails, and other generated content bloat files
-   - Use Python scripts like `strip_mesh_library_previews.py` to remove them
-   - Godot will regenerate them when needed
-   - **Primary goal**: Keep files under ~30,000 tokens so Claude can read them
-
-4. **Direct text editing is preferred**:
-   - Godot resource files are text-based - take advantage!
-   - Use Python scripts with regex for surgical edits
-   - Avoid "open in editor → manual changes → export" workflows when you can automate
-   - But if file is too large, you MUST strip it first or Claude can't read it
-
-5. **Future consideration: Programmatic generation**:
-   - For very complex resources, consider generating them via EditorScript
-   - Store source files in git, generate the .tres at build time
-   - See planning session on MeshLibrary generation for full strategy
-
-**Example workflow for Claude working with large files**:
-```bash
-# BEFORE asking Claude to edit a large .tres file:
-python3 _claude_scripts/strip_mesh_library_previews.py
-
-# Now Claude can actually read it
-# Claude edits the file...
-
-# Later: Godot regenerates previews when you open the file
-# Next time Claude needs to edit it, strip again
-```
-
----
 
 ## 11. Deploying to itch.io with Butler
 
@@ -1327,8 +1181,6 @@ build/
 │   └── [other web files]
 └── *.tar.gz           # Archives for GitHub releases (separate workflow)
 ```
-
-**Note**: The current workflow has flat files + tar.gz archives. For butler, we need platform subdirectories. User handles Godot exports.
 
 ### Push Commands
 
@@ -1398,16 +1250,8 @@ VERSION=$(git describe --tags --abbrev=0)
 
 ## Final Notes
 
-**This project is a learning journey** - user is learning game dev, you're helping them build good habits and understanding. Take time to explain, be patient with questions, and respect the deliberate pace.
-
 **Quality over speed** - no deadlines, no rush. Each system should be thoughtful, tested, and documented before moving on.
 
 **Test before commit** - seriously, this is the most important lesson. User will tell you when they're ready to commit.
 
-**Stay true to the vision** - read DESIGN.md to understand the game's goals. Don't suggest features that contradict the core vision.
-
-Good luck, future Claude! This is a fascinating project with a thoughtful developer. Take your time, explain well, and build something great together.
-
----
-
-**Generated**: 2025-11-08 by Claude Code reviewing initial architecture implementation session
+**Investigate the truth!** - the codebase itself is the best source of truth in the repo. Before major changes, make sure you read all the files you need to, in full, to get as much appropriate context as possible prior to planning.
