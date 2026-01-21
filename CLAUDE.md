@@ -1369,21 +1369,30 @@ Preview what would be pushed without actually uploading:
 butler push build/windows aebrer/backrooms-power-crawl:windows --dry-run
 ```
 
-### Full Release Workflow (Future)
+### Full Publish Workflow
 
-When doing a release, the workflow would be:
+**When the user says "let's publish", this is what they mean:**
 
-1. **User exports builds** from Godot to `build/windows/`, `build/linux/`, `build/web/`
-2. **Create git tag**: eg. `git tag v0.6.0`
-3. **Push to itch.io**:
-   ```bash
-   VERSION=$(git describe --tags --abbrev=0)
-   butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
-   butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
-   butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
-   ```
-4. **Create GitHub release** with tar.gz archives (existing workflow)
-5. **Post devlog on itch.io** (manual - butler can't do this - user will copy release notes MD)
+```bash
+# 1. Export all platforms (headless - Claude can run these)
+godot --headless --export-release "Linux"
+godot --headless --export-release "Windows Desktop"
+godot --headless --export-release "Web"
+
+# 2. Push to itch.io with version from git tag
+VERSION=$(git describe --tags --abbrev=0)
+/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+
+# 3. Verify uploads
+/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+```
+
+**Additional steps (if doing a full release):**
+- Create git tag first: `git tag v0.6.0`
+- Create GitHub release with tar.gz archives (existing workflow)
+- Post devlog on itch.io (manual - butler can't do this)
 
 ---
 
