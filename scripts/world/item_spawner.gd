@@ -373,7 +373,11 @@ func spawn_forced_item(
 ) -> WorldItem:
 	"""Force spawn a single item (pity timer triggered).
 
-	Directly spawns a random common item without RNG rolls.
+	CRITICAL: This MUST use the EXACT SAME rarity probabilities as natural spawns!
+	DO NOT filter to common-only or modify the rarity distribution in any way.
+	The pity timer guarantees A spawn happens, but the rarity should still be
+	rolled using the same corruption-modified probabilities as normal spawns.
+
 	This avoids the memory overhead of calling spawn_items_for_chunk()
 	repeatedly (which creates many temporary arrays and deep-copied Resources).
 
@@ -381,24 +385,79 @@ func spawn_forced_item(
 		chunk: Chunk to spawn item in
 		turn_number: Current turn number
 		available_items: All items that could spawn
-		player: Optional player reference (unused, kept for API consistency)
+		player: Optional player reference for spawn rate bonuses
 
 	Returns:
 		WorldItem if spawned successfully, null otherwise
 	"""
-	# Filter to common items (most likely to exist, guaranteed pity spawn)
-	var common_items: Array[Item] = []
-	for item in available_items:
-		if item.rarity == ItemRarity.Tier.COMMON:
-			common_items.append(item)
-
-	# Fallback to any item if no common items available
-	var item_pool = common_items if not common_items.is_empty() else available_items
-	if item_pool.is_empty():
+	if available_items.is_empty():
 		return null
 
-	# Pick a random item from pool
-	var item = item_pool.pick_random()
+	# Get current corruption level for this chunk's level
+	var corruption = corruption_tracker.get_corruption(chunk.level_id)
+
+	# Roll for rarity using the SAME probabilities as natural spawns
+	# (corruption-modified base probabilities, highest to lowest)
+	var rarity_order = [
+		ItemRarity.Tier.DEBUG,
+		ItemRarity.Tier.ANOMALY,
+		ItemRarity.Tier.LEGENDARY,
+		ItemRarity.Tier.EPIC,
+		ItemRarity.Tier.RARE,
+		ItemRarity.Tier.UNCOMMON,
+		ItemRarity.Tier.COMMON
+	]
+
+	var selected_rarity: ItemRarity.Tier = ItemRarity.Tier.COMMON  # Fallback
+	var selected_items: Array[Item] = []
+
+	# Get item spawn rate bonus from player's equipped items
+	var spawn_rate_bonus = _get_player_spawn_rate_bonus(player)
+
+	# Build weighted pool based on rarity probabilities (same as natural spawns)
+	# Each rarity's weight = its corruption-modified spawn probability
+	var weighted_pool: Array[Dictionary] = []  # [{item: Item, weight: float}, ...]
+	var total_weight: float = 0.0
+
+	for rarity in rarity_order:
+		var items_of_rarity = _filter_by_rarity(available_items, rarity)
+		if items_of_rarity.is_empty():
+			continue
+
+		# Calculate spawn probability for this rarity (SAME formula as natural spawns)
+		var base_prob = ItemRarity.get_base_probability(rarity)
+		var corruption_mult = ItemRarity.get_corruption_multiplier(rarity)
+		var rarity_weight = corruption_tracker.calculate_spawn_probability(
+			base_prob,
+			corruption_mult,
+			corruption
+		)
+
+		# Apply item spawn rate bonus from equipped items (additive)
+		rarity_weight = rarity_weight + spawn_rate_bonus
+
+		# Add all items of this rarity with equal share of the rarity's weight
+		var per_item_weight = rarity_weight / items_of_rarity.size()
+		for item in items_of_rarity:
+			weighted_pool.append({"item": item, "weight": per_item_weight})
+			total_weight += per_item_weight
+
+	# Weighted random selection - pity timer guarantees something spawns
+	if total_weight > 0:
+		var roll = randf() * total_weight
+		var cumulative: float = 0.0
+		for entry in weighted_pool:
+			cumulative += entry.weight
+			if roll <= cumulative:
+				selected_items = [entry.item]
+				selected_rarity = entry.item.rarity
+				break
+
+	if selected_items.is_empty():
+		return null
+
+	# Pick a random item from the selected rarity pool
+	var item = selected_items.pick_random()
 
 	# Find spawn location (only try once - if chunk has no valid spots, fail gracefully)
 	var spawn_pos = _find_spawn_location(chunk, item)
@@ -409,7 +468,7 @@ func spawn_forced_item(
 	return WorldItem.new(
 		item.duplicate_item(),
 		spawn_pos,
-		item.rarity,
+		selected_rarity,
 		turn_number
 	)
 
