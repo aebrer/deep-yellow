@@ -2,7 +2,7 @@
 
 **Project**: Backrooms Power Crawl - Turn-based Roguelike in Godot 4.x
 **Developer**: Drew Brereton (aebrer) - Python/generative art background, new to game dev
-**Last Updated**: 2025-12-07 (Updated for CachyOS native environment - headless Godot testing now possible!)
+**Last Updated**: 2026-01-21 (Added butler/itch.io deployment instructions)
 
 ---
 
@@ -1272,6 +1272,118 @@ python3 _claude_scripts/strip_mesh_library_previews.py
 # Later: Godot regenerates previews when you open the file
 # Next time Claude needs to edit it, strip again
 ```
+
+---
+
+## 11. Deploying to itch.io with Butler
+
+### Overview
+
+**Butler** is itch.io's command-line tool for uploading game builds. It's already installed, authorized, and in $PATH.
+
+**Key benefits over manual upload:**
+- Delta compression - only uploads changed files (fast subsequent pushes)
+- Version tracking
+- Can be automated in CI/CD pipelines
+
+**Butler limitations:**
+- Upload/deploy only - cannot post comments, create devlogs, or interact with community features
+- For community interaction, use the itch.io web interface
+
+### Project Configuration
+
+- **itch.io username**: `aebrer`
+- **Game slug**: `backrooms-power-crawl`
+- **Platforms**: Windows, Linux, Web (HTML5 - already marked as playable in browser)
+
+### Channel Names
+
+Butler uses "channels" to organize different platform builds:
+
+| Platform | Channel Name | Auto-detected |
+|----------|--------------|---------------|
+| Windows  | `windows`    | ✅ Yes        |
+| Linux    | `linux`      | ✅ Yes        |
+| Web      | `html5`      | ✅ Yes        |
+
+### Build Directory Structure
+
+Butler pushes **directories**, not archives. The build folder should be organized like this:
+
+```
+build/
+├── windows/           # Windows export (directory)
+│   ├── bpc.exe
+│   ├── bpc.pck
+│   └── [godot runtime files]
+├── linux/             # Linux export (directory)
+│   ├── bpc_linux.x86_64
+│   ├── bpc_linux.pck
+│   └── [godot runtime files]
+├── web/               # Web export (directory)
+│   ├── index.html     # MUST be at root level
+│   ├── bpc.wasm
+│   ├── bpc.js
+│   └── [other web files]
+└── *.tar.gz           # Archives for GitHub releases (separate workflow)
+```
+
+**Note**: The current workflow has flat files + tar.gz archives. For butler, we need platform subdirectories. User handles Godot exports.
+
+### Push Commands
+
+**Butler location**: `/home/drew/.local/bin/butler`
+
+```bash
+# Get version from git tag (recommended)
+VERSION=$(git describe --tags --abbrev=0)
+
+# Push all platforms (from project root)
+/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+
+# Check status
+/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+```
+
+### Versioning
+
+- Use `--userversion` to set a human-readable version string
+- Recommended: Use git tags (`v0.5.4`) for consistency with GitHub releases
+- Without `--userversion`, butler auto-generates incrementing integers
+- Version strings are display-only - builds are ordered by upload time, not version parsing
+
+### Common Mistakes to Avoid
+
+- ❌ Pushing zip/tar.gz files directly (butler handles compression internally)
+- ❌ Nesting `index.html` in subdirectories for web builds (must be at root of pushed directory)
+- ❌ Including debug symbols or build artifacts
+- ❌ Forgetting `--userversion` (results in ugly "Build 1", "Build 2" versions)
+
+### Dry Run
+
+Preview what would be pushed without actually uploading:
+
+```bash
+butler push build/windows aebrer/backrooms-power-crawl:windows --dry-run
+```
+
+### Full Release Workflow (Future)
+
+When doing a release, the workflow would be:
+
+1. **User exports builds** from Godot to `build/windows/`, `build/linux/`, `build/web/`
+2. **Create git tag**: eg. `git tag v0.6.0`
+3. **Push to itch.io**:
+   ```bash
+   VERSION=$(git describe --tags --abbrev=0)
+   butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
+   butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
+   butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+   ```
+4. **Create GitHub release** with tar.gz archives (existing workflow)
+5. **Post devlog on itch.io** (manual - butler can't do this - user will copy release notes MD)
 
 ---
 
