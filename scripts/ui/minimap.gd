@@ -101,6 +101,12 @@ func _ready() -> void:
 		call_deferred("_update_texture_scale")
 
 
+func _exit_tree() -> void:
+	# Disconnect autoload signals to prevent memory leaks on scene reload
+	if ChunkManager and ChunkManager.initial_load_completed.is_connected(_on_initial_load_completed):
+		ChunkManager.initial_load_completed.disconnect(_on_initial_load_completed)
+
+
 func _process(_delta: float) -> void:
 	# Update camera rotation every frame (for north orientation)
 	if player:

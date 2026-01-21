@@ -25,6 +25,17 @@ var grid: Node = null
 func _ready() -> void:
 	pass
 
+
+## Reset the pathfinding graph (for new run/scene reload)
+func reset() -> void:
+	"""Clear all pathfinding data for a fresh start"""
+	astar.clear()
+	pos_to_id.clear()
+	id_to_pos.clear()
+	next_id = 0
+	grid = null
+
+
 ## Build navigation graph from walkable tiles in a chunk
 func build_navigation_graph(chunk_positions: Array, grid_ref: Node) -> void:
 	"""Build AStar2D graph from walkable tiles in specified chunks

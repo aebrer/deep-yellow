@@ -35,3 +35,12 @@ func _on_load_progress(loaded_count: int, total_count: int) -> void:
 func _on_load_completed() -> void:
 	"""Hide loading screen when initial load completes"""
 	hide()
+
+
+func _exit_tree() -> void:
+	# Disconnect autoload signals to prevent memory leaks on scene reload
+	if ChunkManager:
+		if ChunkManager.initial_load_progress.is_connected(_on_load_progress):
+			ChunkManager.initial_load_progress.disconnect(_on_load_progress)
+		if ChunkManager.initial_load_completed.is_connected(_on_load_completed):
+			ChunkManager.initial_load_completed.disconnect(_on_load_completed)

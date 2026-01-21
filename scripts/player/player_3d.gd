@@ -170,6 +170,19 @@ func _process(delta: float) -> void:
 	if state_machine:
 		state_machine.process_frame(delta)
 
+
+func _exit_tree() -> void:
+	# Disconnect all autoload signal connections to prevent memory leaks
+	# When scene reloads, old player connections would persist as dangling references
+	if KnowledgeDB and KnowledgeDB.discovery_made.is_connected(_on_discovery_made):
+		KnowledgeDB.discovery_made.disconnect(_on_discovery_made)
+
+	if ChunkManager and ChunkManager.new_chunk_entered.is_connected(_on_new_chunk_entered):
+		ChunkManager.new_chunk_entered.disconnect(_on_new_chunk_entered)
+
+	# stats signals don't need disconnect - stats is owned by player and will be freed together
+
+
 # ============================================================================
 # MOVEMENT (SAME API AS 2D VERSION)
 # ============================================================================

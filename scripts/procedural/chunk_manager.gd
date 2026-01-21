@@ -1235,6 +1235,12 @@ func start_new_run(new_seed: int = -1) -> void:
 	else:
 		world_seed = new_seed
 
+	# CRITICAL: Disconnect all WorldEntity signals before clearing chunks
+	# WorldEntity objects (RefCounted) have signals connected to EntityRenderer (Node3D)
+	# When scene reloads, EntityRenderer is freed but WorldEntity persists in autoload
+	# This creates dangling signal references that prevent garbage collection
+	_disconnect_all_entity_signals()
+
 	loaded_chunks.clear()
 	generating_chunks.clear()
 	visited_chunks.clear()
@@ -1244,9 +1250,38 @@ func start_new_run(new_seed: int = -1) -> void:
 	initial_load_complete = false  # Reset for new run
 	corruption_tracker.reset_all()
 
+	# Reset pathfinding graph (persists in autoload, must be explicitly cleared)
+	var pathfinder = get_node_or_null("/root/Pathfinding")
+	if pathfinder:
+		pathfinder.reset()
+
+	# Clear level cache (persists in autoload, must be explicitly cleared)
+	if LevelManager:
+		LevelManager.clear_cache()
+
 	# Re-initialize level generators (fresh instances for new run)
 	level_generators.clear()
 	level_generators[0] = Level0Generator.new()
+
+
+func _disconnect_all_entity_signals() -> void:
+	"""Disconnect all WorldEntity signals to prevent memory leaks on scene reload
+
+	WorldEntity objects persist in ChunkManager (autoload) while EntityRenderer
+	(scene node) is freed. Signal connections between them create reference
+	issues that prevent proper garbage collection.
+	"""
+	for chunk in loaded_chunks.values():
+		for sub_chunk in chunk.sub_chunks:
+			for entity in sub_chunk.world_entities:
+				# Disconnect all signal connections
+				# Using get_signal_connection_list to safely disconnect everything
+				for connection in entity.hp_changed.get_connections():
+					entity.hp_changed.disconnect(connection.callable)
+				for connection in entity.died.get_connections():
+					entity.died.disconnect(connection.callable)
+				for connection in entity.moved.get_connections():
+					entity.moved.disconnect(connection.callable)
 
 # ============================================================================
 # CHUNK VALIDATION

@@ -185,15 +185,15 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 
 			if entity_billboards.has(world_pos):
-				# Disconnect signals before cleanup
-				# hp_changed is bound to entity, so we need to check with that binding
-				var hp_callback = _on_entity_hp_changed.bind(entity)
-				if entity.hp_changed.is_connected(hp_callback):
-					entity.hp_changed.disconnect(hp_callback)
-				if entity.died.is_connected(_on_entity_died_signal):
-					entity.died.disconnect(_on_entity_died_signal)
-				if entity.moved.is_connected(_on_entity_moved):
-					entity.moved.disconnect(_on_entity_moved)
+				# Disconnect ALL signal connections from this entity
+				# Using get_connections() to properly disconnect bound callables
+				# (Creating a new .bind() callable doesn't match the original connection)
+				for connection in entity.hp_changed.get_connections():
+					entity.hp_changed.disconnect(connection.callable)
+				for connection in entity.died.get_connections():
+					entity.died.disconnect(connection.callable)
+				for connection in entity.moved.get_connections():
+					entity.moved.disconnect(connection.callable)
 
 				var billboard = entity_billboards[world_pos]
 				billboard.queue_free()
@@ -610,6 +610,16 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	if entity == null:
 		entity = entity_cache.get(world_pos, null)
 
+	# Disconnect signals from entity to prevent memory leaks
+	# WorldEntity (RefCounted) persists in ChunkManager even after billboard is freed
+	if entity:
+		for connection in entity.hp_changed.get_connections():
+			entity.hp_changed.disconnect(connection.callable)
+		for connection in entity.died.get_connections():
+			entity.died.disconnect(connection.callable)
+		for connection in entity.moved.get_connections():
+			entity.moved.disconnect(connection.callable)
+
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
 	if is_instance_valid(billboard):
@@ -701,6 +711,15 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 
 	# Get entity for reverse lookup cleanup
 	var entity = entity_cache.get(world_pos, null)
+
+	# Disconnect signals from entity to prevent memory leaks
+	if entity:
+		for connection in entity.hp_changed.get_connections():
+			entity.hp_changed.disconnect(connection.callable)
+		for connection in entity.died.get_connections():
+			entity.died.disconnect(connection.callable)
+		for connection in entity.moved.get_connections():
+			entity.moved.disconnect(connection.callable)
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
