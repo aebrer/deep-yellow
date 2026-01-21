@@ -1279,7 +1279,7 @@ python3 _claude_scripts/strip_mesh_library_previews.py
 
 ### Overview
 
-**Butler** is itch.io's command-line tool for uploading game builds. It's already installed, authorized, and in $PATH.
+**Butler** is itch.io's command-line tool for uploading game builds. It's already installed, authorized, and located at /home/drew/.local/bin/butler .
 
 **Key benefits over manual upload:**
 - Delta compression - only uploads changed files (fast subsequent pushes)
