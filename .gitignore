@@ -30,6 +30,7 @@ exports/
 *.app
 *.dmg
 *.zip
+web_deployment/*
 
 # Logs and databases
 *.log
@@ -51,3 +52,4 @@ data/mazes
 
 # godot
 *.import
+
