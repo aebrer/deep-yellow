@@ -263,11 +263,14 @@ func _update_header() -> void:
 		header_label.text = "GAME PAUSED"
 		return
 
-	var button_text = "[Left Click]"
+	# Show both move and wait actions in header
+	var move_btn = "[Left Click]"
+	var wait_btn = "[Right Click]"
 	if current_input_device == InputManager.InputDevice.GAMEPAD:
-		button_text = "[RT]"
+		move_btn = "[RT]"
+		wait_btn = "[LT]"
 
-	header_label.text = "%s Next Turn" % button_text
+	header_label.text = "%s Move  •  %s Wait" % [move_btn, wait_btn]
 
 func _show_pause_message() -> void:
 	"""Show pause message instead of action preview"""

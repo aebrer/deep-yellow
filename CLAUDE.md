@@ -191,8 +191,8 @@ to be certain. Does this align with what you're seeing?"
 ┌──────────────────▼──────────────────────────────────────────┐
 │              STATE MACHINE LAYER                            │
 │  Player → InputStateMachine → Current State                 │
-│    States: IdleState, LookModeState, ExecutingTurnState,    │
-│            PostTurnState                                    │
+│    States: IdleState (with FPV/Tactical camera modes),      │
+│            PreTurnState, ExecutingTurnState, PostTurnState  │
 │  - State-specific input handling                            │
 │  - Turn boundaries explicit                                 │
 │  - Queries InputManager for normalized input                │
@@ -247,34 +247,40 @@ to be certain. Does this align with what you're seeing?"
 These are the ONLY controls currently implemented. Don't assume other inputs exist or should be added.
 
 **Controller:**
-- RT → Confirm actions (move forward, wait in look mode)
-- LT → Look mode (first-person examination)
-- Right stick → Camera controls (tactical + look mode)
+- RT → Move forward (in camera look direction)
+- LT → Wait (pass turn)
+- Right stick → Camera rotation
 - Left stick → Navigate HUD when paused
-- START → Toggle pause status
-- LB + RB -> zoom level
+- START → Toggle pause
+- SELECT → Toggle camera mode (FPV ↔ Tactical)
+- LB + RB → Zoom
 
 **Mouse + Keyboard:**
-- LMB → Confirm actions (move forward, wait in look mode)
-- RMB → Look mode (first-person examination)
-- Mouse movement → Camera controls (tactical + look mode)
-- ESC or MMB → Toggle pause status (MMB recommended on web due to fullscreen ESC issues)
-- Mouse hover over HUD → Navigate HUD when paused
-- Mouse wheel -> zoom level
+- LMB → Move forward (in camera look direction)
+- RMB → Wait (pass turn)
+- Mouse movement → Camera rotation
+- ESC or MMB → Toggle pause (MMB recommended on web due to fullscreen ESC issues)
+- C → Toggle camera mode (FPV ↔ Tactical)
+- Mouse wheel → Zoom
+- Mouse hover → Navigate HUD when paused
 
 **NOT IMPLEMENTED:**
 - Any other inputs not explicitly listed above
 
-**Forward Indicator Movement System (THE NEW ERA)**
-- Always-on green arrow shows 1 cell ahead in camera direction
+**FPV-Default Camera System**
+- **Game loads in FPV (first-person view)** by default
+- C key / SELECT button toggles between FPV and Tactical (third-person overhead)
+- Controls are unified in both modes: RT/LMB = move, LT/RMB = wait
+- Examination crosshair active in FPV mode, hidden in Tactical
+- Move indicator (green arrow) hidden in FPV, visible in Tactical
+- Camera mode persists through pause/unpause
+- FOV: 90° default, range 60°-110°
+
+**Forward Indicator Movement System**
+- In Tactical mode: green arrow shows 1 cell ahead in camera direction
 - Rotate camera to aim where you want to go
-- RT/Space/Left Click to move forward (with hold-to-repeat)
+- RT/Left Click to move forward (with hold-to-repeat)
 - Simple, intuitive, works identically on all input devices
-- **Why this replaced stick-based aiming:**
-  - Better input parity (mouse has no "left stick")
-  - More intuitive for third-person camera control
-  - Simpler mental model: look where you want to go, click to move
-  - User preference: "THE NEW ERA IS THE ERA OF ALWAYS ON INDICATOR"
 
 **Viewport Culling from Day One**
 - 128x128 grid = 16,384 tiles (would crash without culling)
@@ -292,12 +298,13 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 
 **Player System**
 - `/scripts/player/player_3d.gd` - 3D player controller, turn-based movement
-- `/scripts/player/first_person_camera.gd` - Camera rig with third-person controls
+- `/scripts/player/first_person_camera.gd` - First-person camera with examination raycast
+- `/scripts/player/tactical_camera.gd` - Third-person overhead tactical camera
 - `/scripts/player/input_state_machine.gd` - State manager, delegates to current state
 - `/scripts/player/states/player_input_state.gd` - Base state class with transition signals
-- `/scripts/player/states/idle_state.gd` - Waiting for input
-- `/scripts/player/states/look_mode_state.gd` - Examination mode with camera control
+- `/scripts/player/states/idle_state.gd` - Main input state, handles FPV/Tactical camera modes
 - `/scripts/player/states/executing_turn_state.gd` - Processing turn actions
+- `/scripts/player/states/pre_turn_state.gd` - Pre-turn processing
 - `/scripts/player/states/post_turn_state.gd` - Post-turn cleanup and state transitions
 
 **Actions (Command Pattern)**
@@ -496,7 +503,7 @@ If you're implementing camera controls, ask: "What does Fortnite/Gears of War/ev
 4. Show cursor at grid position + stick offset
 5. Display tooltip for tile under cursor
 
-This follows the same pattern as `LookModeState` (the current examination/camera control state). The state handles input, updates cursor position, and shows UI. When examine button released, transition back to `IdleState`.
+This follows the same pattern as `IdleState` (which handles both FPV and Tactical camera modes with examination). The state handles input, updates cursor position, and shows UI.
 
 Should I implement this, or do you want to discuss the tooltip system first?"
 

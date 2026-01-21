@@ -16,10 +16,10 @@ extends Node3D
 @export var pitch_min: float = -89.0  # Look down
 @export var pitch_max: float = 89.0   # Look up
 
-# FOV (field of view)
-@export var default_fov: float = 75.0
+# FOV (field of view) - FPV is now default mode, wider FOV for immersion
+@export var default_fov: float = 90.0
 @export var fov_min: float = 60.0
-@export var fov_max: float = 90.0
+@export var fov_max: float = 110.0
 @export var fov_zoom_speed: float = 5.0
 
 # Node references
@@ -31,7 +31,7 @@ extends Node3D
 var tactical_camera: TacticalCamera = null
 
 # State
-var active: bool = false  # Controlled by LookModeState
+var active: bool = false  # Controlled by IdleState camera mode
 
 # Mouse motion accumulator (fixes Firefox drift at integer zoom levels)
 var mouse_motion_accumulator := Vector2.ZERO

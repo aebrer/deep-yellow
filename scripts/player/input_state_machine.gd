@@ -39,7 +39,7 @@ func _ready() -> void:
 		var first_state_name = states.keys()[0]
 		change_state(first_state_name)
 
-	# Connect to PauseManager to exit LookModeState when paused
+	# Connect to PauseManager (camera mode persists through pause now)
 	if PauseManager:
 		PauseManager.pause_toggled.connect(_on_pause_toggled)
 
@@ -98,12 +98,10 @@ func _on_state_transition_requested(new_state_name: String) -> void:
 	"""Handle state transition requests from states"""
 	change_state(new_state_name)
 
-func _on_pause_toggled(is_paused: bool) -> void:
-	"""Handle pause state changes - exit LookModeState when paused
+func _on_pause_toggled(_is_paused: bool) -> void:
+	"""Handle pause state changes
 
-	LookModeState activates the first-person camera which requires get_tree().root
-	access. If the player dies while in LookModeState and game over triggers pause,
-	the scene may be in a transitional state. Exit to IdleState to prevent errors.
+	Camera mode (FPV vs Tactical) now persists through pause/unpause.
+	No state change needed - IdleState handles both modes.
 	"""
-	if is_paused and current_state and current_state.name == "LookModeState":
-		change_state("IdleState")
+	pass

@@ -69,9 +69,11 @@ var right_trigger_pressed: bool = false
 var _left_trigger_just_pressed: bool = false
 var _right_trigger_just_pressed: bool = false
 
-## Mouse button state - for input parity (left click = RT)
+## Mouse button state - for input parity (left click = RT, right click = LT)
 var left_mouse_pressed: bool = false
 var _left_mouse_just_pressed: bool = false
+var right_mouse_pressed: bool = false
+var _right_mouse_just_pressed: bool = false
 
 # ============================================================================
 # LIFECYCLE
@@ -89,6 +91,7 @@ func _process(_delta: float) -> void:
 	_left_trigger_just_pressed = false
 	_right_trigger_just_pressed = false
 	_left_mouse_just_pressed = false
+	_right_mouse_just_pressed = false
 
 	# Update trigger state
 	_update_triggers()
@@ -112,7 +115,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		"toggle_ability_2",
 		"toggle_ability_3",
 		"toggle_ability_4",
-		"look_mode",
+		"wait_action",
+		"toggle_camera",
 		"pause"
 	]
 
@@ -222,31 +226,40 @@ func _update_triggers() -> void:
 	# RT (right trigger) -> move_confirm action
 	if _right_trigger_just_pressed:
 		_actions_this_frame["move_confirm"] = true
-		# Input event logging handled by _log_input_event()
+
+	# LT (left trigger) -> wait_action
+	if _left_trigger_just_pressed:
+		_actions_this_frame["wait_action"] = true
 
 
 func _update_mouse_buttons() -> void:
-	"""Track mouse button state for input parity (left click = RT)"""
+	"""Track mouse button state for input parity (left click = RT, right click = LT)"""
 	# Only track when mouse is captured (otherwise it's for UI/camera)
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		left_mouse_pressed = false
 		_left_mouse_just_pressed = false
+		right_mouse_pressed = false
+		_right_mouse_just_pressed = false
 		return
 
-	# Check current state
-	var mouse_now_pressed = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	# Check current state - LMB
+	var lmb_now_pressed = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	_left_mouse_just_pressed = lmb_now_pressed and not left_mouse_pressed
+	left_mouse_pressed = lmb_now_pressed
 
-	# Track "just pressed" (transition from not pressed -> pressed)
-	_left_mouse_just_pressed = mouse_now_pressed and not left_mouse_pressed
-
-	# Update pressed state for next frame
-	left_mouse_pressed = mouse_now_pressed
+	# Check current state - RMB
+	var rmb_now_pressed = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_right_mouse_just_pressed = rmb_now_pressed and not right_mouse_pressed
+	right_mouse_pressed = rmb_now_pressed
 
 	# Synthesize action events for mouse buttons
 	# Left click -> move_confirm action (same as RT)
 	if _left_mouse_just_pressed:
 		_actions_this_frame["move_confirm"] = true
-		# Input event logging handled by _log_input_event()
+
+	# Right click -> wait_action (same as LT)
+	if _right_mouse_just_pressed:
+		_actions_this_frame["wait_action"] = true
 
 # ============================================================================
 # ACTION QUERIES
@@ -268,12 +281,13 @@ func is_action_pressed(action: String) -> bool:
 		# 3. Regular keyboard/button action is pressed (Space)
 		return right_trigger_pressed or left_mouse_pressed or Input.is_action_pressed(action)
 
-	# Special handling for look_mode - check LT trigger state
-	if action == "look_mode":
-		# look_mode is "pressed" if any of:
-		# 1. Physical LT trigger is above threshold (already mapped in project.godot)
-		# 2. RMB (already mapped in project.godot)
-		return left_trigger_pressed or Input.is_action_pressed(action)
+	# Special handling for wait_action - check LT trigger state + RMB
+	if action == "wait_action":
+		# wait_action is "pressed" if any of:
+		# 1. Physical LT trigger is above threshold
+		# 2. Right mouse button is pressed (input parity!)
+		# 3. Regular keyboard action (if mapped)
+		return left_trigger_pressed or right_mouse_pressed or Input.is_action_pressed(action)
 
 	# For other actions, use Godot's built-in system
 	return Input.is_action_pressed(action)

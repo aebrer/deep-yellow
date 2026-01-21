@@ -1,11 +1,10 @@
-[gd_scene load_steps=15 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=14 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
 [ext_resource type="Script" path="res://scripts/player/player_3d.gd" id="4_player3d"]
 [ext_resource type="Script" path="res://scripts/player/input_state_machine.gd" id="5_statemachine"]
 [ext_resource type="Script" path="res://scripts/player/states/idle_state.gd" id="6_idle"]
-[ext_resource type="Script" path="res://scripts/player/states/look_mode_state.gd" id="7_lookmode"]
 [ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="8_executing"]
 [ext_resource type="Script" path="res://scripts/player/states/pre_turn_state.gd" id="9_preturn"]
 [ext_resource type="Script" path="res://scripts/player/states/post_turn_state.gd" id="10_postturn"]
@@ -96,9 +95,6 @@ script = ExtResource("5_statemachine")
 [node name="IdleState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("6_idle")
 
-[node name="LookModeState" type="Node" parent="Player3D/InputStateMachine"]
-script = ExtResource("7_lookmode")
-
 [node name="ExecutingTurnState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("8_executing")
 
@@ -140,9 +136,9 @@ mouse_sensitivity = 0.15
 rotation_deadzone = 0.3
 pitch_min = -89.0
 pitch_max = 89.0
-default_fov = 75.0
+default_fov = 90.0
 fov_min = 60.0
-fov_max = 90.0
+fov_max = 110.0
 fov_zoom_speed = 5.0
 
 [node name="HorizontalPivot" type="Node3D" parent="Player3D/FirstPersonCamera"]
@@ -151,7 +147,7 @@ fov_zoom_speed = 5.0
 
 [node name="Camera3D" type="Camera3D" parent="Player3D/FirstPersonCamera/HorizontalPivot/VerticalPivot"]
 current = false
-fov = 75.0
+fov = 90.0
 
 [node name="PostProcessLayer" type="CanvasLayer" parent="."]
 layer = 999
