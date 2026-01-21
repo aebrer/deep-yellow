@@ -381,6 +381,11 @@ func _on_restart_pressed() -> void:
 	if KnowledgeDB:
 		KnowledgeDB.reset_knowledge()
 
+	# Reset ChunkManager state (chunks, pathfinding, entity signals, corruption)
+	# ChunkManager is an autoload that persists across scene reloads - must be reset!
+	if ChunkManager:
+		ChunkManager.start_new_run()
+
 	# Emit signal for game.gd to handle
 	restart_requested.emit()
 

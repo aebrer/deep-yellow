@@ -29,10 +29,9 @@ signal new_chunk_entered(chunk_position: Vector3i)
 
 # Constants
 const CHUNK_SIZE := 128
-const ACTIVE_RADIUS := 3  # Chunks to keep loaded around player
-const GENERATION_RADIUS := 3  # Chunks to pre-generate (7×7 = 49 chunks)
-const UNLOAD_RADIUS := 5  # Chunks beyond this distance are candidates for unloading (hysteresis buffer)
-const MAX_LOADED_CHUNKS := 64  # Memory limit - allows full 7×7 grid + buffer zone for unloading
+const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
+const UNLOAD_RADIUS := 3  # Chunks beyond this distance are candidates for unloading (small buffer)
+const MAX_LOADED_CHUNKS := 49  # Memory limit - 7×7 max with buffer
 const CHUNK_BUDGET_MS := 4.0  # Max milliseconds per frame for chunk operations
 const MAX_CHUNKS_PER_FRAME := 3  # Hard limit to prevent burst overload
 
@@ -424,6 +423,11 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 	# Load into GridMap (deferred to ensure main thread)
 	call_deferred("_load_chunk_to_grid", chunk, chunk_key)
 
+	# Immediately check for chunks to unload (keeps chunk count bounded)
+	# This is critical because worker thread can complete chunks faster than
+	# turns happen, so we can't rely solely on on_turn_completed() for unloading.
+	_unload_distant_chunks()
+
 func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Load chunk into Grid3D (runs on main thread via call_deferred)"""
 	var chunk_pos := Vector2i(chunk_key.x, chunk_key.y)
@@ -803,21 +807,14 @@ func _unload_distant_chunks() -> void:
 			chunks_to_unload.append(chunk_key)
 
 	# Unload distant chunks
+	# NOTE: We unload ALL distant chunks, not just 1 per turn.
+	# Worker thread can complete multiple chunks per frame, so we must keep up.
+	# The 1-chunk-per-turn limit was causing unbounded chunk accumulation.
 	if not chunks_to_unload.is_empty():
 		hit_chunk_limit = false  # Reset limit flag since we're freeing up space
 
-	var unload_count := 0
 	for chunk_key in chunks_to_unload:
 		_unload_chunk(chunk_key)
-		unload_count += 1
-
-		# After initial load, limit to 1 chunk per turn to avoid lag spikes
-		if initial_load_complete and unload_count >= 1:
-			break
-
-		# Stop if we're back under comfortable limit
-		if loaded_chunks.size() <= MAX_LOADED_CHUNKS * 0.8:
-			break
 
 func _unload_chunk(chunk_key: Vector3i) -> void:
 	"""Unload a chunk from memory"""
