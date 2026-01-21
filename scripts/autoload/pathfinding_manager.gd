@@ -16,8 +16,13 @@ var pos_to_id: Dictionary = {}  # Vector2i -> int
 ## Mapping from AStar point ID to grid position
 var id_to_pos: Dictionary = {}  # int -> Vector2i
 
-## Next available point ID
+## Next available point ID (only used when free list is empty)
 var next_id: int = 0
+
+## Free list of recycled point IDs (CRITICAL: prevents unbounded memory growth)
+## Without recycling, next_id grows forever as chunks load/unload, causing
+## AStar2D internal arrays to grow without bound even if point count stays constant.
+var free_ids: Array[int] = []
 
 ## Grid reference (set by Grid3D when ready)
 var grid: Node = null
@@ -33,6 +38,7 @@ func reset() -> void:
 	pos_to_id.clear()
 	id_to_pos.clear()
 	next_id = 0
+	free_ids.clear()
 	grid = null
 
 
@@ -90,30 +96,36 @@ func _add_point(pos: Vector2i) -> void:
 	if pos_to_id.has(pos):
 		return  # Already added
 
-	var point_id := next_id
-	next_id += 1
+	# Recycle an ID from the free list if available, otherwise allocate new
+	var point_id: int
+	if not free_ids.is_empty():
+		point_id = free_ids.pop_back()
+	else:
+		point_id = next_id
+		next_id += 1
 
 	astar.add_point(point_id, Vector2(pos.x, pos.y))
 	pos_to_id[pos] = point_id
 	id_to_pos[point_id] = pos
 
+## Neighbor offsets (pre-allocated to avoid creating new Vector2i per call)
+const NEIGHBOR_OFFSETS: Array[Vector2i] = [
+	Vector2i(0, -1),   # North
+	Vector2i(0, 1),    # South
+	Vector2i(-1, 0),   # West
+	Vector2i(1, 0),    # East
+	Vector2i(-1, -1),  # Northwest
+	Vector2i(1, -1),   # Northeast
+	Vector2i(-1, 1),   # Southwest
+	Vector2i(1, 1)     # Southeast
+]
+
 ## Connect a point to its walkable neighbors (8-directional)
 func _connect_neighbors(pos: Vector2i, point_id: int) -> void:
 	"""Connect a point to its 8-directional neighbors (diagonals have same cost)"""
-	var neighbors := [
-		# Cardinals
-		pos + Vector2i(0, -1),   # North
-		pos + Vector2i(0, 1),    # South
-		pos + Vector2i(-1, 0),   # West
-		pos + Vector2i(1, 0),    # East
-		# Diagonals
-		pos + Vector2i(-1, -1),  # Northwest
-		pos + Vector2i(1, -1),   # Northeast
-		pos + Vector2i(-1, 1),   # Southwest
-		pos + Vector2i(1, 1)     # Southeast
-	]
-
-	for neighbor_pos in neighbors:
+	# Use pre-allocated offsets to avoid creating 8 Vector2i per call
+	for offset in NEIGHBOR_OFFSETS:
+		var neighbor_pos := pos + offset
 		if pos_to_id.has(neighbor_pos):
 			var neighbor_id: int = pos_to_id[neighbor_pos]
 			# Bidirectional connection with cost 1.0 (uniform - diagonals same as cardinals)
@@ -334,27 +346,39 @@ func add_chunk(chunk: Chunk) -> void:
 		Log.warn(Log.Category.GRID, "PathfindingManager: No grid reference, cannot add chunk")
 		return
 
+	# Collect walkable positions in first pass, then connect in second pass
+	# This avoids iterating over ALL tiles twice (only walkable tiles twice)
+	var walkable_positions: Array[Vector2i] = []
+
+	# Pre-calculate chunk offset once (avoid recalculating per tile)
+	var chunk_offset: Vector2i = chunk.position * Chunk.SIZE
+
 	# Add all walkable tiles from this chunk
 	for subchunk in chunk.sub_chunks:
+		# Pre-calculate subchunk offset once per subchunk
+		var subchunk_offset: Vector2i = chunk_offset + subchunk.local_position * subchunk.SIZE
+
 		for y in range(subchunk.SIZE):
 			for x in range(subchunk.SIZE):
 				var tile_type = subchunk.get_tile(Vector2i(x, y))
 				if tile_type == subchunk.TileType.FLOOR:
-					# Calculate world position
-					var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
+					var world_pos: Vector2i = subchunk_offset + Vector2i(x, y)
 					if not pos_to_id.has(world_pos):
 						_add_point(world_pos)
+						walkable_positions.append(world_pos)
 
 	# Connect all new points to their neighbors (including cross-chunk connections)
-	# This must happen AFTER all points are added
-	for subchunk in chunk.sub_chunks:
-		for y in range(subchunk.SIZE):
-			for x in range(subchunk.SIZE):
-				var tile_type = subchunk.get_tile(Vector2i(x, y))
-				if tile_type == subchunk.TileType.FLOOR:
-					var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
-					if pos_to_id.has(world_pos):
-						_connect_neighbors(world_pos, pos_to_id[world_pos])
+	# Only iterate over walkable positions, not all 16k tiles
+	for world_pos in walkable_positions:
+		if pos_to_id.has(world_pos):
+			_connect_neighbors(world_pos, pos_to_id[world_pos])
+
+	# Note: Logging removed for performance - uncomment for debugging
+	# var points_after := astar.get_point_count()
+	# var points_added := points_after - points_before
+	# Log.system("  Pathfinding: added %d points (total: %d, free IDs: %d, next_id: %d)" % [
+	# 	points_added, points_after, free_ids.size(), next_id
+	# ])
 
 func remove_chunk(chunk: Chunk) -> void:
 	"""Remove all tiles from a chunk from the navigation graph
@@ -365,9 +389,6 @@ func remove_chunk(chunk: Chunk) -> void:
 	Args:
 		chunk: The chunk being unloaded
 	"""
-	var start_time := Time.get_ticks_msec()
-	var removed_count := 0
-
 	# Collect all point IDs to remove (can't modify dict while iterating)
 	var points_to_remove: Array[int] = []
 
@@ -377,16 +398,21 @@ func remove_chunk(chunk: Chunk) -> void:
 				var world_pos = chunk.position * Chunk.SIZE + subchunk.local_position * subchunk.SIZE + Vector2i(x, y)
 				if pos_to_id.has(world_pos):
 					points_to_remove.append(pos_to_id[world_pos])
-					removed_count += 1
 
 	# Remove points (AStar2D automatically removes connections)
+	# Add IDs to free list for recycling (CRITICAL: prevents unbounded growth)
 	for point_id in points_to_remove:
 		var pos = id_to_pos[point_id]
 		astar.remove_point(point_id)
 		pos_to_id.erase(pos)
 		id_to_pos.erase(point_id)
+		free_ids.append(point_id)  # Recycle this ID
 
-	var build_time := Time.get_ticks_msec() - start_time
+	# Note: Logging removed for performance - uncomment for debugging
+	# var build_time := Time.get_ticks_msec() - start_time
+	# Log.system("Pathfinding: removed %d points from chunk %s (total: %d, free IDs: %d)" % [
+	# 	removed_count, chunk.position, astar.get_point_count(), free_ids.size()
+	# ])
 
 func set_grid_reference(grid_ref: Node) -> void:
 	"""Set the grid reference for walkability queries

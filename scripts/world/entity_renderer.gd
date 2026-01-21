@@ -115,6 +115,10 @@ const HEALTH_BAR_OFFSET_Y = 0.4  # Above entity sprite
 const HEALTH_BAR_BG_COLOR = Color(0.0, 0.0, 0.0, 0.9)  # Black background (very visible)
 const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 
+## Shared health bar shader (CRITICAL: reuse to avoid memory leak from shader recompilation)
+## Creating a new Shader per entity causes massive memory bloat on web/WASM.
+var _health_bar_shader: Shader = null
+
 # ============================================================================
 # CHUNK LOADING
 # ============================================================================
@@ -173,7 +177,9 @@ func render_chunk_entities(chunk: Chunk) -> void:
 func unload_chunk_entities(chunk: Chunk) -> void:
 	"""Remove billboards for all entities in chunk
 
-	Disconnects WorldEntity signals before cleanup.
+	Note: We don't disconnect signals here - the EntityRenderer persists across
+	chunk loads/unloads, so the signal handlers remain valid. Signals will be
+	cleaned up when the scene reloads (start_new_run).
 
 	Args:
 		chunk: Chunk being unloaded
@@ -185,16 +191,6 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 
 			if entity_billboards.has(world_pos):
-				# Disconnect ALL signal connections from this entity
-				# Using get_connections() to properly disconnect bound callables
-				# (Creating a new .bind() callable doesn't match the original connection)
-				for connection in entity.hp_changed.get_connections():
-					entity.hp_changed.disconnect(connection.callable)
-				for connection in entity.died.get_connections():
-					entity.died.disconnect(connection.callable)
-				for connection in entity.moved.get_connections():
-					entity.moved.disconnect(connection.callable)
-
 				var billboard = entity_billboards[world_pos]
 				billboard.queue_free()
 				entity_billboards.erase(world_pos)
@@ -400,30 +396,15 @@ func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: 
 	sprite.modulate = color  # Base color via modulate
 	sprite.set_meta("base_color", color)
 
-func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
-	"""Create a health bar using a shader for proper fill behavior.
+func _get_health_bar_shader() -> Shader:
+	"""Get or create the shared health bar shader.
 
-	Uses a single quad mesh with a shader that handles the fill direction.
-	This avoids scaling/positioning issues with sprite-based approaches.
-
-	Args:
-		entity_pos: World position of the entity
-
-	Returns:
-		MeshInstance3D with health bar shader
+	CRITICAL: Shaders should be shared, not recreated per entity.
+	Creating new Shaders causes GPU compilation and memory bloat on web/WASM.
 	"""
-	var mesh_instance = MeshInstance3D.new()
-	mesh_instance.name = "HealthBar"
-	mesh_instance.position = entity_pos + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
-
-	# Create quad mesh
-	var quad = QuadMesh.new()
-	quad.size = Vector2(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT)
-	mesh_instance.mesh = quad
-
-	# Create shader material
-	var shader = Shader.new()
-	shader.code = """
+	if _health_bar_shader == null:
+		_health_bar_shader = Shader.new()
+		_health_bar_shader.code = """
 shader_type spatial;
 render_mode unshaded, cull_disabled;
 
@@ -453,9 +434,32 @@ void fragment() {
 	}
 }
 """
+	return _health_bar_shader
 
+func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
+	"""Create a health bar using a shader for proper fill behavior.
+
+	Uses a single quad mesh with a shader that handles the fill direction.
+	This avoids scaling/positioning issues with sprite-based approaches.
+
+	Args:
+		entity_pos: World position of the entity
+
+	Returns:
+		MeshInstance3D with health bar shader
+	"""
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.name = "HealthBar"
+	mesh_instance.position = entity_pos + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
+
+	# Create quad mesh
+	var quad = QuadMesh.new()
+	quad.size = Vector2(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT)
+	mesh_instance.mesh = quad
+
+	# Use shared shader (CRITICAL: don't create new Shader per entity!)
 	var material = ShaderMaterial.new()
-	material.shader = shader
+	material.shader = _get_health_bar_shader()
 	material.set_shader_parameter("fg_color", HEALTH_BAR_FG_COLOR)
 	material.set_shader_parameter("bg_color", HEALTH_BAR_BG_COLOR)
 	material.set_shader_parameter("health", 1.0)
@@ -610,16 +614,6 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	if entity == null:
 		entity = entity_cache.get(world_pos, null)
 
-	# Disconnect signals from entity to prevent memory leaks
-	# WorldEntity (RefCounted) persists in ChunkManager even after billboard is freed
-	if entity:
-		for connection in entity.hp_changed.get_connections():
-			entity.hp_changed.disconnect(connection.callable)
-		for connection in entity.died.get_connections():
-			entity.died.disconnect(connection.callable)
-		for connection in entity.moved.get_connections():
-			entity.moved.disconnect(connection.callable)
-
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
 	if is_instance_valid(billboard):
@@ -711,15 +705,6 @@ func remove_entity_at(world_pos: Vector2i) -> bool:
 
 	# Get entity for reverse lookup cleanup
 	var entity = entity_cache.get(world_pos, null)
-
-	# Disconnect signals from entity to prevent memory leaks
-	if entity:
-		for connection in entity.hp_changed.get_connections():
-			entity.hp_changed.disconnect(connection.callable)
-		for connection in entity.died.get_connections():
-			entity.died.disconnect(connection.callable)
-		for connection in entity.moved.get_connections():
-			entity.moved.disconnect(connection.callable)
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]

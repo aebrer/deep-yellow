@@ -29,10 +29,9 @@ signal new_chunk_entered(chunk_position: Vector3i)
 
 # Constants
 const CHUNK_SIZE := 128
-const ACTIVE_RADIUS := 3  # Chunks to keep loaded around player
-const GENERATION_RADIUS := 3  # Chunks to pre-generate (7×7 = 49 chunks)
-const UNLOAD_RADIUS := 5  # Chunks beyond this distance are candidates for unloading (hysteresis buffer)
-const MAX_LOADED_CHUNKS := 64  # Memory limit - allows full 7×7 grid + buffer zone for unloading
+const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
+const UNLOAD_RADIUS := 3  # Chunks beyond this distance are candidates for unloading (small buffer)
+const MAX_LOADED_CHUNKS := 49  # Memory limit - 7×7 max with buffer
 const CHUNK_BUDGET_MS := 4.0  # Max milliseconds per frame for chunk operations
 const MAX_CHUNKS_PER_FRAME := 3  # Hard limit to prevent burst overload
 
@@ -45,7 +44,10 @@ var last_player_chunk: Vector3i = Vector3i(-999, -999, -999)  # Track chunk chan
 var hit_chunk_limit: bool = false  # Track if we've logged hitting the limit
 var was_generating: bool = false  # Track if chunks were queued (for completion signal)
 var initial_load_complete: bool = false  # Track if initial area load is done
-var cut_borders: Dictionary = {}  # "x1,y1|x2,y2|level" -> true (tracks which chunk borders have been cut)
+# Note: cut_borders dictionary was removed - border cutting is now idempotent
+# Setting floor tiles where floor already exists is a no-op, so we always cut
+# when a new chunk loads adjacent to an existing chunk. This fixes a bug where
+# chunks that unloaded and reloaded would be missing their side of the hallway.
 var chunks_without_items: int = 0  # Pity timer: consecutive chunks without items spawned
 
 # Pity timer configuration
@@ -140,6 +142,11 @@ func on_turn_completed() -> void:
 	Note: Entity AI is processed in ExecutingTurnState before this signal fires.
 	This handles chunk management and item discovery.
 	"""
+	# Debug: Log memory stats every 25 turns (using Log.system for web visibility)
+	var player = _find_player()
+	if player and player.turn_count % 25 == 0:
+		log_memory_stats(player.turn_count)
+
 	# Check if player entered a new chunk (for corruption tracking)
 	_check_player_chunk_change()
 
@@ -379,10 +386,11 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 				)
 				if forced_item:
 					spawned_items.append(forced_item)
-					if guarantee_first_chunk:
-						Log.system("Guaranteed item spawn in first chunk")
-					else:
-						Log.system("Pity timer: Forced item spawn after %d empty chunks" % chunks_without_items)
+					# Note: Debug logging commented out for production
+					# if guarantee_first_chunk:
+					# 	Log.system("Guaranteed item spawn in first chunk")
+					# else:
+					# 	Log.system("Pity timer: Forced item spawn after %d empty chunks" % chunks_without_items)
 
 		# Update pity timer (if forced spawn fails, counter keeps incrementing so we try again next chunk)
 		if spawned_items.is_empty():
@@ -414,6 +422,11 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 
 	# Load into GridMap (deferred to ensure main thread)
 	call_deferred("_load_chunk_to_grid", chunk, chunk_key)
+
+	# Immediately check for chunks to unload (keeps chunk count bounded)
+	# This is critical because worker thread can complete chunks faster than
+	# turns happen, so we can't rely solely on on_turn_completed() for unloading.
+	_unload_distant_chunks()
 
 func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Load chunk into Grid3D (runs on main thread via call_deferred)"""
@@ -794,21 +807,14 @@ func _unload_distant_chunks() -> void:
 			chunks_to_unload.append(chunk_key)
 
 	# Unload distant chunks
+	# NOTE: We unload ALL distant chunks, not just 1 per turn.
+	# Worker thread can complete multiple chunks per frame, so we must keep up.
+	# The 1-chunk-per-turn limit was causing unbounded chunk accumulation.
 	if not chunks_to_unload.is_empty():
 		hit_chunk_limit = false  # Reset limit flag since we're freeing up space
 
-	var unload_count := 0
 	for chunk_key in chunks_to_unload:
 		_unload_chunk(chunk_key)
-		unload_count += 1
-
-		# After initial load, limit to 1 chunk per turn to avoid lag spikes
-		if initial_load_complete and unload_count >= 1:
-			break
-
-		# Stop if we're back under comfortable limit
-		if loaded_chunks.size() <= MAX_LOADED_CHUNKS * 0.8:
-			break
 
 func _unload_chunk(chunk_key: Vector3i) -> void:
 	"""Unload a chunk from memory"""
@@ -897,40 +903,13 @@ func _cut_border_hallways(new_chunk: Chunk, chunk_pos: Vector2i, level_id: int) 
 		if neighbor_key not in loaded_chunks:
 			continue
 
-		# Create canonical border key (sorted so A|B == B|A)
-		var border_key := _get_border_key(chunk_pos, neighbor_pos, level_id)
-
-		# Skip if this border was already cut
-		if border_key in cut_borders:
-			continue
-
-		# Mark border as cut
-		cut_borders[border_key] = true
-
-		# Get neighbor chunk
+		# Get neighbor chunk and cut the hallway
+		# NOTE: We always cut, even if this border was cut before. This is intentional!
+		# Chunks are regenerated from scratch when they reload (WFC output), so any
+		# previous hallway modifications are lost. Re-cutting is idempotent (setting
+		# floor where floor exists is a no-op) and ensures connectivity is maintained.
 		var neighbor_chunk: Chunk = loaded_chunks[neighbor_key]
-
-		# Cut the hallway
 		_cut_single_border_hallway(new_chunk, neighbor_chunk, chunk_pos, neighbor_pos, level_id)
-
-
-func _get_border_key(pos_a: Vector2i, pos_b: Vector2i, level_id: int) -> String:
-	"""Create a canonical key for a border between two chunks.
-
-	Sorts positions so the same border always produces the same key,
-	regardless of which chunk was generated first.
-	"""
-	var min_pos: Vector2i
-	var max_pos: Vector2i
-
-	if pos_a.x < pos_b.x or (pos_a.x == pos_b.x and pos_a.y < pos_b.y):
-		min_pos = pos_a
-		max_pos = pos_b
-	else:
-		min_pos = pos_b
-		max_pos = pos_a
-
-	return "%d,%d|%d,%d|%d" % [min_pos.x, min_pos.y, max_pos.x, max_pos.y, level_id]
 
 
 ## Border hallway configuration
@@ -1050,9 +1029,10 @@ func _cut_single_border_hallway(chunk_a: Chunk, chunk_b: Chunk, pos_a: Vector2i,
 				var world_pos := Vector2i(world_x_base + w, y)
 				_set_tile_floor_with_ceiling(bottom_chunk, world_pos, bottom_needs_gridmap_update)
 
-	Log.system("Cut border hallway between chunks %s and %s (width=%d, pos=%d, horizontal=%s)" % [
-		pos_a, pos_b, hallway_width, hallway_pos, is_horizontal
-	])
+	# Note: Debug logging removed for production - uncomment if investigating border issues
+	# Log.system("Cut border hallway between chunks %s and %s (width=%d, pos=%d, horizontal=%s)" % [
+	# 	pos_a, pos_b, hallway_width, hallway_pos, is_horizontal
+	# ])
 
 
 func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_gridmap: bool = false) -> void:
@@ -1244,7 +1224,6 @@ func start_new_run(new_seed: int = -1) -> void:
 	loaded_chunks.clear()
 	generating_chunks.clear()
 	visited_chunks.clear()
-	cut_borders.clear()  # Reset border cut tracking for new run
 	chunks_without_items = 0  # Reset pity timer for new run
 	last_player_chunk = Vector3i(-999, -999, -999)
 	initial_load_complete = false  # Reset for new run
@@ -1298,3 +1277,32 @@ func get_loaded_chunk_count() -> int:
 func get_corruption(level_id: int) -> float:
 	"""Get current corruption for a level"""
 	return corruption_tracker.get_corruption(level_id)
+
+func log_memory_stats(turn: int) -> void:
+	"""Debug: Log memory statistics to identify leaks (uses Log.system for web visibility)"""
+	var total_entities := 0
+	var total_items := 0
+
+	for chunk_key in loaded_chunks:
+		var chunk: Chunk = loaded_chunks[chunk_key]
+		for sub_chunk in chunk.sub_chunks:
+			total_entities += sub_chunk.world_entities.size()
+			total_items += sub_chunk.world_items.size()
+
+	var pathfinder = get_node_or_null("/root/Pathfinding")
+	var pathfinding_points := 0
+	var pathfinding_dict_size := 0
+	if pathfinder:
+		pathfinding_points = pathfinder.astar.get_point_count()
+		pathfinding_dict_size = pathfinder.pos_to_id.size()
+
+	# Get walkable cells count (don't call get_used_cells() - it allocates a huge array!)
+	var walkable_cells := 0
+	if grid_3d:
+		walkable_cells = grid_3d.walkable_cells.size()
+
+	# Single line for each stat to avoid memory allocation from string building
+	Log.system("=== MEMORY STATS (Turn %d) ===" % turn)
+	Log.system("Chunks: %d loaded, %d visited" % [loaded_chunks.size(), visited_chunks.size()])
+	Log.system("Entities: %d, Items: %d, Walkable: %d" % [total_entities, total_items, walkable_cells])
+	Log.system("Pathfinding: %d points, %d dict" % [pathfinding_points, pathfinding_dict_size])

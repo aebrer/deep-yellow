@@ -373,25 +373,45 @@ func spawn_forced_item(
 ) -> WorldItem:
 	"""Force spawn a single item (pity timer triggered).
 
-	Repeatedly attempts the normal spawn process until an item spawns.
-	Uses the same rarity/corruption logic as regular spawning.
+	Directly spawns a random common item without RNG rolls.
+	This avoids the memory overhead of calling spawn_items_for_chunk()
+	repeatedly (which creates many temporary arrays and deep-copied Resources).
 
 	Args:
 		chunk: Chunk to spawn item in
 		turn_number: Current turn number
 		available_items: All items that could spawn
-		player: Optional player reference for spawn rate bonuses
+		player: Optional player reference (unused, kept for API consistency)
 
 	Returns:
 		WorldItem if spawned successfully, null otherwise
 	"""
-	# Retry normal spawn logic up to 20 times
-	for _attempt in range(20):
-		var spawned = spawn_items_for_chunk(chunk, turn_number, available_items, player)
-		if not spawned.is_empty():
-			return spawned[0]
+	# Filter to common items (most likely to exist, guaranteed pity spawn)
+	var common_items: Array[Item] = []
+	for item in available_items:
+		if item.rarity == ItemRarity.Tier.COMMON:
+			common_items.append(item)
 
-	return null
+	# Fallback to any item if no common items available
+	var item_pool = common_items if not common_items.is_empty() else available_items
+	if item_pool.is_empty():
+		return null
+
+	# Pick a random item from pool
+	var item = item_pool.pick_random()
+
+	# Find spawn location (only try once - if chunk has no valid spots, fail gracefully)
+	var spawn_pos = _find_spawn_location(chunk, item)
+	if spawn_pos == Vector2i(-1, -1):
+		return null
+
+	# Create the WorldItem (single deep copy, not 20+ potential copies)
+	return WorldItem.new(
+		item.duplicate_item(),
+		spawn_pos,
+		item.rarity,
+		turn_number
+	)
 
 
 func _find_nearby_valid_location(chunk, target: Vector2i, max_attempts: int = 20, occupied_positions: Array[Vector2i] = []) -> Vector2i:
