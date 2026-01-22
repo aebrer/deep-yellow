@@ -291,36 +291,123 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 
 ### Key Files and Their Purposes
 
-**Autoloads (Singletons)**
-- `/scripts/autoload/input_manager.gd` - Input normalization and device abstraction
-- `/scripts/autoload/logger.gd` - Centralized logging with category/level filtering
-- `/scripts/autoload/level_manager.gd` - Level loading, LRU cache, transitions
+**Autoloads (Singletons)** - `scripts/autoload/`
+- `input_manager.gd` - Input normalization and device abstraction
+- `logger.gd` - Centralized logging with category/level filtering
+- `logger_presets.gd` - Logging configuration presets (development, deep_debug, release)
+- `level_manager.gd` - Level loading, LRU cache, transitions
+- `entity_registry.gd` - Entity type definitions and spawning
+- `knowledge_db.gd` - Examination/lore database
+- `pathfinding_manager.gd` - A* pathfinding for entities
+- `pause_manager.gd` - Pause state and menu handling
+- `ui_scale_manager.gd` - UI scaling for different resolutions
+- `utilities.gd` - Common utility functions
 
-**Player System**
-- `/scripts/player/player_3d.gd` - 3D player controller, turn-based movement
-- `/scripts/player/first_person_camera.gd` - First-person camera with examination raycast
-- `/scripts/player/tactical_camera.gd` - Third-person overhead tactical camera
-- `/scripts/player/input_state_machine.gd` - State manager, delegates to current state
-- `/scripts/player/states/player_input_state.gd` - Base state class with transition signals
-- `/scripts/player/states/idle_state.gd` - Main input state, handles FPV/Tactical camera modes
-- `/scripts/player/states/executing_turn_state.gd` - Processing turn actions
-- `/scripts/player/states/pre_turn_state.gd` - Pre-turn processing
-- `/scripts/player/states/post_turn_state.gd` - Post-turn cleanup and state transitions
+**Player System** - `scripts/player/`
+- `player_3d.gd` - 3D player controller, turn-based movement, stats
+- `first_person_camera.gd` - First-person camera with examination raycast
+- `tactical_camera.gd` - Third-person overhead tactical camera with zoom
+- `input_state_machine.gd` - State manager, delegates to current state
+- `states/player_input_state.gd` - Base state class with transition signals
+- `states/idle_state.gd` - Main input state, handles FPV/Tactical camera modes
+- `states/executing_turn_state.gd` - Processing turn actions
+- `states/pre_turn_state.gd` - Pre-turn processing (entity AI, corruption)
+- `states/post_turn_state.gd` - Post-turn cleanup and state transitions
 
-**Actions (Command Pattern)**
-- `/scripts/actions/action.gd` - Base action class
-- `/scripts/actions/movement_action.gd` - Grid movement with validation
-- `/scripts/actions/wait_action.gd` - Pass turn without moving
+**Actions (Command Pattern)** - `scripts/actions/`
+- `action.gd` - Base action class
+- `movement_action.gd` - Grid movement with validation
+- `wait_action.gd` - Pass turn without moving
+- `pickup_item_action.gd` / `pickup_to_slot_action.gd` - Item pickup
+- `toggle_item_action.gd` / `reorder_item_action.gd` - Inventory management
+- `attack_preview_action.gd` / `attack_cooldown_action.gd` - Combat UI actions
+- `sanity_damage_action.gd` / `mana_blocked_action.gd` - Status effect actions
+- `control_hint_action.gd` / `item_status_action.gd` - Informational display actions
 
-**Core Systems**
-- `/scripts/grid_3d.gd` - 3D grid with chunk streaming, viewport culling, level configuration
-- `/scripts/game_3d.gd` - Main 3D game scene coordinator
-- `/scripts/procedural/chunk_manager.gd` - Chunk streaming, infinite world generation
-- `/scripts/procedural/level_0_generator.gd` - Wave Function Collapse maze generator for Level 0
+**Combat System** - `scripts/combat/`
+- `attack_executor.gd` - Executes attacks, calculates damage, spawns VFX
+- `attack_types.gd` - Attack type definitions (melee, ranged, magic)
+- `pool_attack.gd` - AoE pool attack implementation
 
-**Scenes**
-- `/scenes/game_3d.tscn` - Main 3D gameplay scene
-- `/scenes/main_menu.tscn` - Menu (placeholder)
+**Entity/AI System** - `scripts/ai/` and `scripts/world/`
+- `entity_ai.gd` - Main AI controller, runs entity turns
+- `behaviors/entity_behavior.gd` - Base behavior class
+- `behaviors/bacteria_*.gd` - Bacteria enemy behaviors
+- `behaviors/smiler_behavior.gd` - Smiler enemy behavior
+- `world/world_entity.gd` - Entity data class (HP, stats, position)
+- `world/entity_renderer.gd` - Entity billboard rendering, damage VFX, health bars
+
+**Item System** - `scripts/items/` and `scripts/world/`
+- `item.gd` - Base item class with passive/active/toggle abilities
+- `item_pool.gd` - Item spawn pool with rarity weights
+- `item_rarity.gd` - Rarity tier definitions
+- `world/world_item.gd` - Item instance in world
+- `world/item_renderer.gd` - Item billboard rendering
+- `world/item_spawner.gd` - Item placement logic
+- Individual items: `almond_water.gd`, `baseball_bat.gd`, `binoculars.gd`, etc.
+
+**Procedural Generation** - `scripts/procedural/`
+- `chunk_manager.gd` - Chunk streaming, infinite world generation
+- `chunk.gd` / `sub_chunk.gd` - Chunk data structures
+- `chunk_generation_thread.gd` - Background chunk generation
+- `level_0_generator.gd` - Wave Function Collapse maze generator
+- `level_config.gd` / `level_generator.gd` - Level configuration base classes
+- `entity_config.gd` - Entity spawn configuration
+- `corruption_tracker.gd` - Corruption/difficulty scaling
+
+**UI System** - `scripts/ui/`
+- `hud_element.gd` - Base class for interactive HUD elements with pause navigation
+- `core_inventory.gd` - Main inventory UI
+- `stats_panel.gd` - HP/Sanity/Mana display
+- `status_bars.gd` - Top-of-screen HP/Sanity bars
+- `action_preview_ui.gd` - Action preview display
+- `examination_panel.gd` - Entity/item examination UI
+- `examination_crosshair.gd` - FPV crosshair
+- `minimap.gd` - Minimap display
+- `exp_bar.gd` - Experience bar
+- `level_up_panel.gd` - Level up UI
+- `game_over_panel.gd` - Game over screen
+- `loading_screen.gd` - Loading screen
+- `start_menu.gd` - Start menu
+- `item_slot_selection_panel.gd` - Item slot picker
+
+**Components** - `scripts/components/`
+- `examinable.gd` - Makes objects examinable via raycast
+- `stat_block.gd` - Entity stats (HP, attack, defense, etc.)
+- `stat_modifier.gd` - Temporary stat modifications
+
+**Core Systems** - `scripts/`
+- `grid_3d.gd` - 3D grid with chunk streaming, proximity fade updates
+- `game_3d.gd` - Main 3D game scene coordinator
+- `game.gd` - Main HUD layout with responsive design (landscape/portrait), embeds 3D viewport
+
+**Shaders** - `shaders/`
+- `psx_base.gdshaderinc` - Base PSX shader include (vertex snapping, UV)
+- `psx_lit.gdshader` - Standard lit PSX shader
+- `psx_lit_nocull.gdshader` - Lit PSX shader with cull_disabled (double-sided)
+- `psx_unlit.gdshader` - Unlit PSX shader variant
+- `psx_wall_proximity.gdshader` - Wall shader with camera→player sightline cutout
+- `psx_wall_proximity_nocull.gdshader` - Wall proximity shader, double-sided (wall top caps)
+- `psx_ceiling_proximity.gdshader` - Ceiling shader with player proximity fade
+- `psx_ceiling_tactical.gdshader` - Ceiling shader for tactical view (cull_front, visible from below)
+- `psx_sprite.gdshader` - Billboard sprite shader
+- `pp_band-dither.gdshader` - Post-processing dither effect
+
+**Scenes** - `scenes/`
+- `game_3d.tscn` - Main 3D gameplay scene
+- `start_menu.tscn` - Start menu scene
+- `main_menu.tscn` - Main menu (placeholder)
+- `ui/*.tscn` - UI component scenes
+
+**Level Assets** - `assets/levels/level_00/`
+- `*.tres` - Material resources (wall_yellow, floor_brown, ceiling_acoustic, etc.)
+- `wall_multimat.tres` - Multi-material wall mesh (floor + ceiling_wall + walls)
+- `textures/*.png` - Level textures
+
+**Maintenance Scripts** - `_claude_scripts/`
+- `generate_wall_mesh.gd` - Generates wall_multimat.tres ArrayMesh
+- `strip_mesh_library_previews.py` - Strips preview images from MeshLibrary
+- `textures/*/generate.py` - Texture generation scripts
 
 ---
 
