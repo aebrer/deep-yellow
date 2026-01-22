@@ -110,15 +110,23 @@ func _exit_tree() -> void:
 func _process(_delta: float) -> void:
 	# Update camera rotation every frame (for north orientation)
 	if player:
-		var camera_rig = player.get_node_or_null("CameraRig")
-		if camera_rig:
-			var h_pivot = camera_rig.get_node_or_null("HorizontalPivot")
+		# Check if FPV camera is active (takes priority)
+		var fpv_camera = player.get_node_or_null("FirstPersonCamera")
+		if fpv_camera and fpv_camera.active:
+			var h_pivot = fpv_camera.get_node_or_null("HorizontalPivot")
 			if h_pivot:
 				camera_rotation = h_pivot.rotation.y
+		else:
+			# Fall back to tactical camera
+			var camera_rig = player.get_node_or_null("CameraRig")
+			if camera_rig:
+				var h_pivot = camera_rig.get_node_or_null("HorizontalPivot")
+				if h_pivot:
+					camera_rotation = h_pivot.rotation.y
 
-				# Rotate the texture rect itself instead of re-rendering pixels
-				# Much faster - just a transform, not 65k pixel operations
-				map_texture_rect.rotation = camera_rotation
+		# Rotate the texture rect itself instead of re-rendering pixels
+		# Much faster - just a transform, not 65k pixel operations
+		map_texture_rect.rotation = camera_rotation
 
 	# Only redraw content when it actually changes (on turn, chunk load, etc)
 	if content_dirty:

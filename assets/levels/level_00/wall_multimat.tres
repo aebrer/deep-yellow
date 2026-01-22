@@ -1,0 +1,85 @@
+[gd_resource type="ArrayMesh" load_steps=4 format=4]
+
+[ext_resource type="Material" path="res://assets/levels/level_00/floor_brown.tres" id="1_tpgj7"]
+[ext_resource type="Material" path="res://assets/levels/level_00/ceiling_wall.tres" id="2_8lwkh"]
+[ext_resource type="Material" path="res://assets/levels/level_00/wall_yellow.tres" id="3_4ofqw"]
+
+[resource]
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPw=="),
+"format": 34359742487,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAAACAAMABAAGAAUABAAHAAYA"),
+"material": ExtResource("1_tpgj7"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AACAvwAAAAAAAIC/AACAPwAAAAAAAIC/AACAPwAAAAAAAIA/AACAvwAAAAAAAIA/AACAvwAAAAAAAIC/AACAPwAAAAAAAIC/AACAPwAAAAAAAIA/AACAvwAAAAAAAIA//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//fwAAAAD/v/9/AAAAAP+//38AAAAA/7//fwAAAAD/vw==")
+}, {
+"aabb": AABB(-1, 4.001, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8="),
+"format": 34359742487,
+"index_count": 6,
+"index_data": PackedByteArray("AAADAAIAAAACAAEA"),
+"material": ExtResource("2_8lwkh"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AACAvzEIgEAAAIA/AACAPzEIgEAAAIA/AACAPzEIgEAAAIC/AACAvzEIgEAAAIC//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/78=")
+}, {
+"aabb": AABB(-1, 3.999, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8="),
+"format": 34359742487,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAAACAAMA"),
+"material": ExtResource("2_8lwkh"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AACAv57vf0AAAIA/AACAP57vf0AAAIA/AACAP57vf0AAAIC/AACAv57vf0AAAIC//38AAAAA/7//fwAAAAD/v/9/AAAAAP+//38AAAAA/78=")
+}, {
+"aabb": AABB(-1, 0, 1, 2, 4, 1e-05),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPw=="),
+"format": 34359742487,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAAACAAMABAAGAAUABAAHAAYA"),
+"material": ExtResource("3_4ofqw"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AACAvwAAAAAAAIA/AACAvwAAgEAAAIA/AACAPwAAgEAAAIA/AACAPwAAAAAAAIA/AACAvwAAAAAAAIA/AACAvwAAgEAAAIA/AACAPwAAgEAAAIA/AACAPwAAAAAAAIA//3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID//////38AgP//////fwCA//////9/AID//////38AgA==")
+}, {
+"aabb": AABB(-1, 0, -1, 2, 4, 1e-05),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPw=="),
+"format": 34359742487,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAAACAAMABAAGAAUABAAHAAYA"),
+"material": ExtResource("3_4ofqw"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AACAPwAAAAAAAIC/AACAPwAAgEAAAIC/AACAvwAAgEAAAIC/AACAvwAAAAAAAIC/AACAPwAAAAAAAIC/AACAPwAAgEAAAIC/AACAvwAAgEAAAIC/AACAvwAAAAAAAIC///////9/AID//////38AgP//////fwCA//////9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgA==")
+}, {
+"aabb": AABB(1, 0, -1, 1e-05, 4, 2),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPw=="),
+"format": 34359742487,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAAACAAMABAAGAAUABAAHAAYA"),
+"material": ExtResource("3_4ofqw"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AACAPwAAAAAAAIA/AACAPwAAgEAAAIA/AACAPwAAgEAAAIC/AACAPwAAAAAAAIC/AACAPwAAAAAAAIA/AACAPwAAgEAAAIA/AACAPwAAgEAAAIC/AACAPwAAAAAAAIC/////f/9//7////9//3//v////3//f/+/////f/9//78AAP9//3//vwAA/3//f/+/AAD/f/9//78AAP9//3//vw==")
+}, {
+"aabb": AABB(-1, 0, -1, 1e-05, 4, 2),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPw=="),
+"format": 34359742487,
+"index_count": 12,
+"index_data": PackedByteArray("AAABAAIAAAACAAMABAAGAAUABAAHAAYA"),
+"material": ExtResource("3_4ofqw"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AACAvwAAAAAAAIC/AACAvwAAgEAAAIC/AACAvwAAgEAAAIA/AACAvwAAAAAAAIA/AACAvwAAAAAAAIC/AACAvwAAgEAAAIC/AACAvwAAgEAAAIA/AACAvwAAAAAAAIA/AAD/f/9//78AAP9//3//vwAA/3//f/+/AAD/f/9//7////9//3//v////3//f/+/////f/9//7////9//3//vw==")
+}]

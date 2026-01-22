@@ -383,6 +383,18 @@ func set_player(player: Node3D) -> void:
 	Log.msg(Log.Category.GRID, Log.Level.INFO,
 		"Player linked to Grid3D for proximity fade updates")
 
+func set_proximity_fade_enabled(enabled: bool) -> void:
+	"""Enable or disable proximity fade on wall/ceiling materials.
+
+	Used to disable the see-through-walls effect in FPV mode where it
+	breaks immersion by allowing players to see through nearby walls.
+	"""
+	for material in wall_materials:
+		material.set_shader_parameter("enable_proximity_fade", enabled)
+
+	for material in ceiling_materials:
+		material.set_shader_parameter("enable_proximity_fade", enabled)
+
 # ============================================================================
 # COORDINATE CONVERSION
 # ============================================================================

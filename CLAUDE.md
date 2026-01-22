@@ -2,7 +2,7 @@
 
 **Project**: Backrooms Power Crawl - Turn-based Roguelike in Godot 4.x
 **Developer**: Drew Brereton (aebrer) - Python/generative art background, new to game dev
-**Last Updated**: 2025-12-07 (Updated for CachyOS native environment - headless Godot testing now possible!)
+**Last Updated**: 2026-01-21 (Added butler/itch.io deployment instructions)
 
 ---
 
@@ -191,8 +191,8 @@ to be certain. Does this align with what you're seeing?"
 ┌──────────────────▼──────────────────────────────────────────┐
 │              STATE MACHINE LAYER                            │
 │  Player → InputStateMachine → Current State                 │
-│    States: IdleState, LookModeState, ExecutingTurnState,    │
-│            PostTurnState                                    │
+│    States: IdleState (with FPV/Tactical camera modes),      │
+│            PreTurnState, ExecutingTurnState, PostTurnState  │
 │  - State-specific input handling                            │
 │  - Turn boundaries explicit                                 │
 │  - Queries InputManager for normalized input                │
@@ -247,34 +247,40 @@ to be certain. Does this align with what you're seeing?"
 These are the ONLY controls currently implemented. Don't assume other inputs exist or should be added.
 
 **Controller:**
-- RT → Confirm actions (move forward, wait in look mode)
-- LT → Look mode (first-person examination)
-- Right stick → Camera controls (tactical + look mode)
+- RT → Move forward (in camera look direction)
+- LT → Wait (pass turn)
+- Right stick → Camera rotation
 - Left stick → Navigate HUD when paused
-- START → Toggle pause status
-- LB + RB -> zoom level
+- START → Toggle pause
+- SELECT → Toggle camera mode (FPV ↔ Tactical)
+- LB + RB → Zoom
 
 **Mouse + Keyboard:**
-- LMB → Confirm actions (move forward, wait in look mode)
-- RMB → Look mode (first-person examination)
-- Mouse movement → Camera controls (tactical + look mode)
-- ESC or MMB → Toggle pause status (MMB recommended on web due to fullscreen ESC issues)
-- Mouse hover over HUD → Navigate HUD when paused
-- Mouse wheel -> zoom level
+- LMB → Move forward (in camera look direction)
+- RMB → Wait (pass turn)
+- Mouse movement → Camera rotation
+- ESC or MMB → Toggle pause (MMB recommended on web due to fullscreen ESC issues)
+- C → Toggle camera mode (FPV ↔ Tactical)
+- Mouse wheel → Zoom
+- Mouse hover → Navigate HUD when paused
 
 **NOT IMPLEMENTED:**
 - Any other inputs not explicitly listed above
 
-**Forward Indicator Movement System (THE NEW ERA)**
-- Always-on green arrow shows 1 cell ahead in camera direction
+**FPV-Default Camera System**
+- **Game loads in FPV (first-person view)** by default
+- C key / SELECT button toggles between FPV and Tactical (third-person overhead)
+- Controls are unified in both modes: RT/LMB = move, LT/RMB = wait
+- Examination crosshair active in FPV mode, hidden in Tactical
+- Move indicator (green arrow) hidden in FPV, visible in Tactical
+- Camera mode persists through pause/unpause
+- FOV: 90° default, range 60°-110°
+
+**Forward Indicator Movement System**
+- In Tactical mode: green arrow shows 1 cell ahead in camera direction
 - Rotate camera to aim where you want to go
-- RT/Space/Left Click to move forward (with hold-to-repeat)
+- RT/Left Click to move forward (with hold-to-repeat)
 - Simple, intuitive, works identically on all input devices
-- **Why this replaced stick-based aiming:**
-  - Better input parity (mouse has no "left stick")
-  - More intuitive for third-person camera control
-  - Simpler mental model: look where you want to go, click to move
-  - User preference: "THE NEW ERA IS THE ERA OF ALWAYS ON INDICATOR"
 
 **Viewport Culling from Day One**
 - 128x128 grid = 16,384 tiles (would crash without culling)
@@ -282,82 +288,130 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - Update on player movement
 - **Performance**: Scalability built in from start, not bolted on later
 
----
-
-## 3. Important Documentation Locations
-
-### Design Documents
-
-- **`/home/drew/projects/backrooms_power_crawl/docs/DESIGN.md`**
-  - Core game concept and vision
-  - Inspirations: Caves of Qud, Vampire Survivors, SCP/Backrooms
-  - Mission types (Horde vs Hunt)
-  - Progression philosophy (knowledge-based, no meta-progression)
-  - Control scheme and design philosophy
-  - Open questions and decisions still being made
-
-- **`/home/drew/projects/backrooms_power_crawl/docs/ARCHITECTURE.md`**
-  - Technical architecture and patterns
-  - **Top section (✅ Implemented)**: Current working systems
-  - **Bottom section (🔮 Planned)**: Future systems design
-  - File structure and organization
-  - Code examples and API documentation
-  - Update this when implementing new systems
-
-- **`/home/drew/projects/backrooms_power_crawl/README.md`**
-  - Project overview and setup
-  - High-level feature list
-  - Development philosophy
-  - Quick reference for new contributors
 
 ### Key Files and Their Purposes
 
-**Autoloads (Singletons)**
-- `/scripts/autoload/input_manager.gd` - Input normalization and device abstraction
-- `/scripts/autoload/logger.gd` - Centralized logging with category/level filtering
-- `/scripts/autoload/level_manager.gd` - Level loading, LRU cache, transitions
+**Autoloads (Singletons)** - `scripts/autoload/`
+- `input_manager.gd` - Input normalization and device abstraction
+- `logger.gd` - Centralized logging with category/level filtering
+- `logger_presets.gd` - Logging configuration presets (development, deep_debug, release)
+- `level_manager.gd` - Level loading, LRU cache, transitions
+- `entity_registry.gd` - Entity type definitions and spawning
+- `knowledge_db.gd` - Examination/lore database
+- `pathfinding_manager.gd` - A* pathfinding for entities
+- `pause_manager.gd` - Pause state and menu handling
+- `ui_scale_manager.gd` - UI scaling for different resolutions
+- `utilities.gd` - Common utility functions
 
-**Player System**
-- `/scripts/player/player_3d.gd` - 3D player controller, turn-based movement
-- `/scripts/player/first_person_camera.gd` - Camera rig with third-person controls
-- `/scripts/player/input_state_machine.gd` - State manager, delegates to current state
-- `/scripts/player/states/player_input_state.gd` - Base state class with transition signals
-- `/scripts/player/states/idle_state.gd` - Waiting for input
-- `/scripts/player/states/look_mode_state.gd` - Examination mode with camera control
-- `/scripts/player/states/executing_turn_state.gd` - Processing turn actions
-- `/scripts/player/states/post_turn_state.gd` - Post-turn cleanup and state transitions
+**Player System** - `scripts/player/`
+- `player_3d.gd` - 3D player controller, turn-based movement, stats
+- `first_person_camera.gd` - First-person camera with examination raycast
+- `tactical_camera.gd` - Third-person overhead tactical camera with zoom
+- `input_state_machine.gd` - State manager, delegates to current state
+- `states/player_input_state.gd` - Base state class with transition signals
+- `states/idle_state.gd` - Main input state, handles FPV/Tactical camera modes
+- `states/executing_turn_state.gd` - Processing turn actions
+- `states/pre_turn_state.gd` - Pre-turn processing (entity AI, corruption)
+- `states/post_turn_state.gd` - Post-turn cleanup and state transitions
 
-**Actions (Command Pattern)**
-- `/scripts/actions/action.gd` - Base action class
-- `/scripts/actions/movement_action.gd` - Grid movement with validation
-- `/scripts/actions/wait_action.gd` - Pass turn without moving
+**Actions (Command Pattern)** - `scripts/actions/`
+- `action.gd` - Base action class
+- `movement_action.gd` - Grid movement with validation
+- `wait_action.gd` - Pass turn without moving
+- `pickup_item_action.gd` / `pickup_to_slot_action.gd` - Item pickup
+- `toggle_item_action.gd` / `reorder_item_action.gd` - Inventory management
+- `attack_preview_action.gd` / `attack_cooldown_action.gd` - Combat UI actions
+- `sanity_damage_action.gd` / `mana_blocked_action.gd` - Status effect actions
+- `control_hint_action.gd` / `item_status_action.gd` - Informational display actions
 
-**Core Systems**
-- `/scripts/grid_3d.gd` - 3D grid with chunk streaming, viewport culling, level configuration
-- `/scripts/game_3d.gd` - Main 3D game scene coordinator
-- `/scripts/procedural/chunk_manager.gd` - Chunk streaming, infinite world generation
-- `/scripts/procedural/level_0_generator.gd` - Wave Function Collapse maze generator for Level 0
+**Combat System** - `scripts/combat/`
+- `attack_executor.gd` - Executes attacks, calculates damage, spawns VFX
+- `attack_types.gd` - Attack type definitions (melee, ranged, magic)
+- `pool_attack.gd` - AoE pool attack implementation
 
-**Scenes**
-- `/scenes/game_3d.tscn` - Main 3D gameplay scene
-- `/scenes/main_menu.tscn` - Menu (placeholder)
+**Entity/AI System** - `scripts/ai/` and `scripts/world/`
+- `entity_ai.gd` - Main AI controller, runs entity turns
+- `behaviors/entity_behavior.gd` - Base behavior class
+- `behaviors/bacteria_*.gd` - Bacteria enemy behaviors
+- `behaviors/smiler_behavior.gd` - Smiler enemy behavior
+- `world/world_entity.gd` - Entity data class (HP, stats, position)
+- `world/entity_renderer.gd` - Entity billboard rendering, damage VFX, health bars
+
+**Item System** - `scripts/items/` and `scripts/world/`
+- `item.gd` - Base item class with passive/active/toggle abilities
+- `item_pool.gd` - Item spawn pool with rarity weights
+- `item_rarity.gd` - Rarity tier definitions
+- `world/world_item.gd` - Item instance in world
+- `world/item_renderer.gd` - Item billboard rendering
+- `world/item_spawner.gd` - Item placement logic
+- Individual items: `almond_water.gd`, `baseball_bat.gd`, `binoculars.gd`, etc.
+
+**Procedural Generation** - `scripts/procedural/`
+- `chunk_manager.gd` - Chunk streaming, infinite world generation
+- `chunk.gd` / `sub_chunk.gd` - Chunk data structures
+- `chunk_generation_thread.gd` - Background chunk generation
+- `level_0_generator.gd` - Wave Function Collapse maze generator
+- `level_config.gd` / `level_generator.gd` - Level configuration base classes
+- `entity_config.gd` - Entity spawn configuration
+- `corruption_tracker.gd` - Corruption/difficulty scaling
+
+**UI System** - `scripts/ui/`
+- `hud_element.gd` - Base class for interactive HUD elements with pause navigation
+- `core_inventory.gd` - Main inventory UI
+- `stats_panel.gd` - HP/Sanity/Mana display
+- `status_bars.gd` - Top-of-screen HP/Sanity bars
+- `action_preview_ui.gd` - Action preview display
+- `examination_panel.gd` - Entity/item examination UI
+- `examination_crosshair.gd` - FPV crosshair
+- `minimap.gd` - Minimap display
+- `exp_bar.gd` - Experience bar
+- `level_up_panel.gd` - Level up UI
+- `game_over_panel.gd` - Game over screen
+- `loading_screen.gd` - Loading screen
+- `start_menu.gd` - Start menu
+- `item_slot_selection_panel.gd` - Item slot picker
+
+**Components** - `scripts/components/`
+- `examinable.gd` - Makes objects examinable via raycast
+- `stat_block.gd` - Entity stats (HP, attack, defense, etc.)
+- `stat_modifier.gd` - Temporary stat modifications
+
+**Core Systems** - `scripts/`
+- `grid_3d.gd` - 3D grid with chunk streaming, proximity fade updates
+- `game_3d.gd` - Main 3D game scene coordinator
+- `game.gd` - Main HUD layout with responsive design (landscape/portrait), embeds 3D viewport
+
+**Shaders** - `shaders/`
+- `psx_base.gdshaderinc` - Base PSX shader include (vertex snapping, UV)
+- `psx_lit.gdshader` - Standard lit PSX shader
+- `psx_lit_nocull.gdshader` - Lit PSX shader with cull_disabled (double-sided)
+- `psx_unlit.gdshader` - Unlit PSX shader variant
+- `psx_wall_proximity.gdshader` - Wall shader with camera→player sightline cutout
+- `psx_wall_proximity_nocull.gdshader` - Wall proximity shader, double-sided (wall top caps)
+- `psx_ceiling_proximity.gdshader` - Ceiling shader with player proximity fade
+- `psx_ceiling_tactical.gdshader` - Ceiling shader for tactical view (cull_front, visible from below)
+- `psx_sprite.gdshader` - Billboard sprite shader
+- `pp_band-dither.gdshader` - Post-processing dither effect
+
+**Scenes** - `scenes/`
+- `game_3d.tscn` - Main 3D gameplay scene
+- `start_menu.tscn` - Start menu scene
+- `main_menu.tscn` - Main menu (placeholder)
+- `ui/*.tscn` - UI component scenes
+
+**Level Assets** - `assets/levels/level_00/`
+- `*.tres` - Material resources (wall_yellow, floor_brown, ceiling_acoustic, etc.)
+- `wall_multimat.tres` - Multi-material wall mesh (floor + ceiling_wall + walls)
+- `textures/*.png` - Level textures
+
+**Maintenance Scripts** - `_claude_scripts/`
+- `generate_wall_mesh.gd` - Generates wall_multimat.tres ArrayMesh
+- `strip_mesh_library_previews.py` - Strips preview images from MeshLibrary
+- `textures/*/generate.py` - Texture generation scripts
 
 ---
 
 ## 4. User Preferences & Context
-
-### User Background
-
-**Python + Generative Art Expert**
-- Comfortable with OOP, functional patterns, clean architecture
-- Understands abstractions, design patterns, separation of concerns
-- **Caveat**: New to game development and Godot specifically
-
-**What This Means for You**
-- Use Python analogies when helpful ("Autoload is like a module-level singleton")
-- Don't over-explain OOP concepts, user gets those
-- DO explain game-dev-specific concepts (scene trees, nodes, signals)
-- DO explain Godot-specific patterns (resources, autoloads, exported vars)
 
 ### User's Ethos
 
@@ -458,29 +512,6 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - No list comprehensions - use loops or `map()`/`filter()` with lambdas
 - Tabs for indentation (unlike Python where spaces are standard)
 
-### Don't Skip Architecture Updates
-
-**Keep ARCHITECTURE.md current**
-- When implementing systems, update the "✅ Implemented" section
-- Move planned features from "🔮 Planned" to "✅ Implemented"
-- Keep file structure diagrams accurate
-- Document architectural decisions and rationale
-
-### Don't Add Features Not in Design Docs
-
-**Stick to the vision**
-- DESIGN.md defines the game's scope and philosophy
-- Don't add features that contradict design goals
-- If suggesting new features, reference design docs
-- Ask user before deviating from documented plans
-
-### Don't Forget Controller-First
-
-**Keyboard is fallback, not primary**
-- Every feature must work with controller
-- Test scenarios with controller in mind
-- Input mappings must have BOTH controller and keyboard
-- If designing UI, design for controller navigation first
 
 ### CRITICAL: Input Parity Between Control Schemes
 
@@ -559,7 +590,7 @@ If you're implementing camera controls, ask: "What does Fortnite/Gears of War/ev
 4. Show cursor at grid position + stick offset
 5. Display tooltip for tile under cursor
 
-This follows the same pattern as `LookModeState` (the current examination/camera control state). The state handles input, updates cursor position, and shows UI. When examine button released, transition back to `IdleState`.
+This follows the same pattern as `IdleState` (which handles both FPV and Tactical camera modes with examination). The state handles input, updates cursor position, and shows UI.
 
 Should I implement this, or do you want to discuss the tooltip system first?"
 
@@ -900,47 +931,6 @@ source venv/bin/activate
 
 These scripts are part of the project's tooling infrastructure and should be committed to version control.
 
----
-
-### Stripping MeshLibrary Preview Images
-
-**Problem**: Godot MeshLibrary files (`.tres`) contain embedded preview thumbnails as `PackedByteArray` data, making them enormous:
-- With previews: ~99KB (99,117 tokens - **EXCEEDS Read tool's context window limit!**)
-- Without previews: ~3KB (readable by Claude)
-
-**This is about context window management, not version control!** Claude instances cannot read files that exceed ~30,000 tokens. The preview images make the file literally unreadable.
-
-**Solution**: `_claude_scripts/strip_mesh_library_previews.py`
-
-**What it does**:
-1. Removes `[sub_resource type="Image"]` blocks (embedded byte arrays)
-2. Removes `[sub_resource type="ImageTexture"]` blocks (reference images)
-3. Removes `item/N/preview` assignments
-4. Cleans up extra blank lines
-5. Writes back to `assets/grid_mesh_library.tres`
-
-**When to use**:
-- **When Claude needs to read the file** - Run this FIRST before asking Claude to edit grid_mesh_library.tres
-- After editing the MeshLibrary in Godot Editor (which regenerates previews and blows up file size again)
-- Anytime the file exceeds ~30,000 tokens and can't be read
-
-**How to run**:
-```bash
-# From project root:
-python3 _claude_scripts/strip_mesh_library_previews.py
-```
-
-**Output**:
-```
-✓ Stripped preview images from assets/grid_mesh_library.tres
-  Original size: 99,117 bytes
-  New size: 3,456 bytes
-  Saved: 95,661 bytes (96.5%)
-```
-
-**Note**: Godot Editor will regenerate preview images the next time you open the MeshLibrary, so you'll need to re-run this script before each commit if you've edited the file in Godot.
-
----
 
 ### Generating Textures with Sub-Agent Virtuous Cycle
 
@@ -1232,61 +1222,130 @@ python generate.py  # Outputs tileable PNG
 
 ---
 
-### Strategy for Large Godot Resource Files
 
-**General Pattern for .tres/.tscn files that blow up Claude's context window**:
+## 11. Deploying to itch.io with Butler
 
-1. **Comments don't work** - Godot Editor strips comments (`;`) on save, so they're unreliable for marking sections
+### Overview
 
-2. **Externalize when possible**:
-   - Use `[ext_resource]` instead of `[sub_resource]` when you can
-   - Example: We externalized PSX materials to separate `.tres` files
-   - This keeps the main file small enough for Claude to read
-   - Makes changes easier to understand and edit
+**Butler** is itch.io's command-line tool for uploading game builds. It's already installed, authorized, and located at /home/drew/.local/bin/butler .
 
-3. **Strip generated data**:
-   - Preview images, thumbnails, and other generated content bloat files
-   - Use Python scripts like `strip_mesh_library_previews.py` to remove them
-   - Godot will regenerate them when needed
-   - **Primary goal**: Keep files under ~30,000 tokens so Claude can read them
+**Key benefits over manual upload:**
+- Delta compression - only uploads changed files (fast subsequent pushes)
+- Version tracking
+- Can be automated in CI/CD pipelines
 
-4. **Direct text editing is preferred**:
-   - Godot resource files are text-based - take advantage!
-   - Use Python scripts with regex for surgical edits
-   - Avoid "open in editor → manual changes → export" workflows when you can automate
-   - But if file is too large, you MUST strip it first or Claude can't read it
+**Butler limitations:**
+- Upload/deploy only - cannot post comments, create devlogs, or interact with community features
+- For community interaction, use the itch.io web interface
 
-5. **Future consideration: Programmatic generation**:
-   - For very complex resources, consider generating them via EditorScript
-   - Store source files in git, generate the .tres at build time
-   - See planning session on MeshLibrary generation for full strategy
+### Project Configuration
 
-**Example workflow for Claude working with large files**:
-```bash
-# BEFORE asking Claude to edit a large .tres file:
-python3 _claude_scripts/strip_mesh_library_previews.py
+- **itch.io username**: `aebrer`
+- **Game slug**: `backrooms-power-crawl`
+- **Platforms**: Windows, Linux, Web (HTML5 - already marked as playable in browser)
 
-# Now Claude can actually read it
-# Claude edits the file...
+### Channel Names
 
-# Later: Godot regenerates previews when you open the file
-# Next time Claude needs to edit it, strip again
+Butler uses "channels" to organize different platform builds:
+
+| Platform | Channel Name | Auto-detected |
+|----------|--------------|---------------|
+| Windows  | `windows`    | ✅ Yes        |
+| Linux    | `linux`      | ✅ Yes        |
+| Web      | `html5`      | ✅ Yes        |
+
+### Build Directory Structure
+
+Butler pushes **directories**, not archives. The build folder should be organized like this:
+
 ```
+build/
+├── windows/           # Windows export (directory)
+│   ├── bpc.exe
+│   ├── bpc.pck
+│   └── [godot runtime files]
+├── linux/             # Linux export (directory)
+│   ├── bpc_linux.x86_64
+│   ├── bpc_linux.pck
+│   └── [godot runtime files]
+├── web/               # Web export (directory)
+│   ├── index.html     # MUST be at root level
+│   ├── bpc.wasm
+│   ├── bpc.js
+│   └── [other web files]
+└── *.tar.gz           # Archives for GitHub releases (separate workflow)
+```
+
+### Push Commands
+
+**Butler location**: `/home/drew/.local/bin/butler`
+
+```bash
+# Get version from git tag (recommended)
+VERSION=$(git describe --tags --abbrev=0)
+
+# Push all platforms (from project root)
+/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+
+# Check status
+/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+```
+
+### Versioning
+
+- Use `--userversion` to set a human-readable version string
+- Recommended: Use git tags (`v0.5.4`) for consistency with GitHub releases
+- Without `--userversion`, butler auto-generates incrementing integers
+- Version strings are display-only - builds are ordered by upload time, not version parsing
+
+### Common Mistakes to Avoid
+
+- ❌ Pushing zip/tar.gz files directly (butler handles compression internally)
+- ❌ Nesting `index.html` in subdirectories for web builds (must be at root of pushed directory)
+- ❌ Including debug symbols or build artifacts
+- ❌ Forgetting `--userversion` (results in ugly "Build 1", "Build 2" versions)
+
+### Dry Run
+
+Preview what would be pushed without actually uploading:
+
+```bash
+butler push build/windows aebrer/backrooms-power-crawl:windows --dry-run
+```
+
+### Full Publish Workflow
+
+**When the user says "let's publish", this is what they mean:**
+
+```bash
+# 1. Export all platforms (headless - Claude can run these)
+godot --headless --export-release "Linux"
+godot --headless --export-release "Windows Desktop"
+godot --headless --export-release "Web"
+
+# 2. Push to itch.io with version from git tag
+VERSION=$(git describe --tags --abbrev=0)
+/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+
+# 3. Verify uploads
+/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+```
+
+**Additional steps (if doing a full release):**
+- Create git tag first: `git tag v0.6.0`
+- Create GitHub release with tar.gz archives (existing workflow)
+- Post devlog on itch.io (manual - butler can't do this)
 
 ---
 
 ## Final Notes
 
-**This project is a learning journey** - user is learning game dev, you're helping them build good habits and understanding. Take time to explain, be patient with questions, and respect the deliberate pace.
-
 **Quality over speed** - no deadlines, no rush. Each system should be thoughtful, tested, and documented before moving on.
 
 **Test before commit** - seriously, this is the most important lesson. User will tell you when they're ready to commit.
 
-**Stay true to the vision** - read DESIGN.md to understand the game's goals. Don't suggest features that contradict the core vision.
-
-Good luck, future Claude! This is a fascinating project with a thoughtful developer. Take your time, explain well, and build something great together.
-
----
-
-**Generated**: 2025-11-08 by Claude Code reviewing initial architecture implementation session
+**Investigate the truth!** - the codebase itself is the best source of truth in the repo. Before major changes, make sure you read all the files you need to, in full, to get as much appropriate context as possible prior to planning.

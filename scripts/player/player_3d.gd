@@ -28,7 +28,7 @@ const BAR_BG_COLOR = Color(0.0, 0.0, 0.0, 0.9)  # Black background
 
 ## Emitted when action preview should update (for UI)
 ## actions: Array of Action objects that will execute next turn
-## Note: Emitted by states (IdleState, LookModeState), connected in game_3d.gd
+## Note: Emitted by IdleState, connected in game_3d.gd
 @warning_ignore("unused_signal")
 signal action_preview_changed(actions: Array[Action])
 
@@ -70,6 +70,7 @@ var move_indicator: Node3D = null  # Set by Game node
 @onready var model: Node3D = $Model
 @onready var state_machine = $InputStateMachine
 @onready var camera_rig: TacticalCamera = $CameraRig
+@onready var first_person_camera: FirstPersonCamera = $FirstPersonCamera
 
 # ============================================================================
 # LIFECYCLE
@@ -203,13 +204,21 @@ func update_visual_position() -> void:
 # ============================================================================
 
 func get_camera_forward_grid_direction() -> Vector2i:
-	"""Get the grid direction the camera is facing (1 cell ahead)"""
-	if not camera_rig:
-		return Vector2i(0, 1)  # Default forward
+	"""Get the grid direction the camera is facing (1 cell ahead)
 
-	# Get camera yaw - this is the direction the camera is rotated
-	# We want forward direction to rotate WITH the camera (same direction)
-	var camera_yaw_deg = camera_rig.h_pivot.rotation_degrees.y
+	Uses whichever camera is currently active (FPV or Tactical).
+	"""
+	var camera_yaw_deg: float = 0.0
+
+	# Check which camera is active and get its yaw
+	if first_person_camera and first_person_camera.active:
+		# FPV mode - use first person camera's horizontal pivot
+		camera_yaw_deg = first_person_camera.h_pivot.rotation_degrees.y
+	elif camera_rig:
+		# Tactical mode - use tactical camera's horizontal pivot
+		camera_yaw_deg = camera_rig.h_pivot.rotation_degrees.y
+	else:
+		return Vector2i(0, 1)  # Default forward
 
 	# Negate to match rotation direction, then add 270° offset to go from "left" to "forward"
 	# (180° was left, 270° is forward)

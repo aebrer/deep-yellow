@@ -31,6 +31,7 @@ extends Node3D
 @onready var player: Player3D = $Player3D
 @onready var move_indicator: Node3D = $MoveIndicator
 @onready var exp_bar: EXPBar = $ViewportUILayer/EXPBar
+@onready var status_bars: StatusBars = $ViewportUILayer/StatusBars
 
 func _ready() -> void:
 
@@ -58,3 +59,7 @@ func _ready() -> void:
 	# Wire up EXP bar to player
 	if exp_bar:
 		exp_bar.set_player(player)
+
+	# Wire up status bars (HP/Sanity) to player
+	if status_bars:
+		status_bars.set_player(player)
