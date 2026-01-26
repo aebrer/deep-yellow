@@ -126,14 +126,17 @@ func _update_all_stats() -> void:
 	if null_label:
 		null_label.text = "NULL: %d" % s.null_stat
 
-	# Resources
+	# Resources (with regen rates)
 	if hp_label:
-		hp_label.text = "HP: %.0f / %.0f" % [s.current_hp, s.max_hp]
+		var hp_regen = s.max_hp * (s.hp_regen_percent / 100.0)
+		hp_label.text = "HP: %.0f / %.0f (+%.2f)" % [s.current_hp, s.max_hp, hp_regen]
 	if sanity_label:
-		sanity_label.text = "Sanity: %.0f / %.0f" % [s.current_sanity, s.max_sanity]
+		var san_regen = s.max_sanity * (s.sanity_regen_percent / 100.0)
+		sanity_label.text = "Sanity: %.0f / %.0f (+%.2f)" % [s.current_sanity, s.max_sanity, san_regen]
 	if mana_label:
 		if s.null_stat > 0:
-			mana_label.text = "Mana: %.0f / %.0f" % [s.current_mana, s.max_mana]
+			var mana_regen = s.get_mana_regen_amount()
+			mana_label.text = "Mana: %.0f / %.0f (+%.2f)" % [s.current_mana, s.max_mana, mana_regen]
 		else:
 			mana_label.text = "Mana: [LOCKED]"
 
@@ -170,17 +173,23 @@ func _on_turn_completed() -> void:
 	_update_corruption()
 
 func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
-	"""Update resource display"""
+	"""Update resource display with regen rates"""
+	if not player or not player.stats:
+		return
+	var s = player.stats
 	match resource_name:
 		"hp":
 			if hp_label:
-				hp_label.text = "HP: %.0f / %.0f" % [current, maximum]
+				var hp_regen = maximum * (s.hp_regen_percent / 100.0)
+				hp_label.text = "HP: %.0f / %.0f (+%.2f)" % [current, maximum, hp_regen]
 		"sanity":
 			if sanity_label:
-				sanity_label.text = "Sanity: %.0f / %.0f" % [current, maximum]
+				var san_regen = maximum * (s.sanity_regen_percent / 100.0)
+				sanity_label.text = "Sanity: %.0f / %.0f (+%.2f)" % [current, maximum, san_regen]
 		"mana":
 			if mana_label:
-				mana_label.text = "Mana: %.0f / %.0f" % [current, maximum]
+				var mana_regen = s.get_mana_regen_amount()
+				mana_label.text = "Mana: %.0f / %.0f (+%.2f)" % [current, maximum, mana_regen]
 
 func _on_exp_gained(_amount: int, new_total: int) -> void:
 	"""Update EXP display"""
