@@ -3,11 +3,14 @@
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_brown.tres" id="1_floor_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_yellow.tres" id="2_wall_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_acoustic.tres" id="3_ceiling_mat"]
-[ext_resource type="ArrayMesh" path="res://assets/levels/level_00/wall_multimat.tres" id="4_wall_mesh"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_qclfb"]
 material = ExtResource("1_floor_mat")
 size = Vector2(2, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_i67ov"]
+material = ExtResource("2_wall_mat")
+size = Vector3(2, 4, 2)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ceiling"]
 material = ExtResource("3_ceiling_mat")
@@ -39,8 +42,8 @@ item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 
 item/0/navigation_layers = 1
 
 item/1/name = "Wall"
-item/1/mesh = ExtResource("4_wall_mesh")
-item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/1/mesh = SubResource("BoxMesh_i67ov")
+item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 item/1/mesh_cast_shadow = 1
 item/1/shapes = [
 {
