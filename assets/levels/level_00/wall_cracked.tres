@@ -1,15 +1,7 @@
 [gd_resource type="ShaderMaterial" load_steps=3 format=3]
 
-; ============================================================================
-; WALL SHADER - Testing proximity fade (Godot 4.6+)
-; ============================================================================
-; Walls use cull_back (solid rendering)
-; Ceiling uses SEPARATE shader with cull_front (invisible from above)
-; These CANNOT share shaders due to incompatible culling requirements
-; ============================================================================
-
 [ext_resource type="Shader" path="res://shaders/psx_wall_proximity.gdshader" id="1"]
-[ext_resource type="Texture2D" path="res://assets/levels/level_00/textures/wallpaper_yellow.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/levels/level_00/textures/wallpaper_cracked.png" id="2"]
 
 [resource]
 shader = ExtResource("1")

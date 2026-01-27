@@ -47,8 +47,9 @@ enum TileType {
 	FLOOR_CARDBOARD = 4,
 	WALL_CRACKED = 5,
 	WALL_HOLE = 6,
-	CEILING_STAIN = 7,
-	CEILING_HOLE = 8,
+	WALL_MOULDY = 7,
+	CEILING_STAIN = 8,
+	CEILING_HOLE = 9,
 }
 
 # ============================================================================
@@ -61,7 +62,7 @@ static func is_floor_tile(item_id: int) -> bool:
 
 static func is_wall_tile(item_id: int) -> bool:
 	"""Check if a GridMap cell item is any wall variant"""
-	return item_id == TileType.WALL or item_id == TileType.WALL_CRACKED or item_id == TileType.WALL_HOLE
+	return item_id == TileType.WALL or item_id == TileType.WALL_CRACKED or item_id == TileType.WALL_HOLE or item_id == TileType.WALL_MOULDY
 
 static func is_ceiling_tile(item_id: int) -> bool:
 	"""Check if a GridMap cell item is any ceiling variant"""
@@ -78,6 +79,7 @@ static func subchunk_to_gridmap_item(tile_type: int) -> int:
 		SubChunk.TileType.FLOOR_CARDBOARD: return TileType.FLOOR_CARDBOARD
 		SubChunk.TileType.WALL_CRACKED: return TileType.WALL_CRACKED
 		SubChunk.TileType.WALL_HOLE: return TileType.WALL_HOLE
+		SubChunk.TileType.WALL_MOULDY: return TileType.WALL_MOULDY
 		SubChunk.TileType.CEILING_STAIN: return TileType.CEILING_STAIN
 		SubChunk.TileType.CEILING_HOLE: return TileType.CEILING_HOLE
 		_: return tile_type  # Fallback: pass through
@@ -351,7 +353,7 @@ func _cache_wall_materials() -> void:
 		return
 
 	# Cache materials from all wall-type items (base + variants)
-	var wall_item_ids := [TileType.WALL, TileType.WALL_CRACKED, TileType.WALL_HOLE]
+	var wall_item_ids := [TileType.WALL, TileType.WALL_CRACKED, TileType.WALL_HOLE, TileType.WALL_MOULDY]
 	for item_id in wall_item_ids:
 		var wall_mesh = mesh_library.get_item_mesh(item_id)
 		if not wall_mesh:

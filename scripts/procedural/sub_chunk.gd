@@ -22,6 +22,7 @@ enum TileType {
 	# Wall variants (20-29)
 	WALL_CRACKED = 20,
 	WALL_HOLE = 21,
+	WALL_MOULDY = 22,
 	# Ceiling variants (30-39)
 	CEILING_STAIN = 30,
 	CEILING_HOLE = 31,

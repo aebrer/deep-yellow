@@ -1,9 +1,15 @@
-[gd_resource type="MeshLibrary" load_steps=12 format=3 uid="uid://beijc8l4th7t4"]
+[gd_resource type="MeshLibrary" load_steps=21 format=3 uid="uid://beijc8l4th7t4"]
 
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_brown.tres" id="1_floor_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_yellow.tres" id="2_wall_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_acoustic.tres" id="3_ceiling_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_puddle.tres" id="4_floor_puddle_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_cardboard.tres" id="5_floor_cardboard_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_cracked.tres" id="6_wall_cracked_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_hole.tres" id="7_wall_hole_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_mouldy.tres" id="8_wall_mouldy_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_stain.tres" id="9_ceiling_stain_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_hole.tres" id="10_ceiling_hole_mat"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_qclfb"]
 material = ExtResource("1_floor_mat")
@@ -19,6 +25,30 @@ size = Vector2(2, 2)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_floor_puddle"]
 material = ExtResource("4_floor_puddle_mat")
+size = Vector2(2, 2)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_floor_cardboard"]
+material = ExtResource("5_floor_cardboard_mat")
+size = Vector2(2, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_cracked"]
+material = ExtResource("6_wall_cracked_mat")
+size = Vector3(2, 4, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_hole"]
+material = ExtResource("7_wall_hole_mat")
+size = Vector3(2, 4, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_mouldy"]
+material = ExtResource("8_wall_mouldy_mat")
+size = Vector3(2, 4, 2)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ceiling_stain"]
+material = ExtResource("9_ceiling_stain_mat")
+size = Vector2(2, 2)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ceiling_hole"]
+material = ExtResource("10_ceiling_hole_mat")
 size = Vector2(2, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall"]
@@ -90,3 +120,93 @@ item/3/collision_layer = 2
 item/3/collision_mask = 0
 item/3/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/3/navigation_layers = 1
+
+item/4/name = "FloorCardboard"
+item/4/mesh = SubResource("PlaneMesh_floor_cardboard")
+item/4/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/4/mesh_cast_shadow = 1
+item/4/shapes = [
+{
+"shape": SubResource("BoxShape3D_floor"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+}
+]
+item/4/collision_layer = 2
+item/4/collision_mask = 0
+item/4/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/4/navigation_layers = 1
+
+item/5/name = "WallCracked"
+item/5/mesh = SubResource("BoxMesh_wall_cracked")
+item/5/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+item/5/mesh_cast_shadow = 1
+item/5/shapes = [
+{
+"shape": SubResource("BoxShape3D_wall"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+}
+]
+item/5/collision_layer = 2
+item/5/collision_mask = 0
+item/5/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/5/navigation_layers = 1
+
+item/6/name = "WallHole"
+item/6/mesh = SubResource("BoxMesh_wall_hole")
+item/6/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+item/6/mesh_cast_shadow = 1
+item/6/shapes = [
+{
+"shape": SubResource("BoxShape3D_wall"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+}
+]
+item/6/collision_layer = 2
+item/6/collision_mask = 0
+item/6/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/6/navigation_layers = 1
+
+item/7/name = "WallMouldy"
+item/7/mesh = SubResource("BoxMesh_wall_mouldy")
+item/7/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+item/7/mesh_cast_shadow = 1
+item/7/shapes = [
+{
+"shape": SubResource("BoxShape3D_wall"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+}
+]
+item/7/collision_layer = 2
+item/7/collision_mask = 0
+item/7/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/7/navigation_layers = 1
+
+item/8/name = "CeilingStain"
+item/8/mesh = SubResource("PlaneMesh_ceiling_stain")
+item/8/mesh_transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 2.98, 0)
+item/8/mesh_cast_shadow = 0
+item/8/shapes = [
+{
+"shape": SubResource("BoxShape3D_ceiling"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.98, 0)
+}
+]
+item/8/collision_layer = 2
+item/8/collision_mask = 0
+item/8/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/8/navigation_layers = 1
+
+item/9/name = "CeilingHole"
+item/9/mesh = SubResource("PlaneMesh_ceiling_hole")
+item/9/mesh_transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 2.98, 0)
+item/9/mesh_cast_shadow = 0
+item/9/shapes = [
+{
+"shape": SubResource("BoxShape3D_ceiling"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.98, 0)
+}
+]
+item/9/collision_layer = 2
+item/9/collision_mask = 0
+item/9/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/9/navigation_layers = 1
