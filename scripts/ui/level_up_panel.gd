@@ -23,6 +23,47 @@ enum PerkType {
 	CORRUPTION_MINUS_5,
 }
 
+## Detailed hover/focus explanations for each perk (shown below buttons)
+const PERK_EXPLANATIONS: Dictionary = {
+	PerkType.BODY_PLUS_1:
+		"BODY controls your HP pool (10 HP per point) and STRENGTH.\n" +
+		"STRENGTH boosts melee punch damage by +10% per point.\n" +
+		"Choosing this also fully heals your HP.",
+	PerkType.MIND_PLUS_1:
+		"MIND controls your Sanity pool (10 Sanity per point) and PERCEPTION.\n" +
+		"PERCEPTION boosts psychic attack damage by +20% per point.\n" +
+		"Choosing this also fully restores your Sanity.",
+	PerkType.NULL_PLUS_1:
+		"NULL controls your Mana pool (10 Mana per point) and ANOMALY.\n" +
+		"ANOMALY boosts anomalous attack damage by +50% per point — glass cannon scaling.\n" +
+		"NULL also increases base mana regeneration (NULL/2 per turn).\n" +
+		"Your first point in NULL unlocks a new mana-powered attack type.\n" +
+		"Choosing this also fully restores your Mana.",
+	PerkType.HP_REGEN_PLUS_1:
+		"Adds +0.3% of your max HP regenerated each turn.\n" +
+		"Stacks with multiple picks. Base regen is very low (0.1%),\n" +
+		"so this perk is how you build sustainable HP recovery.",
+	PerkType.SANITY_REGEN_PLUS_1:
+		"Adds +0.3% of your max Sanity regenerated each turn.\n" +
+		"Stacks with multiple picks. Base sanity regen is near zero,\n" +
+		"so this is the primary way to recover sanity over time.",
+	PerkType.MANA_REGEN_PLUS_1:
+		"Adds +1% of your max Mana regenerated each turn (on top of base NULL/2 regen).\n" +
+		"Stacks with multiple picks. Useful if you rely on mana-cost abilities.",
+	PerkType.CLEARANCE_PLUS_1:
+		"Clearance Level unlocks deeper knowledge when examining entities and items.\n" +
+		"+10% EXP from ALL sources per clearance level (up to +50% at CL 5).\n" +
+		"Rare and powerful — a long-term investment in faster progression.",
+	PerkType.CORRUPTION_PLUS_5:
+		"Increases the current level's corruption by 0.05.\n" +
+		"Higher corruption means more enemies spawn and they hit harder,\n" +
+		"but loot drops improve. Risk vs. reward.",
+	PerkType.CORRUPTION_MINUS_5:
+		"Decreases the current level's corruption by 0.05.\n" +
+		"Lower corruption means fewer enemies and less danger,\n" +
+		"but loot quality decreases. Safer exploration.",
+}
+
 const PERK_DATA: Dictionary = {
 	PerkType.BODY_PLUS_1: {
 		"name": "+1 BODY",
@@ -88,6 +129,7 @@ const FONT_SIZE_HEADER := 24
 const FONT_SIZE_LEVEL := 18
 const FONT_SIZE_PERK_NAME := 16
 const FONT_SIZE_PERK_DESC := 14
+const FONT_SIZE_EXPLANATION := 12
 
 ## Delay before accepting input (prevents accidental clicks from held buttons)
 const INPUT_ACCEPT_DELAY := 0.5  # seconds
@@ -99,6 +141,7 @@ const INPUT_ACCEPT_DELAY := 0.5  # seconds
 var panel: PanelContainer
 var content_vbox: VBoxContainer
 var perk_buttons: Array[Button] = []
+var explanation_label: Label = null
 
 ## Font with emoji fallback (project default doesn't auto-apply to programmatic Labels)
 var emoji_font: Font = null
@@ -339,6 +382,30 @@ func _rebuild_content() -> void:
 		content_vbox.add_child(button)
 		perk_buttons.append(button)
 
+		# Connect hover/focus signals for explanation display
+		button.mouse_entered.connect(_on_perk_hover.bind(perk_type))
+		button.mouse_exited.connect(_on_perk_hover_exit)
+		button.focus_entered.connect(_on_perk_hover.bind(perk_type))
+		button.focus_exited.connect(_on_perk_hover_exit)
+
+	# Separator before explanation
+	var explain_separator = HSeparator.new()
+	explain_separator.add_theme_constant_override("separation", 8)
+	content_vbox.add_child(explain_separator)
+
+	# Explanation label (populated on hover/focus)
+	explanation_label = Label.new()
+	explanation_label.name = "ExplanationLabel"
+	explanation_label.text = "Hover over a perk for details"
+	explanation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	explanation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explanation_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_EXPLANATION))
+	explanation_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	explanation_label.custom_minimum_size.y = 60
+	if emoji_font:
+		explanation_label.add_theme_font_override("font", emoji_font)
+	content_vbox.add_child(explanation_label)
+
 func _create_perk_button(perk_type: PerkType) -> Button:
 	"""Create a styled button for a perk"""
 	var data = PERK_DATA[perk_type]
@@ -373,6 +440,21 @@ func _create_perk_button(perk_type: PerkType) -> Button:
 	button.add_to_group("hud_focusable")
 
 	return button
+
+func _on_perk_hover(perk_type: PerkType) -> void:
+	"""Show detailed explanation when hovering/focusing a perk button"""
+	if not explanation_label:
+		return
+	if PERK_EXPLANATIONS.has(perk_type):
+		explanation_label.text = PERK_EXPLANATIONS[perk_type]
+		explanation_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+
+func _on_perk_hover_exit() -> void:
+	"""Clear explanation when leaving a perk button"""
+	if not explanation_label:
+		return
+	explanation_label.text = "Hover over a perk for details"
+	explanation_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 
 func _on_perk_selected(perk_type: PerkType) -> void:
 	"""Apply the selected perk and close the panel"""
