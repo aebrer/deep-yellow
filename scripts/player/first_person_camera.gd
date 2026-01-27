@@ -270,7 +270,7 @@ func get_current_target() -> Examinable:
 			var test_cell = Vector3i(test_grid.x, 0, test_grid.y)
 			var cell_item = grid_3d.grid_map.get_cell_item(test_cell)
 
-			if cell_item == grid_3d.TileType.WALL:
+			if Grid3D.is_wall_tile(cell_item):
 				target_pos = test_pos
 				found_wall = true
 				break
@@ -284,17 +284,17 @@ func get_current_target() -> Examinable:
 	if tile_type == "ceiling":
 		var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
 		var cell_item = grid_3d.grid_map.get_cell_item(ceiling_cell)
-		if cell_item != grid_3d.TileType.CEILING:
+		if not Grid3D.is_ceiling_tile(cell_item):
 			return null
 	elif tile_type == "floor":
 		var floor_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
 		var cell_item = grid_3d.grid_map.get_cell_item(floor_cell)
-		if cell_item != grid_3d.TileType.FLOOR:
+		if not Grid3D.is_floor_tile(cell_item):
 			return null
 	else:  # wall
 		var wall_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
 		var cell_item = grid_3d.grid_map.get_cell_item(wall_cell)
-		if cell_item != grid_3d.TileType.WALL:
+		if not Grid3D.is_wall_tile(cell_item):
 			return null
 
 	# Check cache for existing tile (cache key MUST include tile type!)
@@ -373,15 +373,15 @@ func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_pos: Vector3, hi
 	var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
 	var ceiling_item: int = grid_3d.grid_map.get_cell_item(ceiling_cell)
 
-	if ceiling_item == grid_3d.TileType.CEILING and dot_up < -THRESHOLD:
+	if Grid3D.is_ceiling_tile(ceiling_item) and dot_up < -THRESHOLD:
 		return "ceiling"
 
 	# Floor: normal points UP
-	if cell_item == grid_3d.TileType.FLOOR and dot_up > THRESHOLD:
+	if Grid3D.is_floor_tile(cell_item) and dot_up > THRESHOLD:
 		return "floor"
 
 	# Wall: horizontal normal (not up, not down)
-	if cell_item == grid_3d.TileType.WALL or abs(dot_up) < THRESHOLD:
+	if Grid3D.is_wall_tile(cell_item) or abs(dot_up) < THRESHOLD:
 		return "wall"
 
 	return ""

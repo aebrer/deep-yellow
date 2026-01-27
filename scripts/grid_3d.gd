@@ -37,12 +37,50 @@ var use_procedural_generation: bool = false
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
 
-# MeshLibrary item IDs
+# MeshLibrary item IDs (base types only - variants map to these or their own items)
 enum TileType {
 	FLOOR = 0,
 	WALL = 1,
 	CEILING = 2,
+	# Variant items (added to MeshLibrary as separate items)
+	FLOOR_PUDDLE = 3,
+	FLOOR_CARDBOARD = 4,
+	WALL_CRACKED = 5,
+	WALL_HOLE = 6,
+	CEILING_STAIN = 7,
+	CEILING_HOLE = 8,
 }
+
+# ============================================================================
+# TILE TYPE HELPERS
+# ============================================================================
+
+static func is_floor_tile(item_id: int) -> bool:
+	"""Check if a GridMap cell item is any floor variant"""
+	return item_id == TileType.FLOOR or item_id == TileType.FLOOR_PUDDLE or item_id == TileType.FLOOR_CARDBOARD
+
+static func is_wall_tile(item_id: int) -> bool:
+	"""Check if a GridMap cell item is any wall variant"""
+	return item_id == TileType.WALL or item_id == TileType.WALL_CRACKED or item_id == TileType.WALL_HOLE
+
+static func is_ceiling_tile(item_id: int) -> bool:
+	"""Check if a GridMap cell item is any ceiling variant"""
+	return item_id == TileType.CEILING or item_id == TileType.CEILING_STAIN or item_id == TileType.CEILING_HOLE
+
+static func subchunk_to_gridmap_item(tile_type: int) -> int:
+	"""Convert SubChunk.TileType to Grid3D.TileType (MeshLibrary item ID)"""
+	match tile_type:
+		SubChunk.TileType.FLOOR: return TileType.FLOOR
+		SubChunk.TileType.WALL: return TileType.WALL
+		SubChunk.TileType.CEILING: return TileType.CEILING
+		SubChunk.TileType.EXIT_STAIRS: return TileType.FLOOR  # Stairs render as floor
+		SubChunk.TileType.FLOOR_PUDDLE: return TileType.FLOOR_PUDDLE
+		SubChunk.TileType.FLOOR_CARDBOARD: return TileType.FLOOR_CARDBOARD
+		SubChunk.TileType.WALL_CRACKED: return TileType.WALL_CRACKED
+		SubChunk.TileType.WALL_HOLE: return TileType.WALL_HOLE
+		SubChunk.TileType.CEILING_STAIN: return TileType.CEILING_STAIN
+		SubChunk.TileType.CEILING_HOLE: return TileType.CEILING_HOLE
+		_: return tile_type  # Fallback: pass through
 
 # ============================================================================
 # LIFECYCLE
@@ -217,19 +255,23 @@ func load_chunk(chunk: Chunk) -> void:
 					# Convert to 3D grid coordinates
 					var grid_pos := Vector3i(world_tile_pos.x, 0, world_tile_pos.y)
 
+					# Convert SubChunk tile type to MeshLibrary item ID
+					var gridmap_item: int = Grid3D.subchunk_to_gridmap_item(tile_type)
+
 					# Place floor or wall based on tile type (Y=0 layer)
-					if tile_type == SubChunk.TileType.WALL:
-						grid_map.set_cell_item(grid_pos, TileType.WALL)
+					if SubChunk.is_wall_type(tile_type):
+						grid_map.set_cell_item(grid_pos, gridmap_item)
 						wall_count += 1
-					elif tile_type == SubChunk.TileType.FLOOR:
-						grid_map.set_cell_item(grid_pos, TileType.FLOOR)
+					elif SubChunk.is_floor_type(tile_type):
+						grid_map.set_cell_item(grid_pos, gridmap_item)
 						floor_count += 1
 						walkable_cells[world_tile_pos] = true
 
 					# Place ceiling from chunk data (Y=1 layer) - level generator controls placement
 					var ceiling_tile_type = sub_chunk.get_tile_at_layer(tile_pos, 1)
-					if ceiling_tile_type == SubChunk.TileType.CEILING:
-						grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), TileType.CEILING)
+					if SubChunk.is_ceiling_type(ceiling_tile_type):
+						var ceiling_item: int = Grid3D.subchunk_to_gridmap_item(ceiling_tile_type)
+						grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_item)
 
 	var load_time := (Time.get_ticks_usec() - load_start) / 1000.0
 
@@ -281,17 +323,17 @@ func update_tile(world_tile_pos: Vector2i, tile_type: int, ceiling_type: int = -
 
 	Args:
 		world_tile_pos: World tile position to update
-		tile_type: TileType for layer 0 (FLOOR or WALL)
+		tile_type: TileType for layer 0 (any floor or wall variant)
 		ceiling_type: TileType for layer 1, or -1 to skip ceiling update
 	"""
 	var grid_pos := Vector3i(world_tile_pos.x, 0, world_tile_pos.y)
 
 	# Update floor/wall layer
-	if tile_type == TileType.WALL:
-		grid_map.set_cell_item(grid_pos, TileType.WALL)
+	if Grid3D.is_wall_tile(tile_type):
+		grid_map.set_cell_item(grid_pos, tile_type)
 		walkable_cells.erase(world_tile_pos)
-	elif tile_type == TileType.FLOOR:
-		grid_map.set_cell_item(grid_pos, TileType.FLOOR)
+	elif Grid3D.is_floor_tile(tile_type):
+		grid_map.set_cell_item(grid_pos, tile_type)
 		walkable_cells[world_tile_pos] = true
 
 	# Update ceiling layer if requested
@@ -308,21 +350,21 @@ func _cache_wall_materials() -> void:
 		push_warning("[Grid3D] No MeshLibrary found, cannot cache wall materials")
 		return
 
-	# Get wall material from MeshLibrary
-	var wall_mesh = mesh_library.get_item_mesh(TileType.WALL)
-	if not wall_mesh:
-		push_warning("[Grid3D] Wall mesh not found in MeshLibrary")
-		return
+	# Cache materials from all wall-type items (base + variants)
+	var wall_item_ids := [TileType.WALL, TileType.WALL_CRACKED, TileType.WALL_HOLE]
+	for item_id in wall_item_ids:
+		var wall_mesh = mesh_library.get_item_mesh(item_id)
+		if not wall_mesh:
+			continue
 
-	# Get material from the wall mesh
-	for i in range(wall_mesh.get_surface_count()):
-		var material = wall_mesh.surface_get_material(i)
-		if material and material is ShaderMaterial:
-			wall_materials.append(material)
-			# Verify uniform exists
-			var test_value = material.get_shader_parameter("player_position")
-			if test_value == null:
-				push_warning("[Grid3D] Wall material missing player_position uniform!")
+		for i in range(wall_mesh.get_surface_count()):
+			var material = wall_mesh.surface_get_material(i)
+			if material and material is ShaderMaterial:
+				if material not in wall_materials:
+					wall_materials.append(material)
+					var test_value = material.get_shader_parameter("player_position")
+					if test_value == null:
+						push_warning("[Grid3D] Wall material (item %d) missing player_position uniform!" % item_id)
 
 func _cache_ceiling_materials() -> void:
 	"""Cache ceiling materials from MeshLibrary for player position updates"""
@@ -333,21 +375,21 @@ func _cache_ceiling_materials() -> void:
 		push_warning("[Grid3D] No MeshLibrary found, cannot cache ceiling materials")
 		return
 
-	# Get ceiling material from MeshLibrary
-	var ceiling_mesh = mesh_library.get_item_mesh(TileType.CEILING)
-	if not ceiling_mesh:
-		push_warning("[Grid3D] Ceiling mesh not found in MeshLibrary")
-		return
+	# Cache materials from all ceiling-type items (base + variants)
+	var ceiling_item_ids := [TileType.CEILING, TileType.CEILING_STAIN, TileType.CEILING_HOLE]
+	for item_id in ceiling_item_ids:
+		var ceiling_mesh = mesh_library.get_item_mesh(item_id)
+		if not ceiling_mesh:
+			continue
 
-	# Get material from the ceiling mesh
-	for i in range(ceiling_mesh.get_surface_count()):
-		var material = ceiling_mesh.surface_get_material(i)
-		if material and material is ShaderMaterial:
-			ceiling_materials.append(material)
-			# Verify uniform exists
-			var test_value = material.get_shader_parameter("player_position")
-			if test_value == null:
-				push_warning("[Grid3D] Ceiling material missing player_position uniform!")
+		for i in range(ceiling_mesh.get_surface_count()):
+			var material = ceiling_mesh.surface_get_material(i)
+			if material and material is ShaderMaterial:
+				if material not in ceiling_materials:
+					ceiling_materials.append(material)
+					var test_value = material.get_shader_parameter("player_position")
+					if test_value == null:
+						push_warning("[Grid3D] Ceiling material (item %d) missing player_position uniform!" % item_id)
 
 # Debug: Track frame count for periodic logging
 var _frame_count: int = 0
@@ -435,7 +477,7 @@ func world_to_grid(world_pos: Vector3) -> Vector2i:
 # ============================================================================
 
 func is_walkable(pos: Vector2i) -> bool:
-	"""Check if grid position is walkable (floor tile + no entity blocking)
+	"""Check if grid position is walkable (any floor variant + no entity blocking)
 
 	For procedural generation (infinite world), queries GridMap directly.
 	For static levels, checks bounds first.
@@ -444,7 +486,7 @@ func is_walkable(pos: Vector2i) -> bool:
 	# For procedural generation: infinite world, no bounds checking
 	if use_procedural_generation:
 		var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-		if cell_item != TileType.FLOOR:
+		if not Grid3D.is_floor_tile(cell_item):
 			return false
 
 		# Check for entities blocking this position
@@ -455,7 +497,7 @@ func is_walkable(pos: Vector2i) -> bool:
 		return false
 
 	var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-	if cell_item != TileType.FLOOR:
+	if not Grid3D.is_floor_tile(cell_item):
 		return false
 
 	# Check for entities blocking this position
@@ -590,4 +632,4 @@ func _is_tile_blocking_los(pos: Vector2i) -> bool:
 	- Only terrain/walls block LOS
 	"""
 	var cell_item = grid_map.get_cell_item(Vector3i(pos.x, 0, pos.y))
-	return cell_item != TileType.FLOOR
+	return not Grid3D.is_floor_tile(cell_item)

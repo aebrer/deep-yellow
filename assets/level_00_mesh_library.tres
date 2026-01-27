@@ -1,8 +1,9 @@
-[gd_resource type="MeshLibrary" load_steps=9 format=3 uid="uid://beijc8l4th7t4"]
+[gd_resource type="MeshLibrary" load_steps=12 format=3 uid="uid://beijc8l4th7t4"]
 
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_brown.tres" id="1_floor_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/wall_yellow.tres" id="2_wall_mat"]
 [ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/ceiling_acoustic.tres" id="3_ceiling_mat"]
+[ext_resource type="ShaderMaterial" path="res://assets/levels/level_00/floor_puddle.tres" id="4_floor_puddle_mat"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_qclfb"]
 material = ExtResource("1_floor_mat")
@@ -14,6 +15,10 @@ size = Vector3(2, 4, 2)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ceiling"]
 material = ExtResource("3_ceiling_mat")
+size = Vector2(2, 2)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_floor_puddle"]
+material = ExtResource("4_floor_puddle_mat")
 size = Vector2(2, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall"]
@@ -71,3 +76,17 @@ item/2/collision_mask = 0
 item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 item/2/navigation_layers = 1
 
+item/3/name = "FloorPuddle"
+item/3/mesh = SubResource("PlaneMesh_floor_puddle")
+item/3/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/3/mesh_cast_shadow = 1
+item/3/shapes = [
+{
+"shape": SubResource("BoxShape3D_floor"),
+"transform": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+}
+]
+item/3/collision_layer = 2
+item/3/collision_mask = 0
+item/3/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/3/navigation_layers = 1

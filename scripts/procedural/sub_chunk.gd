@@ -8,12 +8,40 @@ class_name SubChunk extends RefCounted
 const SIZE := 16
 
 # Tile types
+# Base types (0-3) map directly to MeshLibrary items in Grid3D
+# Variant types (10+) are grouped by base type for easy categorization:
+#   10-19 = floor variants, 20-29 = wall variants, 30-39 = ceiling variants
 enum TileType {
 	FLOOR = 0,
 	WALL = 1,
 	CEILING = 2,  # For ceiling layer (Y=1)
 	EXIT_STAIRS = 3,
+	# Floor variants (10-19)
+	FLOOR_PUDDLE = 10,
+	FLOOR_CARDBOARD = 11,
+	# Wall variants (20-29)
+	WALL_CRACKED = 20,
+	WALL_HOLE = 21,
+	# Ceiling variants (30-39)
+	CEILING_STAIN = 30,
+	CEILING_HOLE = 31,
 }
+
+# ============================================================================
+# TILE TYPE HELPERS
+# ============================================================================
+
+static func is_floor_type(tile: int) -> bool:
+	"""Check if tile is any floor variant (FLOOR, FLOOR_PUDDLE, FLOOR_CARDBOARD, EXIT_STAIRS)"""
+	return tile == TileType.FLOOR or tile == TileType.EXIT_STAIRS or (tile >= 10 and tile <= 19)
+
+static func is_wall_type(tile: int) -> bool:
+	"""Check if tile is any wall variant (WALL, WALL_CRACKED, WALL_HOLE)"""
+	return tile == TileType.WALL or (tile >= 20 and tile <= 29)
+
+static func is_ceiling_type(tile: int) -> bool:
+	"""Check if tile is any ceiling variant (CEILING, CEILING_STAIN, CEILING_HOLE)"""
+	return tile == TileType.CEILING or (tile >= 30 and tile <= 39)
 
 # Position
 var local_position: Vector2i  # Position within parent chunk (0-7, 0-7)
@@ -97,9 +125,9 @@ func set_tile_at_layer(local_pos: Vector2i, layer: int, tile_type: int) -> void:
 		ceiling_data[local_pos.y][local_pos.x] = tile_type
 
 func is_walkable(local_pos: Vector2i) -> bool:
-	"""Check if tile is walkable (floor or exit stairs)"""
+	"""Check if tile is walkable (any floor variant or exit stairs)"""
 	var tile := get_tile(local_pos)
-	return tile == TileType.FLOOR or tile == TileType.EXIT_STAIRS
+	return SubChunk.is_floor_type(tile)
 
 # ============================================================================
 # UTILITY

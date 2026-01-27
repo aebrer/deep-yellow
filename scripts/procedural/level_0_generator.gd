@@ -140,8 +140,8 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 
 	var time_after_floor_pct := Time.get_ticks_usec()
 
-	# Apply to chunk
-	_apply_grid_to_chunk(grid, chunk)
+	# Apply to chunk (with variant placement)
+	_apply_grid_to_chunk(grid, chunk, rng)
 
 	var time_after_apply := Time.get_ticks_usec()
 
@@ -450,7 +450,10 @@ func _ensure_floor_percentage_range(grid: Array, rng: RandomNumberGenerator) -> 
 # GRID APPLICATION
 # ============================================================================
 
-func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
+## Variant placement probabilities (per floor tile)
+const FLOOR_PUDDLE_CHANCE := 0.001  # 0.1% of floor tiles become puddles
+
+func _apply_grid_to_chunk(grid: Array, chunk: Chunk, rng: RandomNumberGenerator) -> void:
 	"""Apply generated grid to chunk tiles (layer 0 = floor/wall, layer 1 = ceiling)
 
 	⚠️ PERFORMANCE CRITICAL - DO NOT "REFACTOR" WITHOUT BENCHMARKING ⚠️
@@ -472,6 +475,7 @@ func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
 	remember: the "clean" version was 3x slower and caused frame hitches.
 	"""
 	const CEILING := 2  # SubChunk.TileType.CEILING
+	const FLOOR_PUDDLE := 10  # SubChunk.TileType.FLOOR_PUDDLE
 	const SUB_CHUNK_SIZE := 16
 	const SUB_CHUNKS_PER_SIDE := 8
 
@@ -488,10 +492,15 @@ func _apply_grid_to_chunk(grid: Array, chunk: Chunk) -> void:
 					var grid_y := sub_y * SUB_CHUNK_SIZE + tile_y
 					var tile_type: int = grid[grid_y][grid_x]
 
+					# Randomly replace some floor tiles with variants
+					if tile_type == FLOOR:
+						if rng.randf() < FLOOR_PUDDLE_CHANCE:
+							tile_type = FLOOR_PUDDLE
+
 					# Direct sub-chunk tile access (no coordinate conversion!)
 					var sub_local := Vector2i(tile_x, tile_y)
 					sub_chunk.set_tile(sub_local, tile_type)
 
-					# Set ceiling above floor tiles
-					if tile_type == FLOOR:
+					# Set ceiling above floor tiles (all floor variants get ceilings)
+					if tile_type == FLOOR or (tile_type >= 10 and tile_type <= 19):
 						sub_chunk.set_tile_at_layer(sub_local, 1, CEILING)
