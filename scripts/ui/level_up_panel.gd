@@ -399,6 +399,7 @@ func _rebuild_content() -> void:
 	explanation_label.text = "Hover over a perk for details"
 	explanation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	explanation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explanation_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	explanation_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_EXPLANATION))
 	explanation_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	explanation_label.custom_minimum_size.y = 60
