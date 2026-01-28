@@ -34,6 +34,22 @@ entity density: very low"""
 	# Level 0 specific mesh library (yellow wallpaper, brown carpet, grey ceiling)
 	mesh_library_path = "res://assets/level_00_mesh_library.tres"
 
+	# Tile type → MeshLibrary item ID mapping
+	# SubChunk.TileType values → MeshLibrary item indices
+	tile_mapping = {
+		0: 0,   # FLOOR → Floor
+		1: 1,   # WALL → Wall
+		2: 2,   # CEILING → Ceiling
+		3: 0,   # EXIT_STAIRS → Floor (renders as floor)
+		10: 3,  # FLOOR_PUDDLE → FloorPuddle
+		11: 4,  # FLOOR_CARDBOARD → FloorCardboard
+		20: 5,  # WALL_CRACKED → WallCracked
+		21: 6,  # WALL_HOLE → WallHole
+		22: 7,  # WALL_MOULDY → WallMouldy
+		30: 8,  # CEILING_STAIN → CeilingStain
+		31: 9,  # CEILING_HOLE → CeilingHole
+	}
+
 	# Yellow office aesthetic
 	ambient_light_color = Color(1.0, 0.95, 0.7, 1.0)  # Warm yellow
 	ambient_light_intensity = 0.5

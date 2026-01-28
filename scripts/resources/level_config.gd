@@ -46,6 +46,14 @@ class_name LevelConfig
 ## MeshLibrary contains all tile meshes with materials baked in (walls, floors, ceilings)
 @export_file("*.tres") var mesh_library_path: String = ""
 
+## Maps SubChunk.TileType values to MeshLibrary item IDs for this level.
+## Each level defines which MeshLibrary items correspond to which tile types.
+## Keys: SubChunk.TileType int values (0=FLOOR, 1=WALL, 2=CEILING, 3=EXIT_STAIRS,
+##        10-19=floor variants, 20-29=wall variants, 30-39=ceiling variants)
+## Values: MeshLibrary item IDs (0, 1, 2, etc.)
+## Unmapped variant types fall back to their base type (e.g., FLOOR_PUDDLE → FLOOR).
+var tile_mapping: Dictionary = {}
+
 ## Ambient light color for this level
 @export var ambient_light_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 
@@ -331,9 +339,7 @@ func get_random_exit_destination() -> int:
 func validate() -> bool:
 	var valid := true
 
-	if level_id < 0:
-		push_error("[LevelConfig] Invalid level_id: %d" % level_id)
-		valid = false
+	# level_id can be negative (e.g., -1 for tutorial level)
 
 	if display_name.is_empty():
 		push_warning("[LevelConfig] Missing display_name for level %d" % level_id)

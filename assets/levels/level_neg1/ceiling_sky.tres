@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://shaders/psx_ceiling_proximity.gdshader" id="1"]
+[ext_resource type="Texture2D" path="res://assets/levels/level_neg1/textures/dark_sky.png" id="2"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+shader_parameter/enable_proximity_fade = true
+shader_parameter/sightline_fade_radius = 60.0
+shader_parameter/use_dithered_fade = true
+shader_parameter/player_position = Vector3(0, 0, 0)

@@ -61,7 +61,7 @@ enum Strategy {
 	HYBRID          # Mix of both (30% probability)
 }
 
-# Tile types (matching Grid3D.TileType)
+# Tile types (SubChunk.TileType values for generation)
 const FLOOR := 0
 const WALL := 1
 

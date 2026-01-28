@@ -1043,21 +1043,15 @@ func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_grid
 		world_pos: World tile position
 		update_gridmap: If true, also update the GridMap visuals AND pathfinder (for already-loaded chunks)
 	"""
-	# SubChunk tile types (for chunk data)
-	const SUBCHUNK_FLOOR := 0  # SubChunk.TileType.FLOOR
-	const SUBCHUNK_CEILING := 2  # SubChunk.TileType.CEILING
-
-	# Grid3D tile types (for GridMap visuals) - these are DIFFERENT!
-	const GRID_FLOOR := 0  # Grid3D.TileType.FLOOR
-	const GRID_CEILING := 2  # Grid3D.TileType.CEILING
-
-	chunk.set_tile(world_pos, SUBCHUNK_FLOOR)
-	chunk.set_tile_at_layer(world_pos, 1, SUBCHUNK_CEILING)
+	chunk.set_tile(world_pos, SubChunk.TileType.FLOOR)
+	chunk.set_tile_at_layer(world_pos, 1, SubChunk.TileType.CEILING)
 
 	# Update GridMap visuals AND pathfinder if chunk is already rendered
 	if update_gridmap:
 		if grid_3d:
-			grid_3d.update_tile(world_pos, GRID_FLOOR, GRID_CEILING)
+			var grid_floor := Grid3D.subchunk_to_gridmap_item(SubChunk.TileType.FLOOR)
+			var grid_ceiling := Grid3D.subchunk_to_gridmap_item(SubChunk.TileType.CEILING)
+			grid_3d.update_tile(world_pos, grid_floor, grid_ceiling)
 		else:
 			Log.warn(Log.Category.GRID, "Cannot update GridMap - grid_3d is null")
 

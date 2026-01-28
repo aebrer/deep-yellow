@@ -82,9 +82,9 @@ func _add_chunk_to_graph(chunk_pos: Vector2i) -> void:
 			var local_pos := Vector2i(x, y)
 			var world_pos := chunk_world_offset + local_pos
 
-			# Check if tile is walkable (FLOOR = 0)
+			# Check if tile is walkable (any floor type)
 			if grid.has_method("get_tile_type"):
-				if grid.get_tile_type(world_pos) == 0:  # FLOOR
+				if SubChunk.is_floor_type(grid.get_tile_type(world_pos)):
 					_add_point(world_pos)
 			elif grid.has_method("is_walkable"):
 				if grid.is_walkable(world_pos):
@@ -361,7 +361,7 @@ func add_chunk(chunk: Chunk) -> void:
 		for y in range(subchunk.SIZE):
 			for x in range(subchunk.SIZE):
 				var tile_type = subchunk.get_tile(Vector2i(x, y))
-				if tile_type == subchunk.TileType.FLOOR:
+				if SubChunk.is_floor_type(tile_type):
 					var world_pos: Vector2i = subchunk_offset + Vector2i(x, y)
 					if not pos_to_id.has(world_pos):
 						_add_point(world_pos)

@@ -40,52 +40,63 @@ var use_procedural_generation: bool = false
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
 
-# MeshLibrary item IDs (base types only - variants map to these or their own items)
-enum TileType {
-	FLOOR = 0,
-	WALL = 1,
-	CEILING = 2,
-	# Variant items (added to MeshLibrary as separate items)
-	FLOOR_PUDDLE = 3,
-	FLOOR_CARDBOARD = 4,
-	WALL_CRACKED = 5,
-	WALL_HOLE = 6,
-	WALL_MOULDY = 7,
-	CEILING_STAIN = 8,
-	CEILING_HOLE = 9,
-}
+# ============================================================================
+# TILE TYPE SYSTEM (Data-Driven)
+# ============================================================================
+# Tile categories are determined by the current level's tile_mapping dictionary.
+# Each level maps SubChunk.TileType values to MeshLibrary item IDs.
+# These static caches are rebuilt when configure_from_level() is called.
+
+# Cached sets of MeshLibrary item IDs by category (rebuilt per level)
+static var _floor_items: Dictionary = {}  # {item_id: true}
+static var _wall_items: Dictionary = {}   # {item_id: true}
+static var _ceiling_items: Dictionary = {} # {item_id: true}
+# Cached tile_mapping from current level
+static var _tile_mapping: Dictionary = {}
+
+static func _rebuild_tile_category_cache(tile_mapping: Dictionary) -> void:
+	"""Rebuild category caches from a level's tile_mapping dictionary"""
+	_floor_items.clear()
+	_wall_items.clear()
+	_ceiling_items.clear()
+	_tile_mapping = tile_mapping
+	for subchunk_type in tile_mapping:
+		var item_id: int = tile_mapping[subchunk_type]
+		if SubChunk.is_floor_type(subchunk_type):
+			_floor_items[item_id] = true
+		elif SubChunk.is_wall_type(subchunk_type):
+			_wall_items[item_id] = true
+		elif SubChunk.is_ceiling_type(subchunk_type):
+			_ceiling_items[item_id] = true
 
 # ============================================================================
 # TILE TYPE HELPERS
 # ============================================================================
 
 static func is_floor_tile(item_id: int) -> bool:
-	"""Check if a GridMap cell item is any floor variant"""
-	return item_id == TileType.FLOOR or item_id == TileType.FLOOR_PUDDLE or item_id == TileType.FLOOR_CARDBOARD
+	"""Check if a GridMap cell item is any floor variant in the current level"""
+	return _floor_items.has(item_id)
 
 static func is_wall_tile(item_id: int) -> bool:
-	"""Check if a GridMap cell item is any wall variant"""
-	return item_id == TileType.WALL or item_id == TileType.WALL_CRACKED or item_id == TileType.WALL_HOLE or item_id == TileType.WALL_MOULDY
+	"""Check if a GridMap cell item is any wall variant in the current level"""
+	return _wall_items.has(item_id)
 
 static func is_ceiling_tile(item_id: int) -> bool:
-	"""Check if a GridMap cell item is any ceiling variant"""
-	return item_id == TileType.CEILING or item_id == TileType.CEILING_STAIN or item_id == TileType.CEILING_HOLE
+	"""Check if a GridMap cell item is any ceiling variant in the current level"""
+	return _ceiling_items.has(item_id)
 
 static func subchunk_to_gridmap_item(tile_type: int) -> int:
-	"""Convert SubChunk.TileType to Grid3D.TileType (MeshLibrary item ID)"""
-	match tile_type:
-		SubChunk.TileType.FLOOR: return TileType.FLOOR
-		SubChunk.TileType.WALL: return TileType.WALL
-		SubChunk.TileType.CEILING: return TileType.CEILING
-		SubChunk.TileType.EXIT_STAIRS: return TileType.FLOOR  # Stairs render as floor
-		SubChunk.TileType.FLOOR_PUDDLE: return TileType.FLOOR_PUDDLE
-		SubChunk.TileType.FLOOR_CARDBOARD: return TileType.FLOOR_CARDBOARD
-		SubChunk.TileType.WALL_CRACKED: return TileType.WALL_CRACKED
-		SubChunk.TileType.WALL_HOLE: return TileType.WALL_HOLE
-		SubChunk.TileType.WALL_MOULDY: return TileType.WALL_MOULDY
-		SubChunk.TileType.CEILING_STAIN: return TileType.CEILING_STAIN
-		SubChunk.TileType.CEILING_HOLE: return TileType.CEILING_HOLE
-		_: return tile_type  # Fallback: pass through
+	"""Convert SubChunk.TileType to MeshLibrary item ID using current level's mapping"""
+	if _tile_mapping.has(tile_type):
+		return _tile_mapping[tile_type]
+	# Fallback: map variant to its base type
+	if SubChunk.is_floor_type(tile_type):
+		return _tile_mapping.get(0, 0)  # Fall back to base floor
+	elif SubChunk.is_wall_type(tile_type):
+		return _tile_mapping.get(1, 1)  # Fall back to base wall
+	elif SubChunk.is_ceiling_type(tile_type):
+		return _tile_mapping.get(2, 2)  # Fall back to base ceiling
+	return tile_type  # Last resort passthrough
 
 # ============================================================================
 # LIFECYCLE
@@ -122,6 +133,11 @@ func configure_from_level(level_config: LevelConfig) -> void:
 	current_level = level_config
 	grid_size = level_config.grid_size
 
+	# Build tile category caches from level's tile_mapping
+	if not level_config.tile_mapping.is_empty():
+		Grid3D._rebuild_tile_category_cache(level_config.tile_mapping)
+	else:
+		push_warning("[Grid3D] Level %d has empty tile_mapping — tile category checks may fail" % level_config.level_id)
 
 	# Check if ChunkManager exists (indicates procedural generation mode)
 	if has_node("/root/ChunkManager"):
@@ -368,8 +384,7 @@ func _cache_wall_materials() -> void:
 		return
 
 	# Cache materials from all wall-type items (base + variants)
-	var wall_item_ids := [TileType.WALL, TileType.WALL_CRACKED, TileType.WALL_HOLE, TileType.WALL_MOULDY]
-	for item_id in wall_item_ids:
+	for item_id in _wall_items:
 		var wall_mesh = mesh_library.get_item_mesh(item_id)
 		if not wall_mesh:
 			continue
@@ -393,8 +408,7 @@ func _cache_ceiling_materials() -> void:
 		return
 
 	# Cache materials from all ceiling-type items (base + variants)
-	var ceiling_item_ids := [TileType.CEILING, TileType.CEILING_STAIN, TileType.CEILING_HOLE]
-	for item_id in ceiling_item_ids:
+	for item_id in _ceiling_items:
 		var ceiling_mesh = mesh_library.get_item_mesh(item_id)
 		if not ceiling_mesh:
 			continue
