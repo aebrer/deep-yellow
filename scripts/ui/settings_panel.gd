@@ -44,11 +44,15 @@ var sensitivity_slider: HSlider
 var sensitivity_value_label: Label
 var fov_slider: HSlider
 var fov_value_label: Label
+var codex_button: Button
 var restart_button: Button
 var quit_button: Button
 
 # Controls section container (for device-specific label updates)
 var _controls_vbox: VBoxContainer = null
+
+# Reference to codex panel (set by game.gd)
+var codex_panel: CodexPanel = null
 
 # State
 var _accepting_input: bool = false
@@ -188,6 +192,12 @@ func _build_content() -> void:
 	if emoji_font:
 		fov_value_label.add_theme_font_override("font", emoji_font)
 	fov_row.add_child(fov_value_label)
+
+	# --- Codex ---
+	codex_button = _create_action_button("Codex")
+	codex_button.pressed.connect(_on_codex_pressed)
+	content_vbox.add_child(codex_button)
+	focusable_controls.append(codex_button)
 
 	# --- Controls Reference ---
 	_build_controls_section()
@@ -387,6 +397,21 @@ func _is_fullscreen() -> bool:
 	"""Check if window is in fullscreen mode"""
 	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 
+func _on_codex_pressed() -> void:
+	"""Open the codex panel"""
+	if not _accepting_input:
+		return
+	if codex_panel:
+		visible = false
+		if not codex_panel.codex_closed.is_connected(_on_codex_closed):
+			codex_panel.codex_closed.connect(_on_codex_closed)
+		codex_panel.show_codex()
+
+func _on_codex_closed() -> void:
+	"""Re-show settings panel when codex is closed"""
+	if PauseManager and PauseManager.is_paused:
+		_show_panel()
+
 func _on_fullscreen_toggled() -> void:
 	"""Toggle fullscreen mode"""
 	if not _accepting_input:
@@ -562,7 +587,7 @@ func _is_blocking_popup_visible() -> bool:
 			var script = parent.get_script()
 			if script:
 				var script_path = script.resource_path
-				if "level_up_panel" in script_path or "game_over_panel" in script_path or "item_slot_selection_panel" in script_path:
+				if "level_up_panel" in script_path or "game_over_panel" in script_path or "item_slot_selection_panel" in script_path or "codex_panel" in script_path:
 					if parent.visible:
 						return true
 			parent = parent.get_parent()

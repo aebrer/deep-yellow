@@ -207,7 +207,7 @@ Seven features for improved onboarding, UI polish, and new content. Branch: `v0.
 
 **Problem**: No way to trade resources for items mid-run.
 
-**Approach**: Create a vending machine world object that, when interacted with, presents a selection of items. Player picks one, pays HP and/or Sanity cost.
+**Approach**: Create a vending machine world object that, when interacted with, presents a selection of items. Player picks one, pays in a % of max HP, SANITY, or MANA (varies per item and per item rarity).
 
 **Implementation**:
 1. Create `VendingMachine` data class:

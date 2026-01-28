@@ -340,9 +340,7 @@ func _update_examination_target() -> void:
 		if new_target:
 			# Examine the target - route to correct examination function based on entity_type
 			if new_target.entity_type == Examinable.EntityType.ENVIRONMENT:
-				# Extract simple type from "level_0_floor" → "floor"
-				var env_type = new_target.entity_id.replace("level_0_", "")
-				KnowledgeDB.examine_environment(env_type)
+				KnowledgeDB.examine_environment(new_target.entity_id)
 			elif new_target.entity_type == Examinable.EntityType.ITEM:
 				# Items - need to get rarity for correct EXP reward
 				var item = KnowledgeDB._get_item_by_id(new_target.entity_id)

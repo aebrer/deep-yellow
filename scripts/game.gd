@@ -24,6 +24,9 @@ var game_over_panel: GameOverPanel = null
 ## Settings panel (created dynamically, shown when paused)
 var settings_panel: SettingsPanel = null
 
+## Codex panel (created dynamically, opened from settings)
+var codex_panel: CodexPanel = null
+
 ## Access to player in 3D scene
 var player: Node3D
 
@@ -492,9 +495,23 @@ func _create_settings_panel() -> void:
 	settings_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(settings_panel)
 
+	# Create codex panel (opened from settings)
+	_create_codex_panel()
+
 	# Wire up player reference for camera settings
 	if player:
 		settings_panel.set_player(player)
+
+func _create_codex_panel() -> void:
+	"""Create the codex panel and link it to settings panel"""
+	codex_panel = CodexPanel.new()
+	codex_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	codex_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(codex_panel)
+
+	# Link codex panel to settings panel
+	if settings_panel:
+		settings_panel.codex_panel = codex_panel
 
 func _on_player_died(cause: String) -> void:
 	"""Handle player death - show game over screen"""
