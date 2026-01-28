@@ -20,6 +20,9 @@ var item_renderer: ItemRenderer = null
 # Entity rendering
 var entity_renderer: EntityRenderer = null
 
+# Spraypaint text rendering
+var spraypaint_renderer: SpraypaintRenderer = null
+
 # Grid data (same as 2D version)
 var grid_size: Vector2i = GRID_SIZE
 var walkable_cells: Dictionary = {}  # Vector2i -> bool (using Dictionary for O(1) erase instead of O(n))
@@ -103,6 +106,10 @@ func _ready() -> void:
 	# Create entity renderer
 	entity_renderer = EntityRenderer.new()
 	add_child(entity_renderer)
+
+	# Create spraypaint renderer
+	spraypaint_renderer = SpraypaintRenderer.new()
+	add_child(spraypaint_renderer)
 
 	print("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
 
@@ -281,6 +288,10 @@ func load_chunk(chunk: Chunk) -> void:
 	if item_renderer:
 		item_renderer.render_chunk_items(chunk)
 
+	# Render spraypaint text in chunk
+	if spraypaint_renderer:
+		spraypaint_renderer.render_chunk_spraypaint(chunk)
+
 	# NOTE: Entity rendering is handled by ChunkManager AFTER entity spawning
 	# because entities need is_walkable() which requires GridMap to be populated first
 
@@ -318,6 +329,10 @@ func unload_chunk(chunk: Chunk) -> void:
 	# Unload entity billboards
 	if entity_renderer:
 		entity_renderer.unload_chunk_entities(chunk)
+
+	# Unload spraypaint labels
+	if spraypaint_renderer:
+		spraypaint_renderer.unload_chunk_spraypaint(chunk)
 
 
 func update_tile(world_tile_pos: Vector2i, tile_type: int, ceiling_type: int = -1) -> void:

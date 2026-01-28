@@ -152,6 +152,9 @@ func _ready() -> void:
 		# SNAP to grid position (turn-based = no smooth movement)
 		update_visual_position()
 
+		# Place test spraypaint near spawn position
+		_place_spawn_spraypaint()
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Block gameplay input when paused (UI navigation takes over)
@@ -536,3 +539,33 @@ func execute_item_pools() -> void:
 		mind_pool.execute_turn(self, turn_count)
 	if null_pool:
 		null_pool.execute_turn(self, turn_count)
+
+func _place_spawn_spraypaint() -> void:
+	"""Place test spraypaint text near the player's spawn position"""
+	if not grid:
+		print("[Player3D] _place_spawn_spraypaint: no grid reference")
+		return
+	if not grid.spraypaint_renderer:
+		print("[Player3D] _place_spawn_spraypaint: no spraypaint_renderer on grid")
+		return
+
+	# Find an adjacent walkable tile to place spraypaint on
+	var directions := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var spray_pos: Vector2i = grid_position  # Fallback: same tile
+
+	for dir in directions:
+		var candidate: Vector2i = grid_position + dir
+		if grid.is_walkable(candidate):
+			spray_pos = candidate
+			break
+
+	print("[Player3D] Placing spawn spraypaint at %s (player at %s)" % [spray_pos, grid_position])
+
+	grid.spraypaint_renderer.add_spraypaint(
+		spray_pos,
+		"there's an item nearby",
+		Color(1.0, 0.4, 0.1),  # Orange spraypaint
+		64,  # Larger font for visibility
+		"floor",
+		0.0
+	)

@@ -53,6 +53,7 @@ var tile_data: Array[Array] = []  # 16×16 tile types (layer 0)
 var ceiling_data: Array[Array] = []  # 16×16 ceiling tiles (layer 1)
 var world_items: Array[Dictionary] = []  # Serialized WorldItem data (persists across chunk load/unload)
 var world_entities: Array[WorldEntity] = []  # WorldEntity objects (persist across chunk load/unload)
+var spraypaint_data: Array[Dictionary] = []  # Spraypaint text entries (persist across chunk load/unload)
 
 # ============================================================================
 # INITIALIZATION
