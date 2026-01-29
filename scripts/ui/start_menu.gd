@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
 		# Drift forward, loop back when reaching end
 		var drift_pos := fmod(_time * CAMERA_DRIFT_SPEED, _camera_end_z - _camera_start_z)
 		_camera.position.z = _camera_start_z + drift_pos
-		_camera.position.y = 0.85 + sin(_time * CAMERA_BOB_SPEED) * CAMERA_BOB_AMPLITUDE
+		_camera.position.y = 1.275 + sin(_time * CAMERA_BOB_SPEED) * CAMERA_BOB_AMPLITUDE
 
 	# Handle RT/move_confirm input (synthesized by InputManager)
 	if _starting:
@@ -187,11 +187,11 @@ func _build_3d_background() -> void:
 	_camera = Camera3D.new()
 	_camera.fov = 90.0
 	# Start position: middle of corridor width, eye height above floor
-	# Floor is at Y=0, ceiling at Y=1. Eye height ~0.85 for first-person feel.
+	# Floor is at Y=0, ceiling at Y=1. Raised camera for cinematic framing.
 	var mid_x := (CORRIDOR_WIDTH / 2.0) * CELL_SIZE.x + CELL_SIZE.x / 2.0
 	_camera_start_z = 2.0 * CELL_SIZE.z
 	_camera_end_z = float(CORRIDOR_LENGTH - 2) * CELL_SIZE.z
-	_camera.position = Vector3(mid_x, 0.85, _camera_start_z)
+	_camera.position = Vector3(mid_x, 1.275, _camera_start_z)
 	# Look straight down the corridor (positive Z)
 	_camera.rotation_degrees = Vector3(0, 180, 0)
 	viewport.add_child(_camera)
