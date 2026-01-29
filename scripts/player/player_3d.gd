@@ -95,65 +95,28 @@ func _ready() -> void:
 		await ChunkManager.initial_load_completed
 
 	if grid:
-		# Use the navigation graph already built by ChunkManager during initial load
-		# ChunkManager.add_chunk() incrementally adds each chunk's walkable tiles
-		var starting_chunk := Vector2i(0, 0)
+		# Check if level config specifies a fixed spawn position
+		var current_level := LevelManager.get_current_level()
+		var fixed_spawn := current_level.player_spawn_position if current_level else Vector2i(-1, -1)
 
-		# Find a spawn point that can reach at least 2/4 adjacent chunks
-		# This ensures player isn't stuck in a dead-end or isolated area
-		var spawn_found := false
-		var max_attempts := 100  # Increased attempts for better reliability
+		if fixed_spawn != Vector2i(-1, -1):
+			# Hand-crafted level with fixed spawn
+			grid_position = fixed_spawn
+			Log.system("Using fixed spawn position: %s" % grid_position)
 
-		# Constrain spawn candidates to starting chunk only (not all 49 loaded chunks)
-		# This ensures candidates are in the pathfinding graph we just built
-		const CHUNK_SIZE := 128
-		var starting_chunk_offset := starting_chunk * CHUNK_SIZE
-
-		for attempt in range(max_attempts):
-			# Sample candidate from within starting chunk (0,0)
-			var local_x := randi() % CHUNK_SIZE
-			var local_y := randi() % CHUNK_SIZE
-			var candidate := starting_chunk_offset + Vector2i(local_x, local_y)
-
-			# Skip if not walkable (in a wall)
-			if not grid.is_walkable(candidate):
-				continue
-
-			# Validate spawn can reach at least 2 adjacent chunks (not in isolated area)
-			if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):  # Default min_adjacent = 2
-				grid_position = candidate
-				spawn_found = true
-				break
-
-		if not spawn_found:
-			Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches 2+ adjacent chunks, using center of starting chunk")
-			# Fallback: use center of starting chunk and hope for the best
-			grid_position = starting_chunk_offset + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
-			# Find nearest walkable if center is a wall (search within starting chunk only)
-			if not grid.is_walkable(grid_position):
-				# Spiral search outward from center within starting chunk
-				var found_walkable := false
-				for radius in range(1, CHUNK_SIZE / 2):
-					for dx in range(-radius, radius + 1):
-						for dy in range(-radius, radius + 1):
-							if abs(dx) + abs(dy) != radius:
-								continue  # Only check tiles at this exact radius
-
-							var test_pos := grid_position + Vector2i(dx, dy)
-							if grid.is_walkable(test_pos):
-								grid_position = test_pos
-								found_walkable = true
-								break
-						if found_walkable:
-							break
-					if found_walkable:
-						break
+			# Set initial camera direction if configured
+			if current_level.player_spawn_camera_yaw != 0.0:
+				_set_camera_yaw(current_level.player_spawn_camera_yaw)
+		else:
+			# Procedural level — find spawn via random search
+			_find_procedural_spawn()
 
 		# SNAP to grid position (turn-based = no smooth movement)
 		update_visual_position()
 
-		# Place test spraypaint near spawn position
-		_place_spawn_spraypaint()
+		# Place test spraypaint near spawn position (only for procedural levels)
+		if fixed_spawn == Vector2i(-1, -1):
+			_place_spawn_spraypaint()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -539,6 +502,55 @@ func execute_item_pools() -> void:
 		mind_pool.execute_turn(self, turn_count)
 	if null_pool:
 		null_pool.execute_turn(self, turn_count)
+
+func _find_procedural_spawn() -> void:
+	"""Find a random spawn position in the starting chunk for procedural levels"""
+	var starting_chunk := Vector2i(0, 0)
+	var spawn_found := false
+	var max_attempts := 100
+
+	const CHUNK_SIZE := 128
+	var starting_chunk_offset := starting_chunk * CHUNK_SIZE
+
+	for attempt in range(max_attempts):
+		var local_x := randi() % CHUNK_SIZE
+		var local_y := randi() % CHUNK_SIZE
+		var candidate := starting_chunk_offset + Vector2i(local_x, local_y)
+
+		if not grid.is_walkable(candidate):
+			continue
+
+		if Pathfinding.can_reach_chunk_edges(candidate, starting_chunk):
+			grid_position = candidate
+			spawn_found = true
+			break
+
+	if not spawn_found:
+		Log.warn(Log.Category.SYSTEM, "Could not find spawn that reaches 2+ adjacent chunks, using center of starting chunk")
+		grid_position = starting_chunk_offset + Vector2i(CHUNK_SIZE / 2, CHUNK_SIZE / 2)
+		if not grid.is_walkable(grid_position):
+			var found_walkable := false
+			for radius in range(1, CHUNK_SIZE / 2):
+				for dx in range(-radius, radius + 1):
+					for dy in range(-radius, radius + 1):
+						if abs(dx) + abs(dy) != radius:
+							continue
+						var test_pos := grid_position + Vector2i(dx, dy)
+						if grid.is_walkable(test_pos):
+							grid_position = test_pos
+							found_walkable = true
+							break
+					if found_walkable:
+						break
+				if found_walkable:
+					break
+
+func _set_camera_yaw(yaw_degrees: float) -> void:
+	"""Set both cameras to a specific horizontal rotation"""
+	if first_person_camera and first_person_camera.h_pivot:
+		first_person_camera.h_pivot.rotation_degrees.y = yaw_degrees
+	if camera_rig and camera_rig.h_pivot:
+		camera_rig.h_pivot.rotation_degrees.y = yaw_degrees
 
 func _place_spawn_spraypaint() -> void:
 	"""Place test spraypaint text near the player's spawn position"""

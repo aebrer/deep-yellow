@@ -396,22 +396,38 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 		examination_tile_cache.erase(oldest_key)
 
 	# Determine entity ID and world position based on tile type
+	# Entity IDs are level-specific (e.g., "level_0_floor", "level_neg1_wall")
+	var current_level := LevelManager.get_current_level()
+	var level_prefix := "level_0"
+	if current_level:
+		if current_level.level_id < 0:
+			level_prefix = "level_neg%d" % abs(current_level.level_id)
+		else:
+			level_prefix = "level_%d" % current_level.level_id
+
 	var entity_id := ""
 	var world_pos: Vector3 = grid_3d.grid_to_world(grid_pos)
 
 	match tile_type:
 		"floor":
-			entity_id = "level_0_floor"
+			entity_id = level_prefix + "_floor"
 			world_pos.y = 0.0
 		"wall":
-			entity_id = "level_0_wall"
+			entity_id = level_prefix + "_wall"
 			world_pos.y = 2.0
 		"ceiling":
-			entity_id = "level_0_ceiling"
-			# CRITICAL: Y=2.98, NOT Y=3 or Y=4! Ceiling positioned just below wall tops for tactical camera.
-			# Walls top at Y=3, ceiling at Y=2.98 allows tactical camera to see maze layout from above.
-			# Matches MeshLibrary ceiling collision height.
+			entity_id = level_prefix + "_ceiling"
 			world_pos.y = 2.98
+
+	# Fall back to level_0 if level-specific entity not registered
+	if not EntityRegistry.has_entity(entity_id):
+		match tile_type:
+			"floor":
+				entity_id = "level_0_floor"
+			"wall":
+				entity_id = "level_0_wall"
+			"ceiling":
+				entity_id = "level_0_ceiling"
 
 	# Load and instantiate examination tile scene
 	const EXAM_TILE_SCENE = preload("res://scenes/environment/examinable_environment_tile.tscn")

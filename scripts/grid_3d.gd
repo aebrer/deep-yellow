@@ -40,6 +40,13 @@ var use_procedural_generation: bool = false
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
 
+# Exit hole decals: floor overlays rendered on EXIT_STAIRS tiles
+# Maps chunk position (Vector2i) to Array of MeshInstance3D nodes
+var _exit_hole_meshes: Dictionary = {}  # Vector2i -> Array[MeshInstance3D]
+var _exit_hole_texture: Texture2D = null
+var _exit_hole_material: StandardMaterial3D = null
+var exit_tile_positions: Dictionary = {}  # Vector2i -> true (world positions of EXIT_STAIRS)
+
 # ============================================================================
 # TILE TYPE SYSTEM (Data-Driven)
 # ============================================================================
@@ -191,11 +198,20 @@ func _apply_level_visuals(config: LevelConfig) -> void:
 			env.background_mode = Environment.BG_COLOR
 			env.background_color = config.background_color
 
-			# Fog settings (future: enable when fog system is ready)
-			# Will create depth and atmosphere, hide distant geometry
-			# env.fog_enabled = true
-			# env.fog_light_color = config.fog_color
-			# env.fog_density = ...
+			# Ambient light — fills shadowed areas so geometry isn't pitch black
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = config.ambient_light_color
+			env.ambient_light_energy = config.ambient_light_intensity
+
+			# Fog settings (distance-based)
+			if config.fog_start > 0.0 and config.fog_end > 0.0:
+				env.fog_enabled = true
+				env.fog_light_color = config.fog_color
+				env.fog_depth_begin = config.fog_start
+				env.fog_depth_end = config.fog_end
+				env.fog_density = 0.001  # Near-zero density, rely on depth range
+			else:
+				env.fog_enabled = false
 	else:
 		push_warning("[Grid3D] WorldEnvironment node not found - cannot apply background color")
 
@@ -298,6 +314,9 @@ func load_chunk(chunk: Chunk) -> void:
 						var ceiling_item: int = Grid3D.subchunk_to_gridmap_item(ceiling_tile_type)
 						grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_item)
 
+	# Render exit hole sprites on any EXIT_STAIRS tiles found in this chunk
+	_render_exit_holes_for_chunk(chunk)
+
 	var load_time := (Time.get_ticks_usec() - load_start) / 1000.0
 
 	# Render items in chunk (items are already in chunk data from _on_chunk_completed)
@@ -350,6 +369,106 @@ func unload_chunk(chunk: Chunk) -> void:
 	if spraypaint_renderer:
 		spraypaint_renderer.unload_chunk_spraypaint(chunk)
 
+	# Unload exit hole sprites
+	_unload_exit_holes_for_chunk(chunk)
+
+
+
+# ============================================================================
+# EXIT HOLE RENDERING (Environment — triggers on EXIT_STAIRS tiles)
+# ============================================================================
+
+func _render_exit_holes_for_chunk(chunk: Chunk) -> void:
+	"""Scan chunk for EXIT_STAIRS tiles and create floor decals on them.
+
+	Uses MeshInstance3D + QuadMesh with no_depth_test material so the decal
+	always renders on top of floor geometry (same trick as spraypaint Label3D).
+	"""
+	var chunk_world_offset := chunk.position * Chunk.SIZE
+	var meshes: Array = []
+
+	for sub_y in range(Chunk.SUB_CHUNKS_PER_SIDE):
+		for sub_x in range(Chunk.SUB_CHUNKS_PER_SIDE):
+			var sub_chunk := chunk.get_sub_chunk(Vector2i(sub_x, sub_y))
+			if not sub_chunk:
+				continue
+
+			var sub_world_offset := chunk_world_offset + Vector2i(sub_x, sub_y) * SubChunk.SIZE
+
+			for tile_y in range(SubChunk.SIZE):
+				for tile_x in range(SubChunk.SIZE):
+					var tile_type: int = sub_chunk.get_tile(Vector2i(tile_x, tile_y))
+					if tile_type == SubChunk.TileType.EXIT_STAIRS:
+						var world_tile_pos := sub_world_offset + Vector2i(tile_x, tile_y)
+						exit_tile_positions[world_tile_pos] = true
+						var mesh := _create_exit_hole_decal(world_tile_pos)
+						if mesh:
+							meshes.append(mesh)
+
+	if not meshes.is_empty():
+		_exit_hole_meshes[chunk.position] = meshes
+
+func _create_exit_hole_decal(world_tile_pos: Vector2i) -> MeshInstance3D:
+	"""Create a floor decal MeshInstance3D for an exit hole.
+
+	Uses StandardMaterial3D with no_depth_test=true so it renders on top of
+	the floor GridMap, just like spraypaint Label3D uses no_depth_test.
+	"""
+	# Lazy-load texture and material
+	if not _exit_hole_texture:
+		_exit_hole_texture = load("res://assets/textures/entities/exit_hole.png")
+		if not _exit_hole_texture:
+			push_warning("[Grid3D] Failed to load exit_hole.png")
+			return null
+
+	if not _exit_hole_material:
+		_exit_hole_material = StandardMaterial3D.new()
+		_exit_hole_material.albedo_texture = _exit_hole_texture
+		_exit_hole_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		_exit_hole_material.alpha_scissor_threshold = 0.1
+		_exit_hole_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_exit_hole_material.no_depth_test = true
+		_exit_hole_material.render_priority = 1
+		_exit_hole_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_exit_hole_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+
+	# QuadMesh sized to fill one tile (CELL_SIZE.x = 2.0)
+	var quad := QuadMesh.new()
+	quad.size = Vector2(CELL_SIZE.x, CELL_SIZE.z)
+	quad.material = _exit_hole_material
+
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.mesh = quad
+
+	# Rotate to lie flat on floor (face upward)
+	mesh_inst.rotation_degrees.x = -90.0
+
+	# Position: centered on tile, slightly above floor
+	mesh_inst.position = grid_to_world_centered(world_tile_pos, 0.05)
+
+	add_child(mesh_inst)
+	return mesh_inst
+
+func _unload_exit_holes_for_chunk(chunk: Chunk) -> void:
+	"""Remove exit hole decals for a chunk"""
+	if _exit_hole_meshes.has(chunk.position):
+		for mesh in _exit_hole_meshes[chunk.position]:
+			if is_instance_valid(mesh):
+				mesh.queue_free()
+		_exit_hole_meshes.erase(chunk.position)
+
+func clear_exit_holes() -> void:
+	"""Remove all exit hole decals (used during level transitions)"""
+	for chunk_pos in _exit_hole_meshes:
+		for mesh in _exit_hole_meshes[chunk_pos]:
+			if is_instance_valid(mesh):
+				mesh.queue_free()
+	_exit_hole_meshes.clear()
+	exit_tile_positions.clear()
+
+# ============================================================================
+# TILE UPDATES
+# ============================================================================
 
 func update_tile(world_tile_pos: Vector2i, tile_type: int, ceiling_type: int = -1) -> void:
 	"""Update a single tile in the GridMap (used for post-generation modifications).

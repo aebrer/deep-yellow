@@ -15,8 +15,8 @@ var semaphore: Semaphore = Semaphore.new()
 var request_queue: Array = []  # Array of {pos: Vector2i, level_id: int, seed: int}
 var completion_queue: Array = []  # Array of {chunk: Chunk, pos: Vector2i, level_id: int}
 
-# Generator reference
-var generator: LevelGenerator = null
+# Level generators: level_id → LevelGenerator
+var generators: Dictionary = {}
 
 # Signals (emitted from main thread via call_deferred)
 signal chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int)
@@ -25,9 +25,13 @@ signal chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int)
 # LIFECYCLE
 # ============================================================================
 
-func _init(level_generator: LevelGenerator) -> void:
-	"""Initialize thread with generator reference"""
-	generator = level_generator
+func _init(level_generators: Dictionary) -> void:
+	"""Initialize thread with all level generators
+
+	Args:
+		level_generators: Dictionary mapping level_id (int) → LevelGenerator
+	"""
+	generators = level_generators
 
 func start() -> void:
 	"""Start the worker thread"""
@@ -119,12 +123,13 @@ func _thread_function() -> void:
 		var chunk := Chunk.new()
 		chunk.initialize(request.pos, request.level_id)
 
-		# Use generator to populate chunk data
+		# Select generator for this level
 		# NOTE: GDScript has no exception handling - if generation crashes, thread dies
 		# We validate output to catch logic errors, but runtime crashes are not catchable
 		var generation_succeeded := false
+		var generator: LevelGenerator = generators.get(request.level_id, null)
 		if not generator:
-			push_error("[ChunkGenerationThread] No generator available for chunk at %s" % request.pos)
+			push_error("[ChunkGenerationThread] No generator for level %d (chunk %s)" % [request.level_id, request.pos])
 		else:
 			generator.generate_chunk(chunk, request.seed)
 

@@ -12,15 +12,14 @@ class_name ItemSpawner extends RefCounted
 ## - Create WorldItem instances for spawned items
 ##
 ## Usage:
-##   var spawner = ItemSpawner.new(corruption_tracker, level_config)
-##   var spawned_items = spawner.spawn_items_for_chunk(chunk, turn_number)
+##   var spawner = ItemSpawner.new(corruption_tracker)
+##   var spawned_items = spawner.spawn_items_for_chunk(chunk, turn_number, items)
 
 # ============================================================================
 # DEPENDENCIES
 # ============================================================================
 
 var corruption_tracker: CorruptionTracker
-var level_config  # LevelConfig resource (defines item allowlist)
 
 # ============================================================================
 # SPAWN CONFIGURATION
@@ -36,15 +35,13 @@ const DISCOVERY_RANGE = 50.0
 # INITIALIZATION
 # ============================================================================
 
-func _init(p_corruption_tracker: CorruptionTracker, p_level_config) -> void:
-	"""Initialize spawner with corruption tracker and level config
+func _init(p_corruption_tracker: CorruptionTracker) -> void:
+	"""Initialize spawner with corruption tracker
 
 	Args:
 		p_corruption_tracker: Global corruption tracker
-		p_level_config: Level configuration (defines item allowlist)
 	"""
 	corruption_tracker = p_corruption_tracker
-	level_config = p_level_config
 
 
 # ============================================================================

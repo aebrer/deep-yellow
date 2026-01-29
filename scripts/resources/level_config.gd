@@ -254,6 +254,18 @@ var permitted_items: Array[Item] = []
 ## Ceiling vignette outer radius (0.0 - 1.0, edge opaque)
 @export_range(0.0, 1.0) var vignette_outer_radius: float = 0.8
 
+## Enable snowfall particle effect (for outdoor/snowy levels)
+@export var enable_snowfall: bool = false
+
+## Fixed player spawn position (Vector2i(-1, -1) = use random spawn logic)
+## Set to a specific position for hand-crafted levels like tutorials
+@export var player_spawn_position: Vector2i = Vector2i(-1, -1)
+
+## Initial camera yaw (horizontal rotation) in degrees when spawning
+## Only used when player_spawn_position is set (hand-crafted levels)
+## 0 = default direction, 180 = face toward +Y in grid space
+@export var player_spawn_camera_yaw: float = 0.0
+
 # ============================================================================
 # LIFECYCLE HOOKS (Override in subclasses)
 # ============================================================================

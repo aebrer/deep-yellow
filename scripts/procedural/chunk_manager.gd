@@ -27,6 +27,9 @@ signal initial_load_progress(loaded_count: int, total_count: int)
 ## Emitted when player enters a new chunk (for EXP rewards)
 signal new_chunk_entered(chunk_position: Vector3i)
 
+## Emitted when level changes mid-run (exit stairs). Listeners should reconfigure visuals.
+signal level_changed(new_level_id: int)
+
 # Constants
 const CHUNK_SIZE := 128
 const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
@@ -69,17 +72,14 @@ func _ready() -> void:
 	# Initialize corruption tracker
 	corruption_tracker = CorruptionTracker.new()
 
-	# Initialize level generators
-	level_generators[0] = Level0Generator.new()
+	# Register all levels (generators + configs)
+	_register_levels()
 
-	# Instantiate level configs (use .new() instead of load() so _init() is called)
-	level_configs[0] = Level0Config.new()
+	# Initialize item spawner (level-agnostic — per-level config passed at call site)
+	item_spawner = ItemSpawner.new(corruption_tracker)
 
-	# Initialize item spawner with Level 0 config
-	item_spawner = ItemSpawner.new(corruption_tracker, level_configs[0])
-
-	# Initialize generation thread with Level 0 generator
-	generation_thread = ChunkGenerationThread.new(level_generators[0])
+	# Initialize generation thread with all level generators
+	generation_thread = ChunkGenerationThread.new(level_generators)
 	generation_thread.chunk_completed.connect(_on_chunk_completed)
 	generation_thread.start()
 
@@ -92,6 +92,23 @@ func _ready() -> void:
 	# Connect to node_added signal to detect when game scene loads
 	# DON'T start chunk generation yet - wait for Grid3D to exist first
 	get_tree().node_added.connect(_on_node_added)
+
+func _register_levels() -> void:
+	"""Register all level generators and configs.
+
+	Add new levels here. This is the single place to register a new level —
+	just add a generator and config entry for your level_id.
+	"""
+	level_generators.clear()
+	level_configs.clear()
+
+	# Level -1: Tutorial (Kingston, Ontario)
+	level_generators[-1] = LevelNeg1Generator.new()
+	level_configs[-1] = LevelNeg1Config.new()
+
+	# Level 0: The Lobby
+	level_generators[0] = Level0Generator.new()
+	level_configs[0] = Level0Config.new()
 
 func _on_node_added(node: Node) -> void:
 	"""Detect when game scene loads and initialize chunk generation"""
@@ -349,7 +366,7 @@ func _on_chunk_completed(chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> vo
 	# Spawn items (separate pass after terrain generation, on main thread)
 	var level_config: LevelConfig = level_configs.get(level_id, null)
 
-	if level_config and item_spawner and not level_config.permitted_items.is_empty():
+	if level_config and item_spawner and not level_config.permitted_items.is_empty() and level_config.item_density > 0.0:
 		var spawned_items: Array[WorldItem] = []
 
 		# DEBUG MODE: Spawn one of each item in the first chunk (player spawn chunk at 0,0)
@@ -1138,17 +1155,13 @@ func _get_player_position() -> Vector2i:
 	return Vector2i(64, 64)
 
 func _get_player_level() -> int:
-	"""Get player's current level
+	"""Get player's current level from LevelManager
 
 	Returns 0 (Level 0) by default.
 	"""
-	# Try to get player from game scene
-	if has_node("/root/Game/Player"):
-		var player: Node = get_node("/root/Game/Player")
-		if player.has("current_level"):
-			return player.current_level
-
-	# Default to Level 0
+	var current := LevelManager.get_current_level()
+	if current:
+		return current.level_id
 	return 0
 
 # ============================================================================
@@ -1232,9 +1245,48 @@ func start_new_run(new_seed: int = -1) -> void:
 	if LevelManager:
 		LevelManager.clear_cache()
 
-	# Re-initialize level generators (fresh instances for new run)
-	level_generators.clear()
-	level_generators[0] = Level0Generator.new()
+	# Re-initialize level generators and configs (fresh instances for new run)
+	_register_levels()
+
+
+func change_level(target_level_id: int) -> void:
+	"""Switch to a different level mid-run (exit stairs).
+
+	Unlike start_new_run(), this preserves run state:
+	  KEPT: world_seed, corruption_tracker, chunks_without_items (pity timer),
+	        visited_chunks (EXP tracking across levels), level_generators/configs
+	  CLEARED: loaded_chunks, generating_chunks, pathfinding graph,
+	           last_player_chunk, initial_load state, generation flags
+
+	Args:
+		target_level_id: Level to transition to
+	"""
+	Log.system("ChunkManager.change_level() → level %d" % target_level_id)
+
+	# Disconnect entity signals before clearing chunks (prevents dangling refs)
+	_disconnect_all_entity_signals()
+
+	# Clear spatial state for old level
+	loaded_chunks.clear()
+	generating_chunks.clear()
+	last_player_chunk = Vector3i(-999, -999, -999)
+	initial_load_complete = false
+	hit_chunk_limit = false
+	was_generating = false
+
+	# Reset pathfinding for new level geometry
+	var pathfinder = get_node_or_null("/root/Pathfinding")
+	if pathfinder:
+		pathfinder.reset()
+
+	# Transition LevelManager to new level
+	LevelManager.transition_to_level(target_level_id)
+
+	# Notify listeners (game_3d reconfigures grid visuals, snowfall, etc.)
+	level_changed.emit(target_level_id)
+
+	# Trigger initial chunk load for the new level
+	call_deferred("on_turn_completed")
 
 
 func _disconnect_all_entity_signals() -> void:

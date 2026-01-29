@@ -100,6 +100,7 @@ var zoom_level: int = 1
 var player_sprite_cache: Dictionary = {}
 var entity_sprite_cache: Dictionary = {}  # {entity_type: {zoom_level: Image}}
 var item_sprite_cache: Dictionary = {}  # {item_id: {zoom_level: Image}}
+var exit_hole_sprite_cache: Dictionary = {}  # {zoom_level: Image}
 
 # ============================================================================
 # LIFECYCLE
@@ -375,6 +376,9 @@ func _composite_sprites() -> void:
 	# Draw discovered items
 	_draw_discovered_items(player_pos)
 
+	# Draw exit holes
+	_draw_exit_holes(player_pos)
+
 	# Draw entities
 	_draw_entities(player_pos)
 
@@ -555,6 +559,46 @@ func _draw_entities(player_pos: Vector2i) -> void:
 					var pixel := screen_pos + Vector2i(dx, dy)
 					if _is_valid_screen_pos(pixel):
 						map_image.set_pixelv(pixel, COLOR_ENTITY)
+
+func _draw_exit_holes(player_pos: Vector2i) -> void:
+	"""Draw exit hole sprites on minimap at EXIT_STAIRS tile positions."""
+	if not grid:
+		return
+
+	# Lazy-cache exit hole sprite
+	if exit_hole_sprite_cache.is_empty():
+		_cache_exit_hole_sprite()
+
+	for exit_pos in grid.exit_tile_positions:
+		var screen_pos := _world_to_screen(exit_pos, player_pos)
+		if not _is_valid_screen_pos(screen_pos):
+			continue
+
+		if exit_hole_sprite_cache.has(zoom_level):
+			_blit_sprite(exit_hole_sprite_cache[zoom_level], screen_pos)
+		else:
+			# Fallback: dark pixel
+			var marker_size := maxi(2, zoom_level + 1)
+			for dy in range(marker_size):
+				for dx in range(marker_size):
+					var pixel := screen_pos + Vector2i(dx, dy)
+					if _is_valid_screen_pos(pixel):
+						map_image.set_pixelv(pixel, Color(0.1, 0.1, 0.1))
+
+func _cache_exit_hole_sprite() -> void:
+	"""Cache exit hole sprite at all zoom sizes."""
+	var texture := load("res://assets/textures/entities/exit_hole.png")
+	if not texture:
+		return
+	var base_image: Image = texture.get_image()
+	if not base_image:
+		return
+
+	for zoom in range(MIN_ZOOM, MAX_ZOOM + 1):
+		var target_size: int = SPRITE_SIZES.get(zoom, 7)
+		var resized := base_image.duplicate()
+		resized.resize(target_size, target_size, Image.INTERPOLATE_NEAREST)
+		exit_hole_sprite_cache[zoom] = resized
 
 # ============================================================================
 # HELPERS

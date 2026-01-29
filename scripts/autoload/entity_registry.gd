@@ -88,6 +88,42 @@ func _load_entities() -> void:
 	ceiling.threat_level = 0
 	_entities["level_0_ceiling"] = ceiling
 
+	# Create Level -1: Floor (snowy dirt)
+	var neg1_floor = EntityInfo.new()
+	neg1_floor.entity_id = "level_neg1_floor"
+	neg1_floor.entity_name = "Frozen Ground"
+	neg1_floor.visual_description = "Hard-packed dirt dusted with a thin layer of snow. Dead pine needles and small twigs are frozen into the surface."
+	neg1_floor.clearance_info[0] = ""
+	neg1_floor.clearance_info[1] = "Temperature: below freezing. The ground is solid underfoot, crunching faintly with each step."
+	neg1_floor.clearance_info[2] = "No footprints other than your own. The snow appears undisturbed, as if freshly fallen."
+	neg1_floor.object_class = "Safe"
+	neg1_floor.threat_level = 0
+	_entities["level_neg1_floor"] = neg1_floor
+
+	# Create Level -1: Wall (dark pine forest)
+	var neg1_wall = EntityInfo.new()
+	neg1_wall.entity_id = "level_neg1_wall"
+	neg1_wall.entity_name = "Dark Pine Forest"
+	neg1_wall.visual_description = "Dense pine trees standing close together, their dark silhouettes forming an impenetrable wall of forest. Snow clings to the lower branches."
+	neg1_wall.clearance_info[0] = ""
+	neg1_wall.clearance_info[1] = "The trees are unusually uniform in size and spacing. No wind moves through their branches."
+	neg1_wall.clearance_info[2] = "Attempting to push through the trees is impossible. They stand too close together, as if deliberately placed to form a barrier."
+	neg1_wall.object_class = "Safe"
+	neg1_wall.threat_level = 0
+	_entities["level_neg1_wall"] = neg1_wall
+
+	# Create Level -1: Ceiling (dark overcast sky)
+	var neg1_ceiling = EntityInfo.new()
+	neg1_ceiling.entity_id = "level_neg1_ceiling"
+	neg1_ceiling.entity_name = "Overcast Sky"
+	neg1_ceiling.visual_description = "A low, featureless sky of dark gray clouds. Snow falls steadily from above. No stars or moon are visible."
+	neg1_ceiling.clearance_info[0] = ""
+	neg1_ceiling.clearance_info[1] = "The cloud cover appears to be at an unusually low altitude. It feels close enough to touch."
+	neg1_ceiling.clearance_info[2] = "The sky never changes. There is no dawn, no dusk. Time appears frozen in a perpetual winter night."
+	neg1_ceiling.object_class = "Safe"
+	neg1_ceiling.threat_level = 0
+	_entities["level_neg1_ceiling"] = neg1_ceiling
+
 	# Bacteria Spawn (Level 0 basic enemy)
 	# threat_level 1 matches level_00_config.gd entity_spawn_table
 	var bacteria_spawn = EntityInfo.new()
@@ -159,6 +195,30 @@ func _load_entities() -> void:
 	debug_enemy.object_class = "Debug"
 	debug_enemy.threat_level = 0
 	_entities["debug_enemy"] = debug_enemy
+
+	# Tutorial Mannequin (Level -1 tutorial target)
+	var mannequin = EntityInfo.new()
+	mannequin.entity_id = "tutorial_mannequin"
+	mannequin.entity_name = "Plastic Mannequin"
+	mannequin.visual_description = "A life-sized department store mannequin. Smooth, featureless plastic. Its blank face stares ahead with unsettling stillness."
+	mannequin.clearance_info[0] = ""
+	mannequin.clearance_info[1] = "Standard retail display mannequin, approximately 170cm. Pale beige plastic, no articulated joints."
+	mannequin.clearance_info[2] = "Purpose unknown. Appears to have been placed deliberately in a forest clearing. No anomalous properties detected."
+	mannequin.object_class = "Safe"
+	mannequin.threat_level = 0
+	_entities["tutorial_mannequin"] = mannequin
+
+	# Exit Hole (visual marker for EXIT_STAIRS tiles)
+	var exit_hole = EntityInfo.new()
+	exit_hole.entity_id = "exit_hole"
+	exit_hole.entity_name = "Dark Pit"
+	exit_hole.visual_description = "A yawning hole in the ground. The edges are ragged and crumbling. You cannot see the bottom."
+	exit_hole.clearance_info[0] = ""
+	exit_hole.clearance_info[1] = "Estimated depth: unknown. No echoes return from objects dropped inside."
+	exit_hole.clearance_info[2] = "Descent appears survivable. Others have passed through before — scratch marks line the inner walls."
+	exit_hole.object_class = "Safe"
+	exit_hole.threat_level = 0
+	_entities["exit_hole"] = exit_hole
 
 
 # ============================================================================

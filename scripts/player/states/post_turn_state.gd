@@ -36,7 +36,38 @@ func _on_chunk_updates_complete() -> void:
 		if player.stats.current_hp <= 0.0 or player.stats.current_sanity <= 0.0:
 			return
 
+	# Check if player is standing on exit stairs
+	if _check_exit_stairs():
+		return  # Level transition will handle everything
+
 	var target_state = "IdleState"
 	if player and player.return_state:
 		target_state = player.return_state
 	transition_to(target_state)
+
+func _check_exit_stairs() -> bool:
+	"""Check if player is on EXIT_STAIRS tile and trigger level transition"""
+	if not player or not ChunkManager:
+		return false
+
+	var current_level := LevelManager.get_current_level()
+	if not current_level:
+		return false
+
+	var tile_type := ChunkManager.get_tile_type(player.grid_position, current_level.level_id)
+	if tile_type != SubChunk.TileType.EXIT_STAIRS:
+		return false
+
+	# Determine destination level
+	var destinations: Array[int] = current_level.exit_destinations
+	if destinations.is_empty():
+		Log.warn(Log.Category.SYSTEM, "EXIT_STAIRS found but no exit_destinations configured!")
+		return false
+
+	var target_level_id: int = destinations[0]  # First destination for now
+	Log.system("EXIT_STAIRS triggered! Transitioning to level %d" % target_level_id)
+
+	# Use ChunkManager.change_level() for mid-run level transition
+	# This preserves run state (seed, corruption) while switching level geometry
+	ChunkManager.change_level(target_level_id)
+	return true

@@ -32,18 +32,28 @@ extends Node3D
 @onready var move_indicator: Node3D = $MoveIndicator
 @onready var exp_bar: EXPBar = $ViewportUILayer/EXPBar
 @onready var status_bars: StatusBars = $ViewportUILayer/StatusBars
+@onready var loading_screen: CanvasLayer = $LoadingScreen
+
+var snowfall: Snowfall = null
 
 func _ready() -> void:
 
 	# ========================================================================
-	# LEVEL LOADING - Game always starts on Level 0
+	# LEVEL LOADING - Game starts on Level -1 (tutorial)
 	# ========================================================================
-	# Transition to Level 0 (loads config and sets as current level)
-	LevelManager.transition_to_level(0)
+	# Always start at Level -1. Mid-run level changes use ChunkManager.change_level().
+	LevelManager.transition_to_level(-1)
 
-	# Configure grid with Level 0 settings (lighting, materials, fog, etc.)
+	# Configure grid with current level settings (lighting, materials, fog, etc.)
 	var current_level := LevelManager.get_current_level()
 	grid.configure_from_level(current_level)
+
+	# Snowfall effect (toggled per level)
+	if current_level and current_level.enable_snowfall:
+		snowfall = Snowfall.new()
+		add_child(snowfall)
+		snowfall.set_target(player)
+		snowfall.set_active(true)
 
 	# Link player to grid and indicator
 	player.grid = grid
@@ -63,3 +73,79 @@ func _ready() -> void:
 	# Wire up status bars (HP/Sanity) to player
 	if status_bars:
 		status_bars.set_player(player)
+
+	# Listen for mid-run level changes (exit stairs)
+	if ChunkManager and not ChunkManager.level_changed.is_connected(_on_level_changed):
+		ChunkManager.level_changed.connect(_on_level_changed)
+
+
+func _on_level_changed(_new_level_id: int) -> void:
+	"""Reconfigure visuals and respawn player when level changes mid-run"""
+	var new_level := LevelManager.get_current_level()
+	if not new_level:
+		return
+
+	# Show loading screen during transition
+	if loading_screen:
+		var label: Label = loading_screen.get_node_or_null("%LoadingLabel")
+		if label:
+			label.text = "Generating %s..." % new_level.display_name
+		loading_screen.show()
+
+	# Clear old level's rendered tiles and walkable cache
+	grid.grid_map.clear()
+	grid.walkable_cells.clear()
+
+	# Clear old spraypaint, items, entities from renderers
+	if grid.spraypaint_renderer:
+		grid.spraypaint_renderer.clear_all_spraypaint()
+	if grid.item_renderer:
+		grid.item_renderer.clear_all_items()
+	if grid.entity_renderer:
+		grid.entity_renderer.clear_all_entities()
+	grid.clear_exit_holes()
+
+	# Reconfigure grid visuals (lighting, materials, fog, mesh library)
+	grid.configure_from_level(new_level)
+
+	# Toggle snowfall
+	if new_level.enable_snowfall:
+		if not snowfall:
+			snowfall = Snowfall.new()
+			add_child(snowfall)
+			snowfall.set_target(player)
+		snowfall.set_active(true)
+	elif snowfall:
+		snowfall.set_active(false)
+
+	# Player needs to wait for new chunks then respawn
+	# The ChunkManager will emit initial_load_completed when ready
+	_respawn_player_for_new_level.call_deferred()
+
+
+func _respawn_player_for_new_level() -> void:
+	"""Wait for new level chunks to load, then respawn player"""
+	if not player or not grid:
+		return
+
+	# Wait for initial chunks to generate for the new level
+	if ChunkManager and not ChunkManager.initial_load_complete:
+		await ChunkManager.initial_load_completed
+
+	# Check for fixed spawn position
+	var current_level := LevelManager.get_current_level()
+	var fixed_spawn := current_level.player_spawn_position if current_level else Vector2i(-1, -1)
+
+	if fixed_spawn != Vector2i(-1, -1):
+		player.grid_position = fixed_spawn
+		if current_level.player_spawn_camera_yaw != 0.0:
+			player._set_camera_yaw(current_level.player_spawn_camera_yaw)
+	else:
+		player._find_procedural_spawn()
+
+	player.update_visual_position()
+
+	# Transition state machine back to IdleState after level change
+	# (PostTurnState called change_level and stopped transitioning)
+	if player.state_machine:
+		player.state_machine.change_state("IdleState")
