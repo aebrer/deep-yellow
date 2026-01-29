@@ -143,15 +143,22 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 	if level < Log.Level.PLAYER:
 		return  # Skip TRACE, DEBUG, INFO
 
-	# Choose color based on level
+	# Choose color based on level, with content-based overrides
 	var color := "gray"
+	var msg_lower := message.to_lower()
 	match level:
 		Log.Level.ERROR:
 			color = "#ff6b6b"  # Red
 		Log.Level.WARN:
 			color = "#ffd93d"  # Yellow
 		Log.Level.PLAYER:
-			color = "#6bffb8"  # Bright cyan/green (player-facing messages)
+			# Content-based coloring for player messages
+			if "exp" in msg_lower or "lv" in msg_lower or "level up" in msg_lower or "clearance" in msg_lower:
+				color = "#00e5ff"  # Turquoise - EXP/leveling
+			elif "examined" in msg_lower or "discovered" in msg_lower or "codex" in msg_lower:
+				color = "#e040fb"  # Magenta - lore/examination
+			else:
+				color = "#6bffb8"  # Bright cyan/green (default player messages)
 		Log.Level.INFO:
 			color = "white"
 		Log.Level.DEBUG:
@@ -186,7 +193,7 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 			category_name = "sys"
 
 	# Append to log with minimal formatting
-	log_text.append_text("[color=%s][%s] %s[/color]\n" % [color, category_name, message.to_lower()])
+	log_text.append_text("[color=%s][%s] %s[/color]\n" % [color, category_name, msg_lower])
 
 func _on_player_action_preview_changed(actions: Array[Action]) -> void:
 	"""Forward action preview to UI (text overlay - always clean)"""
