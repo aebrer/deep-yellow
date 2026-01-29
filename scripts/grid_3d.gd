@@ -40,11 +40,7 @@ var use_procedural_generation: bool = false
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
 
-# Exit hole decals: floor overlays rendered on EXIT_STAIRS tiles
-# Maps chunk position (Vector2i) to Array of MeshInstance3D nodes
-var _exit_hole_meshes: Dictionary = {}  # Vector2i -> Array[MeshInstance3D]
-var _exit_hole_texture: Texture2D = null
-var _exit_hole_material: StandardMaterial3D = null
+# Exit tile positions: tracked for minimap rendering
 var exit_tile_positions: Dictionary = {}  # Vector2i -> true (world positions of EXIT_STAIRS)
 
 # ============================================================================
@@ -314,8 +310,8 @@ func load_chunk(chunk: Chunk) -> void:
 						var ceiling_item: int = Grid3D.subchunk_to_gridmap_item(ceiling_tile_type)
 						grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_item)
 
-	# Render exit hole sprites on any EXIT_STAIRS tiles found in this chunk
-	_render_exit_holes_for_chunk(chunk)
+	# Scan for EXIT_STAIRS tiles and spawn exit_hole entities (rendered by EntityRenderer)
+	_scan_exit_stairs_for_chunk(chunk)
 
 	var load_time := (Time.get_ticks_usec() - load_start) / 1000.0
 
@@ -369,23 +365,22 @@ func unload_chunk(chunk: Chunk) -> void:
 	if spraypaint_renderer:
 		spraypaint_renderer.unload_chunk_spraypaint(chunk)
 
-	# Unload exit hole sprites
-	_unload_exit_holes_for_chunk(chunk)
-
+	# Unload exit hole position tracking for chunk
+	_unload_exit_positions_for_chunk(chunk)
 
 
 # ============================================================================
-# EXIT HOLE RENDERING (Environment — triggers on EXIT_STAIRS tiles)
+# EXIT HOLE TRACKING (EXIT_STAIRS tiles → WorldEntity objects)
 # ============================================================================
 
-func _render_exit_holes_for_chunk(chunk: Chunk) -> void:
-	"""Scan chunk for EXIT_STAIRS tiles and create floor decals on them.
+func _scan_exit_stairs_for_chunk(chunk: Chunk) -> void:
+	"""Scan chunk for EXIT_STAIRS tiles and spawn exit_hole entities.
 
-	Uses MeshInstance3D + QuadMesh with no_depth_test material so the decal
-	always renders on top of floor geometry (same trick as spraypaint Label3D).
+	Creates WorldEntity objects for each EXIT_STAIRS tile found and adds them
+	to the subchunk. EntityRenderer handles visual rendering (floor decal mode).
+	Also tracks positions in exit_tile_positions for the minimap.
 	"""
 	var chunk_world_offset := chunk.position * Chunk.SIZE
-	var meshes: Array = []
 
 	for sub_y in range(Chunk.SUB_CHUNKS_PER_SIDE):
 		for sub_x in range(Chunk.SUB_CHUNKS_PER_SIDE):
@@ -401,69 +396,32 @@ func _render_exit_holes_for_chunk(chunk: Chunk) -> void:
 					if tile_type == SubChunk.TileType.EXIT_STAIRS:
 						var world_tile_pos := sub_world_offset + Vector2i(tile_x, tile_y)
 						exit_tile_positions[world_tile_pos] = true
-						var mesh := _create_exit_hole_decal(world_tile_pos)
-						if mesh:
-							meshes.append(mesh)
 
-	if not meshes.is_empty():
-		_exit_hole_meshes[chunk.position] = meshes
+						# Spawn exit_hole entity if not already present
+						var existing = false
+						for entity in sub_chunk.world_entities:
+							if entity.world_position == world_tile_pos and entity.entity_type == "exit_hole":
+								existing = true
+								break
+						if not existing:
+							var exit_entity := WorldEntity.new("exit_hole", world_tile_pos, 99999.0, 0)
+							exit_entity.hostile = false
+							exit_entity.blocks_movement = false
+							sub_chunk.add_world_entity(exit_entity)
 
-func _create_exit_hole_decal(world_tile_pos: Vector2i) -> MeshInstance3D:
-	"""Create a floor decal MeshInstance3D for an exit hole.
-
-	Uses StandardMaterial3D with no_depth_test=true so it renders on top of
-	the floor GridMap, just like spraypaint Label3D uses no_depth_test.
-	"""
-	# Lazy-load texture and material
-	if not _exit_hole_texture:
-		_exit_hole_texture = load("res://assets/textures/entities/exit_hole.png")
-		if not _exit_hole_texture:
-			push_warning("[Grid3D] Failed to load exit_hole.png")
-			return null
-
-	if not _exit_hole_material:
-		_exit_hole_material = StandardMaterial3D.new()
-		_exit_hole_material.albedo_texture = _exit_hole_texture
-		_exit_hole_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-		_exit_hole_material.alpha_scissor_threshold = 0.1
-		_exit_hole_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_exit_hole_material.no_depth_test = true
-		_exit_hole_material.render_priority = 1
-		_exit_hole_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_exit_hole_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-
-	# QuadMesh sized to fill one tile (CELL_SIZE.x = 2.0)
-	var quad := QuadMesh.new()
-	quad.size = Vector2(CELL_SIZE.x, CELL_SIZE.z)
-	quad.material = _exit_hole_material
-
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = quad
-
-	# Rotate to lie flat on floor (face upward)
-	mesh_inst.rotation_degrees.x = -90.0
-
-	# Position: centered on tile, slightly above floor
-	mesh_inst.position = grid_to_world_centered(world_tile_pos, 0.05)
-
-	add_child(mesh_inst)
-	return mesh_inst
-
-func _unload_exit_holes_for_chunk(chunk: Chunk) -> void:
-	"""Remove exit hole decals for a chunk"""
-	if _exit_hole_meshes.has(chunk.position):
-		for mesh in _exit_hole_meshes[chunk.position]:
-			if is_instance_valid(mesh):
-				mesh.queue_free()
-		_exit_hole_meshes.erase(chunk.position)
+func _unload_exit_positions_for_chunk(chunk: Chunk) -> void:
+	"""Remove exit tile position tracking for a chunk (entity cleanup handled by EntityRenderer)"""
+	var chunk_world_offset := chunk.position * Chunk.SIZE
+	for sub_y in range(Chunk.SUB_CHUNKS_PER_SIDE):
+		for sub_x in range(Chunk.SUB_CHUNKS_PER_SIDE):
+			var sub_world_offset := chunk_world_offset + Vector2i(sub_x, sub_y) * SubChunk.SIZE
+			for tile_y in range(SubChunk.SIZE):
+				for tile_x in range(SubChunk.SIZE):
+					var pos := sub_world_offset + Vector2i(tile_x, tile_y)
+					exit_tile_positions.erase(pos)
 
 func clear_exit_holes() -> void:
-	"""Remove all exit hole decals (used during level transitions)"""
-	for chunk_pos in _exit_hole_meshes:
-		for mesh in _exit_hole_meshes[chunk_pos]:
-			if is_instance_valid(mesh):
-				mesh.queue_free()
-	_exit_hole_meshes.clear()
+	"""Clear exit hole position tracking (used during level transitions)"""
 	exit_tile_positions.clear()
 
 # ============================================================================
@@ -654,14 +612,15 @@ func is_walkable(pos: Vector2i) -> bool:
 	return not _is_position_blocked_by_entity(pos)
 
 func _is_position_blocked_by_entity(pos: Vector2i) -> bool:
-	"""Check if any entity is occupying this grid position
+	"""Check if a movement-blocking entity is occupying this grid position
 
 	Returns true if blocked, false if clear.
-	Uses EntityRenderer to check entity positions (data-driven, like items).
+	Only entities with blocks_movement=true block the tile.
 	"""
 	if entity_renderer:
-		return entity_renderer.has_entity_at(pos)
-	return false  # No renderer = no entities = not blocked
+		var entity = entity_renderer.get_entity_at(pos)
+		return entity != null and not entity.is_dead and entity.blocks_movement
+	return false
 
 # ============================================================================
 # ENTITY QUERIES

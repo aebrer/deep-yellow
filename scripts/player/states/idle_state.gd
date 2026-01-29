@@ -351,8 +351,9 @@ func _update_examination_target() -> void:
 					# Fallback if item not found
 					KnowledgeDB.examine_item(new_target.entity_id, "common")
 			else:
-				# Entities, hazards
-				KnowledgeDB.examine_entity(new_target.entity_id)
+				# Entities, hazards, objects
+				var is_object = new_target.entity_type == Examinable.EntityType.ENTITY_NEUTRAL
+				KnowledgeDB.examine_entity(new_target.entity_id, is_object)
 
 			if examination_panel:
 				examination_panel.show_panel(new_target)

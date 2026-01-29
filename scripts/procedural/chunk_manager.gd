@@ -567,6 +567,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 			0  # spawn_turn
 		)
 		entity.attack_damage = final_damage
+		entity.hostile = entity_entry.get("hostile", true)
+		entity.blocks_movement = entity_entry.get("blocks_movement", true)
 
 		# Find subchunk and add entity
 		var local_pos = spawn_pos - chunk_world_pos

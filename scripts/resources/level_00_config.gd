@@ -157,13 +157,15 @@ entity density: very low"""
 		},
 		{
 			"entity_type": "vending_machine",
-			"weight": 1.5,  # Uncommon interactable
+			"weight": 0.8,  # Between rare and uncommon frequency
 			"base_hp": 99999.0,  # Indestructible
 			"hp_scale": 0.0,  # No HP scaling
 			"base_damage": 0.0,  # No damage
 			"damage_scale": 0.0,  # No damage scaling
 			"threat_level": 0,  # Gimel (environment) - not a threat
 			"corruption_threshold": 0.0,  # Can spawn at any corruption
+			"hostile": false,  # Non-hostile: not targetable by attacks
+			"blocks_movement": false,  # Player can walk through
 		},
 	]
 

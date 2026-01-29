@@ -76,6 +76,14 @@ var attack_damage: float = 5.0
 ## Attack range in tiles
 var attack_range: float = 1.5
 
+## Whether this entity is hostile (targetable by attacks, participates in combat)
+## Non-hostile entities (vending machines, environment objects) are not attack targets
+var hostile: bool = true
+
+## Whether this entity blocks player movement through its tile
+## Hostile entities block movement; non-hostile (exit holes, vending machines) typically don't
+var blocks_movement: bool = true
+
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
@@ -180,6 +188,8 @@ func to_dict() -> Dictionary:
 		"spawn_cooldown": spawn_cooldown,
 		"attack_damage": attack_damage,
 		"attack_range": attack_range,
+		"hostile": hostile,
+		"blocks_movement": blocks_movement,
 	}
 	# Serialize last_seen_player_pos if set
 	if last_seen_player_pos != null:
@@ -215,6 +225,8 @@ static func from_dict(data: Dictionary) -> WorldEntity:
 	world_entity.spawn_cooldown = data.get("spawn_cooldown", 0)
 	world_entity.attack_damage = data.get("attack_damage", 5.0)
 	world_entity.attack_range = data.get("attack_range", 1.5)
+	world_entity.hostile = data.get("hostile", true)
+	world_entity.blocks_movement = data.get("blocks_movement", true)
 
 	# Restore last_seen_player_pos if present
 	if data.has("last_seen_player_pos"):

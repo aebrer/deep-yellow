@@ -37,9 +37,11 @@ const COLOR_ITEM := Color("#ffff00")  # Bright yellow (discovered items)
 const COLOR_ENTITY := Color("#ff00ff")  # Magenta (entities/enemies)
 
 ## Aura colors (semi-transparent glow behind minimap sprites)
-const COLOR_AURA_ENTITY := Color(1.0, 0.0, 0.0, 0.45)  # Red, semi-transparent
+const COLOR_AURA_ENTITY := Color(1.0, 0.0, 0.0, 0.45)  # Red - hostile entities
+const COLOR_AURA_ENTITY_NEUTRAL := Color(0.0, 0.5, 1.0, 0.45)  # Blue - non-hostile entities (vending machines)
+const COLOR_AURA_ENTITY_EXIT := Color(0.85, 0.75, 0.0, 0.45)  # Deep yellow - exit stairs/holes
 const COLOR_AURA_ITEM := Color(1.0, 1.0, 0.0, 0.45)  # Yellow, semi-transparent
-const COLOR_AURA_EXIT := Color(0.0, 0.5, 1.0, 0.45)  # Blue, semi-transparent
+const COLOR_AURA_EXIT := Color(0.0, 0.5, 1.0, 0.45)  # Blue, semi-transparent (legacy)
 
 ## Sprite icon sizes per zoom level (pixels)
 ## Zoom 0: 5px, Zoom 1: 7px, Zoom 2: 11px, Zoom 3: 15px, Zoom 4: 21px
@@ -101,7 +103,6 @@ var zoom_level: int = 1
 var player_sprite_cache: Dictionary = {}
 var entity_sprite_cache: Dictionary = {}  # {entity_type: {zoom_level: Image}}
 var item_sprite_cache: Dictionary = {}  # {item_id: {zoom_level: Image}}
-var exit_hole_sprite_cache: Dictionary = {}  # {zoom_level: Image}
 
 # ============================================================================
 # LIFECYCLE
@@ -238,7 +239,6 @@ func _on_initial_load_completed() -> void:
 func _on_level_changed(_new_level_id: int) -> void:
 	"""Clear trail and redraw when level changes mid-run"""
 	clear_trail()
-	exit_hole_sprite_cache.clear()  # Re-cache in case texture changes per level
 	content_dirty = true
 
 func _update_texture_scale() -> void:
@@ -396,10 +396,7 @@ func _composite_sprites() -> void:
 	# Draw discovered items
 	_draw_discovered_items(player_pos)
 
-	# Draw exit holes
-	_draw_exit_holes(player_pos)
-
-	# Draw entities
+	# Draw entities (includes exit holes, vending machines, and hostile entities)
 	_draw_entities(player_pos)
 
 	# Draw player position (sprite icon, centered, scales with zoom)
@@ -568,7 +565,8 @@ func _draw_entities(player_pos: Vector2i) -> void:
 		if entity:
 			var etype: String = entity.entity_type
 			if entity_sprite_cache.has(etype) and entity_sprite_cache[etype].has(zoom_level):
-				_blit_sprite(entity_sprite_cache[etype][zoom_level], screen_pos, COLOR_AURA_ENTITY)
+				var aura := _get_entity_aura_color(entity)
+				_blit_sprite(entity_sprite_cache[etype][zoom_level], screen_pos, aura)
 				drew_sprite = true
 
 		if not drew_sprite:
@@ -580,45 +578,16 @@ func _draw_entities(player_pos: Vector2i) -> void:
 					if _is_valid_screen_pos(pixel):
 						map_image.set_pixelv(pixel, COLOR_ENTITY)
 
-func _draw_exit_holes(player_pos: Vector2i) -> void:
-	"""Draw exit hole sprites on minimap at EXIT_STAIRS tile positions."""
-	if not grid:
-		return
-
-	# Lazy-cache exit hole sprite
-	if exit_hole_sprite_cache.is_empty():
-		_cache_exit_hole_sprite()
-
-	for exit_pos in grid.exit_tile_positions:
-		var screen_pos := _world_to_screen(exit_pos, player_pos)
-		if not _is_valid_screen_pos(screen_pos):
-			continue
-
-		if exit_hole_sprite_cache.has(zoom_level):
-			_blit_sprite(exit_hole_sprite_cache[zoom_level], screen_pos, COLOR_AURA_EXIT)
-		else:
-			# Fallback: dark pixel
-			var marker_size := maxi(2, zoom_level + 1)
-			for dy in range(marker_size):
-				for dx in range(marker_size):
-					var pixel := screen_pos + Vector2i(dx, dy)
-					if _is_valid_screen_pos(pixel):
-						map_image.set_pixelv(pixel, Color(0.1, 0.1, 0.1))
-
-func _cache_exit_hole_sprite() -> void:
-	"""Cache exit hole sprite at all zoom sizes."""
-	var texture := load("res://assets/textures/entities/exit_hole.png")
-	if not texture:
-		return
-	var base_image: Image = texture.get_image()
-	if not base_image:
-		return
-
-	for zoom in range(MIN_ZOOM, MAX_ZOOM + 1):
-		var target_size: int = SPRITE_SIZES.get(zoom, 7)
-		var resized := base_image.duplicate()
-		resized.resize(target_size, target_size, Image.INTERPOLATE_NEAREST)
-		exit_hole_sprite_cache[zoom] = resized
+func _get_entity_aura_color(entity: WorldEntity) -> Color:
+	"""Return the appropriate minimap aura color for an entity."""
+	# Exit-type entities get deep yellow
+	if entity.entity_type.begins_with("exit_"):
+		return COLOR_AURA_ENTITY_EXIT
+	# Non-hostile entities (vending machines, etc.) get blue
+	if not entity.hostile:
+		return COLOR_AURA_ENTITY_NEUTRAL
+	# Hostile entities get red
+	return COLOR_AURA_ENTITY
 
 # ============================================================================
 # HELPERS

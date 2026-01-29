@@ -174,6 +174,8 @@ func _spawn_debug_vending_machine(player_pos: Vector2i) -> void:
 
 	# Create the WorldEntity
 	var entity = WorldEntity.new("vending_machine", spawn_pos, 99999.0, 0)
+	entity.hostile = false
+	entity.blocks_movement = false
 
 	# Add to the appropriate subchunk
 	if ChunkManager:

@@ -283,6 +283,8 @@ func _on_discovery_made(subject_type: String, _subject_id: String, exp_reward: i
 		match subject_type:
 			"entity":
 				reason = "CREATURE EXAMINED"
+			"object":
+				reason = "OBJECT EXAMINED"
 			"item":
 				reason = "ITEM EXAMINED"
 			"environment":

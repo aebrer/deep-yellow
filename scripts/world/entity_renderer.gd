@@ -77,6 +77,13 @@ const ENTITY_COLORS = {
 	"smiler": Color(1.0, 1.0, 0.8),             # Pale yellow/white (eerie glow)
 	"tutorial_mannequin": Color(0.85, 0.75, 0.65),  # Pale beige plastic
 	"vending_machine": Color(0.6, 0.6, 0.7),        # Metallic gray-blue
+	"exit_hole": Color(0.15, 0.1, 0.1),             # Dark pit
+}
+
+## Entity render modes: BILLBOARD (default, faces camera) or FLOOR_DECAL (flat on ground)
+enum RenderMode { BILLBOARD, FLOOR_DECAL }
+const ENTITY_RENDER_MODES = {
+	"exit_hole": RenderMode.FLOOR_DECAL,
 }
 
 ## Entity textures (loaded on demand)
@@ -86,6 +93,7 @@ const ENTITY_TEXTURES = {
 	"bacteria_spreader": "res://assets/textures/entities/bacteria_spreader.png",
 	"smiler": "res://assets/textures/entities/smiler.png",
 	"tutorial_mannequin": "res://assets/textures/entities/tutorial_mannequin.png",
+	"exit_hole": "res://assets/textures/entities/exit_hole.png",
 }
 
 ## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
@@ -310,82 +318,149 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 # BILLBOARD CREATION
 # ============================================================================
 
-func _create_billboard_for_entity(entity: WorldEntity) -> Sprite3D:
-	"""Create a Sprite3D billboard for an entity
+func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
+	"""Create a visual node for an entity (billboard sprite or floor decal)
 
 	Args:
-		entity: WorldEntity to create billboard for
+		entity: WorldEntity to create visual for
 
 	Returns:
-		Sprite3D node or null if creation failed
+		Node3D (Sprite3D for billboards, MeshInstance3D for floor decals) or null
 	"""
 	var entity_type = entity.entity_type
 	var world_pos = entity.world_position
+	var render_mode = ENTITY_RENDER_MODES.get(entity_type, RenderMode.BILLBOARD)
 
-	# Create sprite node
+	if render_mode == RenderMode.FLOOR_DECAL:
+		return _create_floor_decal_for_entity(entity)
+
+	# --- Standard billboard sprite ---
 	var sprite = Sprite3D.new()
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art friendly
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	sprite.shaded = true
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_OPAQUE_PREPASS
 
-	# Get height override for this entity type (default BILLBOARD_HEIGHT)
 	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
-
-	# Position at world coordinates (centered in cell)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
-		world_pos.x * 2.0 + 1.0,  # Fallback if no grid
+		world_pos.x * 2.0 + 1.0,
 		entity_height,
 		world_pos.y * 2.0 + 1.0
 	)
 	sprite.position = world_3d
 
-	# Get scale override for this entity type (default 1.0)
 	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
 	var final_size = BILLBOARD_SIZE * scale_mult
 
-	# Load texture if available, otherwise use colored square fallback
 	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
 	if texture_path != "" and ResourceLoader.exists(texture_path):
-		# Use actual sprite texture
 		var texture = load(texture_path) as Texture2D
 		if texture:
 			sprite.texture = texture
 			sprite.pixel_size = final_size / texture.get_width()
-			sprite.modulate = Color.WHITE  # Don't tint the texture
+			sprite.modulate = Color.WHITE
 			sprite.set_meta("base_color", Color.WHITE)
 		else:
-			# Texture load failed, use colored square fallback
 			_apply_fallback_texture(sprite, entity_type, scale_mult)
 	else:
-		# No texture defined, use colored square fallback
 		_apply_fallback_texture(sprite, entity_type, scale_mult)
 
-	# Store entity position for collision queries
 	sprite.set_meta("grid_position", world_pos)
 	sprite.set_meta("entity_type", entity_type)
 
-	# Add examination support (same pattern as ItemRenderer)
-	var exam_body = StaticBody3D.new()
-	exam_body.name = "ExamBody"
-	exam_body.collision_layer = 8  # Layer 4 for raycast detection
-	exam_body.collision_mask = 0   # Doesn't collide with anything
-	sprite.add_child(exam_body)
-
-	# Add Examinable component as child of StaticBody3D
-	var examinable = Examinable.new()
-	examinable.entity_id = entity_type  # e.g., "debug_enemy"
-	examinable.entity_type = Examinable.EntityType.ENTITY_HOSTILE  # Default to hostile for enemies
-	exam_body.add_child(examinable)
-
-	# Add collision shape to StaticBody3D (scaled to match billboard)
-	var collision_shape = CollisionShape3D.new()
-	var box = BoxShape3D.new()
-	box.size = Vector3(final_size, final_size, 0.1)
-	collision_shape.shape = box
-	exam_body.add_child(collision_shape)
+	_add_examination_support(sprite, entity, final_size)
 
 	return sprite
+
+func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
+	"""Create a floor decal (flat quad) for entities like exit holes
+
+	Uses no_depth_test material so the decal renders on top of floor geometry.
+
+	Args:
+		entity: WorldEntity to create decal for
+
+	Returns:
+		MeshInstance3D positioned flat on the floor
+	"""
+	var entity_type = entity.entity_type
+	var world_pos = entity.world_position
+
+	# Load texture
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	var texture: Texture2D = null
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		texture = load(texture_path) as Texture2D
+
+	# Create material
+	var mat = StandardMaterial3D.new()
+	if texture:
+		mat.albedo_texture = texture
+	else:
+		mat.albedo_color = ENTITY_COLORS.get(entity_type, DEFAULT_ENTITY_COLOR)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	mat.alpha_scissor_threshold = 0.1
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.render_priority = 1
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+
+	# Create quad mesh sized to one tile
+	var cell_size_x = 2.0  # Grid3D.CELL_SIZE.x
+	var cell_size_z = 2.0  # Grid3D.CELL_SIZE.z
+	var quad = QuadMesh.new()
+	quad.size = Vector2(cell_size_x, cell_size_z)
+	quad.material = mat
+
+	var mesh_inst = MeshInstance3D.new()
+	mesh_inst.mesh = quad
+	mesh_inst.rotation_degrees.x = -90.0  # Lie flat on floor
+
+	# Position slightly above floor
+	var world_3d = grid_3d.grid_to_world_centered(world_pos, 0.05) if grid_3d else Vector3(
+		world_pos.x * 2.0 + 1.0,
+		0.05,
+		world_pos.y * 2.0 + 1.0
+	)
+	mesh_inst.position = world_3d
+
+	mesh_inst.set_meta("grid_position", world_pos)
+	mesh_inst.set_meta("entity_type", entity_type)
+
+	# Examination support with flat collision box
+	_add_examination_support(mesh_inst, entity, cell_size_x, Vector3(cell_size_x, 0.2, cell_size_z))
+
+	return mesh_inst
+
+func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null) -> void:
+	"""Add Examinable + StaticBody3D for raycast examination
+
+	Args:
+		node: Parent node to attach examination body to
+		entity: WorldEntity for type/hostile info
+		default_size: Default collision box size (square)
+		collision_size: Optional Vector3 override for collision box dimensions
+	"""
+	var exam_body = StaticBody3D.new()
+	exam_body.name = "ExamBody"
+	exam_body.collision_layer = 8
+	exam_body.collision_mask = 0
+	node.add_child(exam_body)
+
+	var examinable = Examinable.new()
+	examinable.entity_id = entity.entity_type
+	examinable.entity_type = Examinable.EntityType.ENTITY_HOSTILE if entity.hostile else Examinable.EntityType.ENTITY_NEUTRAL
+	exam_body.add_child(examinable)
+
+	var col_shape = CollisionShape3D.new()
+	var box = BoxShape3D.new()
+	if collision_size is Vector3:
+		box.size = collision_size
+	else:
+		box.size = Vector3(default_size, default_size, 0.1)
+	col_shape.shape = box
+	exam_body.add_child(col_shape)
 
 func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: float = 1.0) -> void:
 	"""Apply colored square fallback texture when no sprite texture is available.
@@ -540,12 +615,13 @@ func get_all_entity_positions() -> Array[Vector2i]:
 			positions.append(pos)
 	return positions
 
-func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
+func get_entities_in_range(center: Vector2i, radius: float, hostile_only: bool = true) -> Array[Vector2i]:
 	"""Get living entities within radius of center position
 
 	Args:
 		center: Center world tile position
 		radius: Search radius in tiles
+		hostile_only: If true (default), only return hostile entities (skips vending machines, etc.)
 
 	Returns:
 		Array of entity positions within range (excludes dead entities)
@@ -554,6 +630,8 @@ func get_entities_in_range(center: Vector2i, radius: float) -> Array[Vector2i]:
 	for pos in entity_cache.keys():
 		var entity = entity_cache[pos] as WorldEntity
 		if not entity or entity.is_dead:
+			continue
+		if hostile_only and not entity.hostile:
 			continue
 		var distance = center.distance_to(pos)
 		if distance <= radius:

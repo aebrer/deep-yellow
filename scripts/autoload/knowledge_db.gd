@@ -51,8 +51,13 @@ func _ready() -> void:
 # EXAMINATION API
 # ============================================================================
 
-func examine_entity(entity_id: String) -> void:
-	"""Called when player examines an entity - awards EXP if novel at current Clearance"""
+func examine_entity(entity_id: String, is_object: bool = false) -> void:
+	"""Called when player examines an entity - awards EXP if novel at current Clearance
+
+	Args:
+		entity_id: Entity type identifier
+		is_object: If true, this is an object (vending machine, exit hole) not a creature
+	"""
 	if entity_id.is_empty():
 		push_warning("[KnowledgeDB] Cannot examine entity with empty ID")
 		return
@@ -62,7 +67,8 @@ func examine_entity(entity_id: String) -> void:
 	if _is_novel(key):
 		_mark_examined(key)
 		var exp = _get_entity_exp()
-		emit_signal("discovery_made", "entity", entity_id, exp)
+		var subject_type = "object" if is_object else "entity"
+		emit_signal("discovery_made", subject_type, entity_id, exp)
 
 func get_entity_info(entity_id: String) -> Dictionary:
 	"""Get display information for entity based on clearance

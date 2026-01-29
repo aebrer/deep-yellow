@@ -24,14 +24,15 @@ const FONT_SIZE_INFO := 14
 const INPUT_ACCEPT_DELAY := 0.5
 
 ## Base cost per rarity tier (in max stat points)
+## Minimum 20 for commons — vending machines are expensive
 const RARITY_BASE_COST = {
 	ItemRarity.Tier.DEBUG: 1,
-	ItemRarity.Tier.COMMON: 3,
-	ItemRarity.Tier.UNCOMMON: 5,
-	ItemRarity.Tier.RARE: 8,
-	ItemRarity.Tier.EPIC: 12,
-	ItemRarity.Tier.LEGENDARY: 18,
-	ItemRarity.Tier.ANOMALY: 25,
+	ItemRarity.Tier.COMMON: 20,
+	ItemRarity.Tier.UNCOMMON: 30,
+	ItemRarity.Tier.RARE: 45,
+	ItemRarity.Tier.EPIC: 65,
+	ItemRarity.Tier.LEGENDARY: 90,
+	ItemRarity.Tier.ANOMALY: 120,
 }
 
 ## Stat names for cost display
@@ -334,8 +335,13 @@ func _create_item_button(index: int, entry: Dictionary) -> Button:
 	else:
 		var rarity_name = ItemRarity.get_rarity_name(rarity)
 		var stat_name = STAT_NAMES[stat_index]
+		var can_afford = _can_afford(cost, stat_index)
 		button.text = "%s (%s) — Cost: -%d max %s" % [item.item_name, rarity_name, cost, stat_name]
-		button.add_theme_color_override("font_color", ItemRarity.get_color(rarity))
+		if can_afford:
+			button.add_theme_color_override("font_color", ItemRarity.get_color(rarity))
+		else:
+			button.add_theme_color_override("font_color", Color(0.35, 0.35, 0.35))
+			button.disabled = true
 		button.pressed.connect(func(): _on_item_selected(index))
 
 	button.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_INFO))
@@ -387,6 +393,11 @@ func _on_item_selected(index: int) -> void:
 	var stat_mod_name = STAT_MODIFIER_NAMES[stat_index]
 	var stat_display = STAT_NAMES[stat_index]
 
+	# Affordability check
+	if not _can_afford(cost, stat_index):
+		Log.player("Can't afford %s (need %d max %s) — come back later" % [item.item_name, cost, stat_display])
+		return
+
 	# Apply permanent max stat reduction
 	var modifier = StatModifier.new(
 		stat_mod_name,
@@ -410,6 +421,18 @@ func _on_item_selected(index: int) -> void:
 
 	# Close panel (item slot selection will open if needed)
 	_close_panel()
+
+func _can_afford(cost: int, stat_index: int) -> bool:
+	"""Check if the player's current max stat can cover the cost"""
+	if not player_ref or not player_ref.stats:
+		return false
+	var current_max: float
+	match stat_index:
+		0: current_max = player_ref.stats.max_hp
+		1: current_max = player_ref.stats.max_sanity
+		2: current_max = player_ref.stats.max_mana
+		_: return false
+	return current_max >= cost
 
 func _clamp_current_stats(player: Player3D) -> void:
 	"""Clamp current HP/Sanity/Mana to new maximums after stat reduction"""
