@@ -145,60 +145,7 @@ func _respawn_player_for_new_level() -> void:
 
 	player.update_visual_position()
 
-	# DEBUG: Spawn a vending machine near the player on Level 0
-	if current_level and current_level.level_id == 0:
-		_spawn_debug_vending_machine(player.grid_position)
-
 	# Transition state machine back to IdleState after level change
 	# (PostTurnState called change_level and stopped transitioning)
 	if player.state_machine:
 		player.state_machine.change_state("IdleState")
-
-
-func _spawn_debug_vending_machine(player_pos: Vector2i) -> void:
-	"""DEBUG: Spawn a vending machine 3 tiles ahead of the player for testing"""
-	# Try a few offsets to find a walkable spot
-	var offsets = [Vector2i(3, 0), Vector2i(0, 3), Vector2i(-3, 0), Vector2i(0, -3),
-		Vector2i(2, 0), Vector2i(0, 2), Vector2i(4, 0), Vector2i(0, 4)]
-
-	var spawn_pos = Vector2i(-1, -1)
-	for offset in offsets:
-		var candidate = player_pos + offset
-		if grid.is_walkable(candidate):
-			spawn_pos = candidate
-			break
-
-	if spawn_pos == Vector2i(-1, -1):
-		Log.system("[DEBUG] Could not find walkable position for debug vending machine")
-		return
-
-	# Create the WorldEntity
-	var entity = WorldEntity.new("vending_machine", spawn_pos, 99999.0, 0)
-	entity.hostile = false
-	entity.blocks_movement = false
-
-	# Add to the appropriate subchunk
-	if ChunkManager:
-		var current_level := LevelManager.get_current_level()
-		if not current_level:
-			Log.system("[DEBUG] No current level - cannot place debug vending machine in chunk")
-			return
-		var chunk = ChunkManager.get_chunk_at_tile(spawn_pos, current_level.level_id)
-		if chunk:
-			for subchunk in chunk.sub_chunks:
-				var local_x = spawn_pos.x - subchunk.world_position.x
-				var local_y = spawn_pos.y - subchunk.world_position.y
-				if local_x >= 0 and local_x < SubChunk.SIZE and local_y >= 0 and local_y < SubChunk.SIZE:
-					subchunk.add_world_entity(entity)
-					break
-
-	# Render the billboard
-	if grid.entity_renderer:
-		var billboard = grid.entity_renderer._create_billboard_for_entity(entity)
-		if billboard:
-			grid.entity_renderer.add_child(billboard)
-			grid.entity_renderer.entity_billboards[spawn_pos] = billboard
-			grid.entity_renderer.entity_cache[spawn_pos] = entity
-			grid.entity_renderer.entity_to_pos[entity] = spawn_pos
-
-	Log.system("[DEBUG] Spawned vending machine at %s (player at %s)" % [spawn_pos, player_pos])
