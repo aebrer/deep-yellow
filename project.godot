@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Backrooms Power Crawl"
-config/description="A turn-based roguelike combining Caves of Qud's deep simulation with Vampire Survivors' automatic combat, set in the Backrooms."
+config/name="DEEP YELLOW"
+config/description="A turn-based roguelike set in the Backrooms. Explore infinite procedural levels, fight entities, and survive."
 run/main_scene="res://scenes/start_menu.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"

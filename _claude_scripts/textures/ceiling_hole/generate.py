@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generates a tileable ceiling hole texture for Backrooms Power Crawl.
+Generates a tileable ceiling hole texture for DEEP YELLOW.
 Takes the existing acoustic ceiling texture and adds a broken/missing section
 revealing dark void and hints of infrastructure above.
 """

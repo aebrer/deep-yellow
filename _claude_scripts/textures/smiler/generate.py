@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate Smiler entity texture for Backrooms Power Crawl.
+Generate Smiler entity texture for DEEP YELLOW.
 
 The Smiler: A classic Backrooms entity - glowing eyes and an unnerving
 wide smile floating in darkness.

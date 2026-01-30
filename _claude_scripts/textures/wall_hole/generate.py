@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a tileable wall hole texture for Backrooms Power Crawl.
+Generate a tileable wall hole texture for DEEP YELLOW.
 Shows yellow wallpaper with a BOTTOM-OPENING CRAWL HOLE - like a rabbit hole
 or crawl space at floor level. Human-sized, dark void inside, ragged edges.
 """

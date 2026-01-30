@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate itch.io banner for Backrooms Power Crawl
+Generate itch.io banner for DEEP YELLOW
 Output: 960x300 panoramic banner with game title and sprites
 """
 
@@ -122,8 +122,8 @@ def draw_text_with_outline(draw, text, position, font_size=60, outline_width=4):
             if offset_x != 0 or offset_y != 0:
                 draw.text((x + offset_x, y + offset_y), text, font=font, fill=(0, 0, 0, 255))
 
-    # Draw white main text
-    draw.text((x, y), text, font=font, fill=(255, 255, 255, 255))
+    # Draw deep yellow main text
+    draw.text((x, y), text, font=font, fill=(255, 210, 50, 255))
 
     return font
 
@@ -163,7 +163,7 @@ def composite_sprite(canvas, sprite_path, position, scale=1.0, flip=False):
 
 def generate_banner():
     """Generate the complete banner"""
-    print("Generating Backrooms Power Crawl itch.io banner...")
+    print("Generating DEEP YELLOW itch.io banner...")
 
     # Create tiled wallpaper background
     print("  → Tiling wallpaper background...")
@@ -174,7 +174,7 @@ def generate_banner():
     draw = ImageDraw.Draw(canvas)
 
     # Title on one line
-    title = "BACKROOMS POWER CRAWL"
+    title = "DEEP YELLOW"
     font = draw_text_with_outline(
         draw,
         title,

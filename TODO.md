@@ -1,10 +1,10 @@
-# Backrooms Power Crawl - Core Gameplay Implementation TODO
+# DEEP YELLOW - Core Gameplay Implementation TODO
 
 **Created**: 2026-01-08
 **Last Updated**: 2026-01-11
 **Status**: Phase 1-3 COMPLETE - Combat, AI, and Spawning Systems Fully Functional
 
-This document outlines the implementation plan for the remaining core gameplay systems needed to make Backrooms Power Crawl a complete, playable game.
+This document outlines the implementation plan for the remaining core gameplay systems needed to make DEEP YELLOW a complete, playable game.
 
 ---
 

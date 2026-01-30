@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate Bacteria Spreader entity texture for Backrooms Power Crawl.
+Generate Bacteria Spreader entity texture for DEEP YELLOW.
 
 The Bacteria Spreader: A support enemy that heals nearby bacteria.
 Visually distinct from bacteria_spawn - more bulbous with spreading tendrils.

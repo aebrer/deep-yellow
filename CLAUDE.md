@@ -1,6 +1,6 @@
 # CLAUDE.md - Guide for Future Claude Instances
 
-**Project**: Backrooms Power Crawl - Turn-based Roguelike in Godot 4.x
+**Project**: DEEP YELLOW - Turn-based Roguelike in Godot 4.x
 **Developer**: Drew Brereton (aebrer) - Python/generative art background, new to game dev
 **Last Updated**: 2026-01-21 (Added butler/itch.io deployment instructions)
 
@@ -895,7 +895,7 @@ gh api \
 gh api \
   --method PATCH \
   -H "Accept: application/vnd.github+json" \
-  /repos/aebrer/backrooms_power_crawl/pulls/7 \
+  /repos/aebrer/deep-yellow/pulls/7 \
   -f body='Your description here'
 ```
 
@@ -1241,7 +1241,7 @@ python generate.py  # Outputs tileable PNG
 ### Project Configuration
 
 - **itch.io username**: `aebrer`
-- **Game slug**: `backrooms-power-crawl`
+- **Game slug**: `deep-yellow`
 - **Platforms**: Windows, Linux, Web (HTML5 - already marked as playable in browser)
 
 ### Channel Names
@@ -1261,17 +1261,17 @@ Butler pushes **directories**, not archives. The build folder should be organize
 ```
 build/
 ├── windows/           # Windows export (directory)
-│   ├── bpc.exe
-│   ├── bpc.pck
+│   ├── deep_yellow.exe
+│   ├── deep_yellow.pck
 │   └── [godot runtime files]
 ├── linux/             # Linux export (directory)
-│   ├── bpc_linux.x86_64
-│   ├── bpc_linux.pck
+│   ├── deep_yellow_linux.x86_64
+│   ├── deep_yellow_linux.pck
 │   └── [godot runtime files]
 ├── web/               # Web export (directory)
 │   ├── index.html     # MUST be at root level
-│   ├── bpc.wasm
-│   ├── bpc.js
+│   ├── deep_yellow.wasm
+│   ├── deep_yellow.js
 │   └── [other web files]
 └── *.tar.gz           # Archives for GitHub releases (separate workflow)
 ```
@@ -1285,12 +1285,12 @@ build/
 VERSION=$(git describe --tags --abbrev=0)
 
 # Push all platforms (from project root)
-/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
-/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
-/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+/home/drew/.local/bin/butler push build/windows aebrer/deep-yellow:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/deep-yellow:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/deep-yellow:html5 --userversion $VERSION
 
 # Check status
-/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+/home/drew/.local/bin/butler status aebrer/deep-yellow
 ```
 
 ### Versioning
@@ -1312,7 +1312,7 @@ VERSION=$(git describe --tags --abbrev=0)
 Preview what would be pushed without actually uploading:
 
 ```bash
-butler push build/windows aebrer/backrooms-power-crawl:windows --dry-run
+butler push build/windows aebrer/deep-yellow:windows --dry-run
 ```
 
 ### Full Publish Workflow
@@ -1327,12 +1327,12 @@ godot --headless --export-release "Web"
 
 # 2. Push to itch.io with version from git tag
 VERSION=$(git describe --tags --abbrev=0)
-/home/drew/.local/bin/butler push build/windows aebrer/backrooms-power-crawl:windows --userversion $VERSION
-/home/drew/.local/bin/butler push build/linux aebrer/backrooms-power-crawl:linux --userversion $VERSION
-/home/drew/.local/bin/butler push build/web aebrer/backrooms-power-crawl:html5 --userversion $VERSION
+/home/drew/.local/bin/butler push build/windows aebrer/deep-yellow:windows --userversion $VERSION
+/home/drew/.local/bin/butler push build/linux aebrer/deep-yellow:linux --userversion $VERSION
+/home/drew/.local/bin/butler push build/web aebrer/deep-yellow:html5 --userversion $VERSION
 
 # 3. Verify uploads
-/home/drew/.local/bin/butler status aebrer/backrooms-power-crawl
+/home/drew/.local/bin/butler status aebrer/deep-yellow
 ```
 
 **Additional steps (if doing a full release):**

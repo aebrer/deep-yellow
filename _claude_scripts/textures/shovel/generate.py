@@ -1,6 +1,6 @@
 """
 Shovel Item Texture Generator
-Generates a 128x128 pixel-art style shovel for Backrooms Power Crawl.
+Generates a 128x128 pixel-art style shovel for DEEP YELLOW.
 """
 
 from PIL import Image, ImageDraw

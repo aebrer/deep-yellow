@@ -73,7 +73,7 @@ def main():
 
     print()
     print("=" * 70)
-    print("Backrooms Power Crawl - Web Export Server")
+    print("DEEP YELLOW - Web Export Server")
     print("=" * 70)
     print()
     print(f"Server running at: http://localhost:{PORT}")

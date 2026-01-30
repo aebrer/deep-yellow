@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bacteria Spawn sprite generator for Backrooms Power Crawl
+Bacteria Spawn sprite generator for DEEP YELLOW
 Generates a 64x64 PSX-style sprite of a small, spindly bug-rat creature
 """
 from PIL import Image, ImageDraw

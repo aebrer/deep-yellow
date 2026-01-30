@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate itch.io cover image for Backrooms Power Crawl.
+Generate itch.io cover image for DEEP YELLOW.
 
 Creates a 630x500px promotional image using existing game assets.
 REVISION 2: Based on user feedback:
@@ -171,7 +171,7 @@ def draw_text_with_outline(text, outline_width=3):
 
     # Text colors
     outline_color = (0, 0, 0, 255)      # Black outline
-    text_color = (255, 255, 255, 255)   # White text
+    text_color = (255, 210, 50, 255)    # Deep yellow text
 
     # Default font
     font = ImageFont.load_default()
@@ -190,8 +190,8 @@ def draw_text_with_outline(text, outline_width=3):
     small_surface = Image.new("RGBA", (text_width + 10, text_height + 10), (0, 0, 0, 0))
     small_draw = ImageDraw.Draw(small_surface)
 
-    # Draw text on small surface (white)
-    small_draw.text((5, 5), text, fill=(255, 255, 255, 255), font=font)
+    # Draw text on small surface (deep yellow)
+    small_draw.text((5, 5), text, fill=text_color, font=font)
 
     # Scale up using nearest neighbor for crisp pixels
     large_surface = small_surface.resize(
@@ -219,7 +219,7 @@ def draw_text_with_outline(text, outline_width=3):
             black_surface = Image.fromarray(black_arr, mode="RGBA")
             outline_surface.paste(black_surface, (outline_width + dx, outline_width + dy), black_surface)
 
-    # Paste white text on top
+    # Paste yellow text on top
     outline_surface.paste(large_surface, (outline_width, outline_width), large_surface)
 
     return outline_surface, (large_surface.width, large_surface.height)
@@ -364,14 +364,14 @@ def create_cover():
     print("Adding title...")
 
     # Create text surfaces with outline (thicker outline)
-    print("  Rendering 'BACKROOMS'...")
+    print("  Rendering 'DEEP'...")
     backrooms_surface, (br_w, br_h) = draw_text_with_outline(
-        "BACKROOMS", outline_width=5
+        "DEEP", outline_width=5
     )
 
-    print("  Rendering 'POWER CRAWL'...")
+    print("  Rendering 'YELLOW'...")
     powercrawl_surface, (pc_w, pc_h) = draw_text_with_outline(
-        "POWER CRAWL", outline_width=5
+        "YELLOW", outline_width=5
     )
 
     # Calculate total title block height

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generates a tileable ceiling water stain texture for Backrooms Power Crawl.
+Generates a tileable ceiling water stain texture for DEEP YELLOW.
 
 Loads the existing acoustic ceiling texture and overlays a yellowish-brown
 water stain with irregular edges and concentric ring patterns.

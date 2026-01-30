@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate tileable floor cardboard texture for Backrooms Power Crawl.
+Generate tileable floor cardboard texture for DEEP YELLOW.
 Loads existing carpet texture and overlays a flattened cardboard piece.
 """
 

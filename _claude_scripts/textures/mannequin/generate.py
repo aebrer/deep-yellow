@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate a 64x64 pixel art sprite of a department store plastic mannequin.
-PSX-style horror aesthetic for Backrooms Power Crawl.
+PSX-style horror aesthetic for DEEP YELLOW.
 """
 
 from PIL import Image, ImageDraw

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DEBUG_ITEM sprite generator for Backrooms Power Crawl
+DEBUG_ITEM sprite generator for DEEP YELLOW
 Generates a 64x64 PSX-style sprite of a malfunctioning anomaly containment device
 """
 from PIL import Image, ImageDraw

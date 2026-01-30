@@ -317,7 +317,7 @@ func _build_main_menu() -> CenterContainer:
 
 	# Title
 	var title := Label.new()
-	title.text = "BACKROOMS\nPOWER CRAWL"
+	title.text = "DEEP\nYELLOW"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_TITLE))
 	title.add_theme_color_override("font_color", Color(0.95, 0.92, 0.8))

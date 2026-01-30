@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a tileable floor puddle texture for Backrooms Power Crawl.
+Generate a tileable floor puddle texture for DEEP YELLOW.
 
 Creates a water puddle on brown carpet by:
 1. Loading the base carpet texture

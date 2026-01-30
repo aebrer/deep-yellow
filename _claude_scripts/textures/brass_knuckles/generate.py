@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Brass Knuckles sprite generator for Backrooms Power Crawl
+Brass Knuckles sprite generator for DEEP YELLOW
 Generates a 64x64 PSX-style sprite of brass knuckles (BODY item)
 """
 from PIL import Image, ImageDraw

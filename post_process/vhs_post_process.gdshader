@@ -4,7 +4,7 @@
 // Fork of FMS_Cat's VCR distortion shader (ShaderToy)
 // License: CC0
 //
-// Purpose: Analog horror VHS tape artifacts for Backrooms Power Crawl
+// Purpose: Analog horror VHS tape artifacts for DEEP YELLOW
 // - Tape wave distortion (horizontal wobble)
 // - Tape crease effects (vertical smear/jitter)
 // - Bottom border noise (tracking errors)
