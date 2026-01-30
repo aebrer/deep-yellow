@@ -16,7 +16,7 @@ import numpy as np
 from pathlib import Path
 
 # Paths
-PROJECT_ROOT = Path("/home/drew/projects/backrooms_power_crawl")
+PROJECT_ROOT = Path("/home/drew/projects/deep_yellow")
 OUTPUT_PATH = PROJECT_ROOT / "media" / "itch_assets" / "cover.png"
 
 # Asset paths

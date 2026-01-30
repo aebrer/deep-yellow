@@ -10,8 +10,8 @@ from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
 
 # Paths
-SOURCE_TEXTURE = "/home/drew/projects/backrooms_power_crawl/assets/levels/level_00/textures/wallpaper_yellow.png"
-OUTPUT_PATH = "/home/drew/projects/backrooms_power_crawl/media/itch_assets/background.png"
+SOURCE_TEXTURE = "/home/drew/projects/deep_yellow/assets/levels/level_00/textures/wallpaper_yellow.png"
+OUTPUT_PATH = "/home/drew/projects/deep_yellow/media/itch_assets/background.png"
 
 # Parameters
 OUTPUT_SIZE = 256

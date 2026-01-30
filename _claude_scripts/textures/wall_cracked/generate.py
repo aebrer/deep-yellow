@@ -9,7 +9,7 @@ import numpy as np
 import random
 
 SIZE = 128
-BASE_WALLPAPER = "/home/drew/projects/backrooms_power_crawl/assets/levels/level_00/textures/wallpaper_yellow.png"
+BASE_WALLPAPER = "/home/drew/projects/deep_yellow/assets/levels/level_00/textures/wallpaper_yellow.png"
 
 def add_crack_segment(img_array, x1, y1, x2, y2, width=2, intensity=0.3):
     """

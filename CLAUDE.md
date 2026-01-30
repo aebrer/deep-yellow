@@ -798,7 +798,7 @@ Let me know if you find any issues, or if it works as expected and you'd like to
 
 ### Project Structure
 ```
-/home/drew/projects/backrooms_power_crawl/
+/home/drew/projects/deep_yellow/
 ├── docs/              # Design and architecture docs (READ THESE!)
 ├── scenes/            # .tscn files
 ├── scripts/           # .gd files
@@ -905,7 +905,7 @@ gh api \
 
 ### Python Virtual Environment
 
-**Location**: `/home/drew/projects/backrooms_power_crawl/venv/`
+**Location**: `/home/drew/projects/deep_yellow/venv/`
 
 The project includes a Python virtual environment for running maintenance scripts and tools. This venv is used by Claude instances for automation tasks.
 
@@ -927,7 +927,7 @@ source venv/bin/activate
 
 **Purpose**: Maintenance scripts for managing Godot resource files and other automation tasks that Claude instances may need to run.
 
-**Location**: `/home/drew/projects/backrooms_power_crawl/_claude_scripts/`
+**Location**: `/home/drew/projects/deep_yellow/_claude_scripts/`
 
 These scripts are part of the project's tooling infrastructure and should be committed to version control.
 
@@ -1062,7 +1062,7 @@ IF YOU CATCH YOURSELF DOING WORK, YOU'RE FAILING.
      - Cairo for vector graphics
      - ModernGL/PyOpenGL for shader-based generation
      - **Whatever generative art technique produces the best result**
-   - **Runs in project venv**: `/home/drew/projects/backrooms_power_crawl/venv/`
+   - **Runs in project venv**: `/home/drew/projects/deep_yellow/venv/`
    - **CRITICAL REQUIREMENTS**:
      - **MUST BE TILEABLE/SEAMLESS**: Texture must repeat seamlessly when tiled in a grid
      - **Use modulo wrapping for ALL pixel operations**: `img_array[y % SIZE, x % SIZE] = value`
@@ -1073,7 +1073,7 @@ IF YOU CATCH YOURSELF DOING WORK, YOU'RE FAILING.
    - **AUTOMATION**:
      1. Agent creates `generate.py`
      2. Installs any dependencies in venv
-     3. Runs script: `cd /home/drew/projects/backrooms_power_crawl && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
+     3. Runs script: `cd /home/drew/projects/deep_yellow && source venv/bin/activate && cd _claude_scripts/textures/texture_name && python generate.py`
      4. Verifies `output.png` exists and meets requirements
    - **THIS IS SIMPLE**: Pure Python, direct PNG output, agent chooses the best technique
 
@@ -1201,7 +1201,7 @@ _claude_scripts/textures/
 **Running the Generator**:
 ```bash
 # From project root, activate venv and run script:
-cd /home/drew/projects/backrooms_power_crawl
+cd /home/drew/projects/deep_yellow
 source venv/bin/activate
 cd _claude_scripts/textures/backrooms_wallpaper
 python generate.py  # Outputs tileable PNG
