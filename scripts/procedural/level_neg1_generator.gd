@@ -130,19 +130,22 @@ func _place_tutorial_content(chunk: Chunk) -> void:
 	_add_spraypaint(chunk, Vector2i(64, 73), "PAUSE AND READ THE CONTROLS", Color(0.8, 0.2, 0.2), 180.0)
 	_add_spraypaint(chunk, Vector2i(64, 75), "DESCEND", Color(0.8, 0.2, 0.2), 180.0)
 
-	# --- Item in Room 2 ---
+	# --- Item in Room 2 (weighted rarity pick from tutorial items) ---
 	var item_pos := Vector2i(64, 40)
-	var item_data := {
-		"item_id": "debug_item",
-		"world_position": {"x": item_pos.x + chunk_world.x, "y": item_pos.y + chunk_world.y},
-		"picked_up": false,
-		"discovered": false,
-		"spawn_turn": 0,
-		"rarity": 0,  # COMMON
-	}
-	var subchunk := chunk.get_sub_chunk(Vector2i(item_pos.x / SubChunk.SIZE, item_pos.y / SubChunk.SIZE))
-	if subchunk:
-		subchunk.add_world_item(item_data)
+	var tutorial_item := _pick_tutorial_item()
+	if tutorial_item:
+		var item_data := {
+			"item_id": tutorial_item.item_id,
+			"world_position": {"x": item_pos.x + chunk_world.x, "y": item_pos.y + chunk_world.y},
+			"picked_up": false,
+			"discovered": false,
+			"spawn_turn": 0,
+			"rarity": tutorial_item.rarity,
+			"level": tutorial_item.level,
+		}
+		var subchunk := chunk.get_sub_chunk(Vector2i(item_pos.x / SubChunk.SIZE, item_pos.y / SubChunk.SIZE))
+		if subchunk:
+			subchunk.add_world_item(item_data)
 
 	# --- Mannequin in Room 3 ---
 	var mannequin_pos := Vector2i(64, 61) + chunk_world
@@ -152,6 +155,33 @@ func _place_tutorial_content(chunk: Chunk) -> void:
 	var mannequin_sc := chunk.get_sub_chunk(Vector2i(mannequin_local.x / SubChunk.SIZE, mannequin_local.y / SubChunk.SIZE))
 	if mannequin_sc:
 		mannequin_sc.add_world_entity(mannequin)
+
+
+func _pick_tutorial_item() -> Item:
+	"""Pick one tutorial item using weighted rarity selection.
+
+	Uses base spawn probabilities as weights (no corruption in tutorial).
+	Meat (COMMON) ~67%, Vegetables (UNCOMMON) ~27%, Mustard (RARE) ~7%.
+	"""
+	var items: Array[Item] = [Meat.new(), Vegetables.new(), Mustard.new()]
+
+	# Build weighted pool from base rarity probabilities
+	var total_weight := 0.0
+	var weights: Array[float] = []
+	for item in items:
+		var weight: float = ItemRarity.get_base_probability(item.rarity)
+		weights.append(weight)
+		total_weight += weight
+
+	# Weighted random selection
+	var roll := randf() * total_weight
+	var cumulative := 0.0
+	for i in range(items.size()):
+		cumulative += weights[i]
+		if roll <= cumulative:
+			return items[i]
+
+	return items[0]  # Fallback
 
 
 func _add_spraypaint(chunk: Chunk, local_pos: Vector2i, text: String, color: Color = Color(0.9, 0.9, 0.85), rotation_y: float = 0.0) -> void:

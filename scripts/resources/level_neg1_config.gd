@@ -88,7 +88,9 @@ entity density: none (hand-placed)"""
 	# ITEM SPAWNING
 	# ========================================================================
 	item_density = 0.0  # No random items — placed manually
-	add_permitted_item(DebugItem.new())
+	add_permitted_item(Meat.new())
+	add_permitted_item(Vegetables.new())
+	add_permitted_item(Mustard.new())
 
 	# ========================================================================
 	# EXIT CONFIGURATION
