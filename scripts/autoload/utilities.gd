@@ -24,6 +24,15 @@ const DEBUG_SPAWN_ENTITY := ""
 ## Can be toggled off for motion sickness or preference for instant snapping
 static var movement_smoothing: bool = true
 
+## Auto-explore settings
+static var auto_explore_speed: float = 10.0  # turns per second
+static var auto_explore_hp_threshold: float = 0.5  # stop below this % of max HP
+static var auto_explore_sanity_threshold: float = 0.5  # stop below this % of max sanity
+static var auto_explore_stop_for_enemies: bool = false
+static var auto_explore_stop_for_items: bool = true
+static var auto_explore_stop_on_damage: bool = false
+static var auto_explore_stop_at_stairs: bool = true
+
 # ============================================================================
 # MATH UTILITIES
 # ============================================================================

@@ -92,6 +92,10 @@ func _on_level_changed(_new_level_id: int) -> void:
 			label.text = "Generating %s..." % new_level.display_name
 		loading_screen.show()
 
+	# Reset exploration tracking for new level
+	if ExplorationTracker:
+		ExplorationTracker.reset()
+
 	# Clear old level's rendered tiles and walkable cache
 	grid.grid_map.clear()
 	grid.walkable_cells.clear()
