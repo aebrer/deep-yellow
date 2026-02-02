@@ -44,6 +44,7 @@ var sensitivity_slider: HSlider
 var sensitivity_value_label: Label
 var fov_slider: HSlider
 var fov_value_label: Label
+var smoothing_button: Button
 var codex_button: Button
 var restart_button: Button
 var quit_button: Button
@@ -192,6 +193,14 @@ func _build_content() -> void:
 	if emoji_font:
 		fov_value_label.add_theme_font_override("font", emoji_font)
 	fov_row.add_child(fov_value_label)
+
+	# --- Movement Smoothing ---
+	smoothing_button = _create_toggle_button(
+		"Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
+	)
+	smoothing_button.pressed.connect(_on_smoothing_toggled)
+	content_vbox.add_child(smoothing_button)
+	focusable_controls.append(smoothing_button)
 
 	# --- Codex ---
 	codex_button = _create_action_button("Codex")
@@ -412,6 +421,13 @@ func _on_codex_closed() -> void:
 	if PauseManager and PauseManager.is_paused:
 		_show_panel()
 
+func _on_smoothing_toggled() -> void:
+	"""Toggle movement smoothing"""
+	if not _accepting_input:
+		return
+	Utilities.movement_smoothing = not Utilities.movement_smoothing
+	smoothing_button.text = "Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
+
 func _on_fullscreen_toggled() -> void:
 	"""Toggle fullscreen mode"""
 	if not _accepting_input:
@@ -542,8 +558,9 @@ func _show_panel() -> void:
 	if _is_blocking_popup_visible():
 		return
 
-	# Update fullscreen label in case it changed
+	# Update toggle labels in case they changed
 	fullscreen_button.text = "Fullscreen: ON" if _is_fullscreen() else "Fullscreen: OFF"
+	smoothing_button.text = "Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
 
 	# Sync FOV slider with current camera FOV (may have changed via zoom)
 	_sync_fov_from_camera()

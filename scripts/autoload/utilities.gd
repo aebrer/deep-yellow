@@ -17,6 +17,14 @@ const DEBUG_SPAWN_ALL_ITEMS := false
 const DEBUG_SPAWN_ENTITY := ""
 
 # ============================================================================
+# SETTINGS
+# ============================================================================
+
+## Movement smoothing (tween between grid positions)
+## Can be toggled off for motion sickness or preference for instant snapping
+static var movement_smoothing: bool = true
+
+# ============================================================================
 # MATH UTILITIES
 # ============================================================================
 

@@ -143,7 +143,7 @@ func _respawn_player_for_new_level() -> void:
 	else:
 		player._find_procedural_spawn()
 
-	player.update_visual_position()
+	player.snap_visual_position()
 
 	# Place level-defined spraypaint near spawn point
 	if current_level and not current_level.spawn_spraypaint.is_empty():
