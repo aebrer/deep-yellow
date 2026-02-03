@@ -28,6 +28,10 @@ var corruption_tracker: CorruptionTracker
 ## Default spawn space requirement (3x3 clear area)
 const DEFAULT_CLEAR_SIZE = 3
 
+## Corruption per bonus item level (at 0.25 corruption → +1 level)
+## At corruption 1.0 → level 5, corruption 2.0 → level 9
+const CORRUPTION_PER_LEVEL_STEP = 0.25
+
 ## Discovery range (player must be within this distance to "see" item)
 const DISCOVERY_RANGE = 50.0
 
@@ -113,9 +117,14 @@ func spawn_items_for_chunk(
 			# Find valid spawn location
 			var spawn_pos = _find_spawn_location(chunk, item)
 			if spawn_pos != Vector2i(-1, -1):
-				# Create WorldItem
+				# Create WorldItem with corruption-scaled level
+				var duped_item = item.duplicate_item()
+				var item_level = _roll_item_level(corruption)
+				if item_level > 1:
+					duped_item.level = item_level
+					Log.grid("Item %s spawned at level %d (corruption %.2f)" % [duped_item.item_name, item_level, corruption])
 				var world_item = WorldItem.new(
-					item.duplicate_item(),  # Create independent copy
+					duped_item,
 					spawn_pos,
 					rarity,
 					turn_number
@@ -269,6 +278,36 @@ func _get_player_spawn_rate_bonus(player) -> float:
 # ============================================================================
 # UTILITY
 # ============================================================================
+
+func _roll_item_level(corruption: float) -> int:
+	"""Roll item level based on corruption.
+
+	Each CORRUPTION_PER_LEVEL_STEP (0.25) of corruption gives one guaranteed
+	bonus level. The fractional remainder is a probability roll for +1 more.
+
+	Examples (CORRUPTION_PER_LEVEL_STEP = 0.25):
+	  corruption 0.0   → level 1 (always)
+	  corruption 0.1   → level 1 (60%) or 2 (40%)
+	  corruption 0.25  → level 2 (always)
+	  corruption 0.5   → level 3 (always)
+	  corruption 1.0   → level 5 (always)
+	  corruption 2.0   → level 9 (always)
+
+	Returns:
+		Item level (1+)
+	"""
+	if corruption <= 0.0:
+		return 1
+
+	var steps = corruption / CORRUPTION_PER_LEVEL_STEP
+	var guaranteed = int(steps)
+	var remainder = steps - guaranteed
+
+	# Roll for fractional step
+	if randf() < remainder:
+		guaranteed += 1
+
+	return 1 + guaranteed
 
 func _filter_by_rarity(items: Array[Item], rarity: ItemRarity.Tier) -> Array[Item]:
 	"""Filter items by rarity tier
@@ -461,9 +500,14 @@ func spawn_forced_item(
 	if spawn_pos == Vector2i(-1, -1):
 		return null
 
-	# Create the WorldItem (single deep copy, not 20+ potential copies)
+	# Create the WorldItem with corruption-scaled level
+	var duped_item = item.duplicate_item()
+	var item_level = _roll_item_level(corruption)
+	if item_level > 1:
+		duped_item.level = item_level
+		Log.grid("Forced spawn %s at level %d (corruption %.2f)" % [duped_item.item_name, item_level, corruption])
 	return WorldItem.new(
-		item.duplicate_item(),
+		duped_item,
 		spawn_pos,
 		selected_rarity,
 		turn_number

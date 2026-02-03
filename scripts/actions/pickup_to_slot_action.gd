@@ -66,14 +66,15 @@ func execute(player: Player3D) -> void:
 		1:  # COMBINE_LEVEL_UP
 			var existing_item = pool.get_item(slot_index)
 			if existing_item:
-				existing_item.level_up()
+				# Additive combining: incoming item's level is added to existing
+				existing_item.level_up(item.level)
 				pool.emit_signal("item_leveled_up", existing_item, slot_index, existing_item.level)
 
 				# Re-apply stat bonus
 				existing_item._remove_stat_bonus(player)
 				existing_item._apply_stat_bonus(player)
 
-				Log.player("Combined %s - leveled up to Level %d!" % [item.item_name, existing_item.level])
+				Log.player("Combined %s (+%d) - now Level %d!" % [item.item_name, item.level, existing_item.level])
 
 		2:  # OVERWRITE
 			pool.overwrite_item(slot_index, item, player)

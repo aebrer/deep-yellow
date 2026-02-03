@@ -98,14 +98,15 @@ func on_turn(player: Player3D, turn_number: int) -> void:
 	"""
 	pass  # Override in subclasses
 
-func level_up() -> void:
+func level_up(amount: int = 1) -> void:
 	"""Called when a duplicate item is picked up.
 
-	Increases item level by 1 (unlimited scaling).
+	Increases item level by the given amount (default 1, unlimited scaling).
+	When combining items, amount = incoming item's level (additive).
 	Subclasses can override to apply additional effects.
 	"""
-	level += 1
-	Log.player("%s leveled up! Now Level %d" % [item_name, level])
+	level += amount
+	Log.player("%s leveled up by +%d! Now Level %d" % [item_name, amount, level])
 
 func get_description(clearance_level: int) -> String:
 	"""Get item description based on player's Clearance level.

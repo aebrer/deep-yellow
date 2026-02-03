@@ -112,10 +112,10 @@ func on_turn(player: Player3D, turn_number: int) -> void:
 			player.stats.restore_sanity(heal)
 			Log.player("DEBUG_ITEM: Restored %.0f Sanity" % heal)
 
-func level_up() -> void:
+func level_up(amount: int = 1) -> void:
 	"""Level up item and update mana bonus."""
 	var old_level = level
-	super.level_up()  # Increment level
+	super.level_up(amount)  # Increment level
 
 	Log.player("DEBUG_ITEM leveled up: %d → %d (+%d Mana)" % [
 		old_level,

@@ -238,8 +238,19 @@ func _roll_item(available_items: Array[Item], corruption: float) -> Dictionary:
 	# Random stat type for this item's cost
 	var stat_index = randi() % 3  # 0=HP, 1=Sanity, 2=Mana
 
+	# Roll corruption-scaled item level (same formula as ItemSpawner._roll_item_level)
+	var duped_item = selected.item.duplicate_item()
+	if corruption > 0.0:
+		var steps = corruption / ItemSpawner.CORRUPTION_PER_LEVEL_STEP
+		var guaranteed = int(steps)
+		var remainder = steps - guaranteed
+		if randf() < remainder:
+			guaranteed += 1
+		if guaranteed > 0:
+			duped_item.level = 1 + guaranteed
+
 	return {
-		"item": selected.item.duplicate_item(),
+		"item": duped_item,
 		"rarity": rarity,
 		"cost": final_cost,
 		"stat_index": stat_index,

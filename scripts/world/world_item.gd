@@ -97,7 +97,8 @@ func to_dict() -> Dictionary:
 		"picked_up": picked_up,
 		"discovered": discovered,
 		"spawn_turn": spawn_turn,
-		"rarity": rarity
+		"rarity": rarity,
+		"level": item_resource.level if item_resource else 1
 	}
 
 static func from_dict(data: Dictionary, item_resource: Item) -> WorldItem:
@@ -122,6 +123,11 @@ static func from_dict(data: Dictionary, item_resource: Item) -> WorldItem:
 
 	world_item.picked_up = data.get("picked_up", false)
 	world_item.discovered = data.get("discovered", false)
+
+	# Restore item level (corruption-scaled items spawn above level 1)
+	var saved_level = data.get("level", 1)
+	if item_resource and saved_level > 1:
+		item_resource.level = saved_level
 
 	return world_item
 
