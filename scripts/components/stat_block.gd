@@ -557,17 +557,17 @@ func _exp_for_next_level() -> int:
 	"""Calculate EXP cost for the NEXT level up.
 
 	Formula: BASE × ((level + 1) ^ EXPONENT)
-	BASE = 100
-	EXPONENT = 1.5
+	BASE = 75
+	EXPONENT = 1.25
 
 	Examples (cost to reach level):
-	  Level 0 → 1:  100 × (1^1.5) = 100
-	  Level 1 → 2:  100 × (2^1.5) = 283
-	  Level 4 → 5:  100 × (5^1.5) = 1118
-	  Level 9 → 10: 100 × (10^1.5) = 3162
+	  Level 0 → 1:  75 × (1^1.25) = 75
+	  Level 1 → 2:  75 × (2^1.25) = 178
+	  Level 4 → 5:  75 × (5^1.25) = 447
+	  Level 9 → 10: 75 × (10^1.25) = 1334
 	"""
-	const BASE = 100
-	const EXPONENT = 1.5
+	const BASE = 75
+	const EXPONENT = 1.25
 	return int(BASE * pow(level + 1, EXPONENT))
 
 func exp_to_next_level() -> int:

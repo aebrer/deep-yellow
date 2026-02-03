@@ -321,8 +321,8 @@ func _on_discovery_made(subject_type: String, _subject_id: String, exp_reward: i
 func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 	"""Called when player enters a new chunk - award exploration EXP"""
 	if stats:
-		# Flat 10 EXP per new chunk - clearance multiplier is applied in gain_exp()
-		var exp_reward = 10
+		# Flat 20 EXP per new chunk - clearance multiplier is applied in gain_exp()
+		var exp_reward = 20
 		stats.gain_exp(exp_reward, "EXPLORED NEW CHUNK")
 		Log.turn("Entered new chunk %s" % Vector2i(chunk_position.x, chunk_position.y))
 
@@ -335,8 +335,8 @@ func _on_entity_died(entity: WorldEntity) -> void:
 	kill_count += 1
 
 	# EXP reward based on entity max HP (no level scaling - kills become more frequent with corruption)
-	# Base: max_hp / 10, minimum 10 EXP
-	var exp_reward = max(10, int(entity.max_hp / 10.0))
+	# Base: max_hp / 5, minimum 15 EXP — generous enough that weak enemies still feel rewarding
+	var exp_reward = max(15, int(entity.max_hp / 5.0))
 	stats.gain_exp(exp_reward, "CREATURE KILL")
 
 	# Restore sanity based on enemy threat level (same weights used for sanity damage)
