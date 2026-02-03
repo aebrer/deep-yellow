@@ -127,6 +127,9 @@ func process_frame(delta: float) -> void:
 
 		if chebyshev_dist <= 1:
 			# Already adjacent — stop
+			# Mark vending machines as visited so we don't stop for them again
+			if nav_target["reason"] == "vending machine detected":
+				ExplorationTracker.mark_vending_machine_visited(obj_pos)
 			Log.state("Auto-explore: Stopped - %s (adjacent)" % nav_target["reason"])
 			Log.player("Auto-explore stopped: %s" % nav_target["reason"])
 			transition_to("IdleState")
@@ -266,6 +269,9 @@ func _nearest_item_in_range(perception_range: float) -> Vector2i:
 	var nearest_dist := INF
 
 	for item_pos in item_positions:
+		# Skip items the player chose to leave on ground
+		if ExplorationTracker.is_item_dismissed(item_pos):
+			continue
 		var dist := Vector2(player.grid_position).distance_to(Vector2(item_pos))
 		if dist <= perception_range and dist < nearest_dist:
 			nearest_dist = dist
@@ -285,6 +291,9 @@ func _nearest_vending_machine_in_range(perception_range: float) -> Vector2i:
 	for entity_pos in entity_positions:
 		var entity = player.grid.entity_renderer.get_entity_at(entity_pos)
 		if not entity or entity.entity_type != "vending_machine":
+			continue
+		# Skip vending machines we already stopped at
+		if ExplorationTracker.is_vending_machine_visited(entity_pos):
 			continue
 		var dist := Vector2(player.grid_position).distance_to(Vector2(entity_pos))
 		if dist <= perception_range and dist < nearest_dist:

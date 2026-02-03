@@ -350,6 +350,9 @@ func _on_slot_selected(slot_index: int, action_type: ActionType) -> void:
 func _on_cancel_pressed() -> void:
 	"""Handle cancel button press - leave item on ground"""
 	Log.player("Left item on ground")
+	# Mark this item position as dismissed so auto-explore won't stop for it again
+	if item_position != Vector2i.ZERO:
+		ExplorationTracker.mark_item_dismissed(item_position)
 	_close_panel()
 
 func _close_panel() -> void:
