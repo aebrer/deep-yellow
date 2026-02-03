@@ -36,6 +36,11 @@ func _execute_pre_turn() -> void:
 
 	Log.turn("===== TURN %d PRE-TURN =====" % (player.turn_count + 1))
 
+	# Update exploration tracking (marks tiles within perception range as explored)
+	if player.stats and ExplorationTracker:
+		var perception_range: float = 15.0 + (player.stats.perception * 5.0)
+		ExplorationTracker.mark_explored(player.grid_position, perception_range)
+
 	# Regenerate all resources (HP, Sanity, Mana)
 	if player.stats:
 		player.stats.regenerate_resources()

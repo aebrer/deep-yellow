@@ -157,12 +157,15 @@ func set_player(player_ref: Node) -> void:
 	if player and player.stats:
 		if player.stats.resource_changed.is_connected(_on_resource_changed):
 			player.stats.resource_changed.disconnect(_on_resource_changed)
+		if player.stats.stat_changed.is_connected(_on_stat_changed):
+			player.stats.stat_changed.disconnect(_on_stat_changed)
 
 	player = player_ref
 
 	if player and player.stats:
-		# Connect to resource change signal
+		# Connect to resource and stat change signals
 		player.stats.resource_changed.connect(_on_resource_changed)
+		player.stats.stat_changed.connect(_on_stat_changed)
 
 		# Initial update
 		_update_values()
@@ -180,6 +183,11 @@ func _on_resource_changed(resource_name: String, current: float, maximum: float)
 			sanity_max = maximum
 			sanity_target_fill = current / maximum if maximum > 0 else 0.0
 	# Mana is ignored (shown in stats panel instead)
+	queue_redraw()
+
+func _on_stat_changed(_stat_name: String, _old_value: float, _new_value: float) -> void:
+	"""Called when base stats change (body/mind/null) — recalculate derived HP/Sanity"""
+	_update_values()
 	queue_redraw()
 
 func _update_values() -> void:

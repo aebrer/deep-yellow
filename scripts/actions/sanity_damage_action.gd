@@ -163,11 +163,12 @@ static func calculate_sanity_damage(player, grid) -> Dictionary:
 
 	# Calculate damage using corruption-scaled formula
 	# At 0.01 corruption: base=0, per-enemy=0.2 → 3 enemies = 0.6
-	# At 0.1 corruption: base=1, per-enemy=0.8 → 3 enemies = 1 + 2.4 = 3.4
-	# Formula: base = corruption * 10, per_enemy = 0.2 + corruption * 6
+	# At 0.5 corruption: base=2.5, per-enemy=1.7 → 3 enemies = 2.5 + 5.1 = 7.6
+	# At 1.0 corruption: base=5, per-enemy=3.2 → 3 enemies = 5 + 9.6 = 14.6
+	# Formula: base = corruption * 5, per_enemy = 0.2 + corruption * 3
 	var corruption = result["corruption"]
-	var base_damage = corruption * 10.0
-	var per_enemy_damage = 0.2 + corruption * 6.0
+	var base_damage = corruption * 5.0
+	var per_enemy_damage = 0.2 + corruption * 3.0
 	var damage = base_damage + result["weighted_count"] * per_enemy_damage
 	result["damage"] = damage
 

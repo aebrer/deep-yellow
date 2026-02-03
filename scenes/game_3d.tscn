@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://cy7w8qn1yf3d"]
+[gd_scene load_steps=16 format=3 uid="uid://cy7w8qn1yf3d"]
 
 [ext_resource type="Script" path="res://scripts/game_3d.gd" id="1_game3d"]
 [ext_resource type="Script" path="res://scripts/grid_3d.gd" id="2_grid3d"]
@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" uid="uid://loading_screen" path="res://scenes/ui/loading_screen.tscn" id="20_loadingscreen"]
 [ext_resource type="Script" path="res://scripts/ui/exp_bar.gd" id="21_expbar"]
 [ext_resource type="Script" path="res://scripts/ui/status_bars.gd" id="22_statusbars"]
+[ext_resource type="Script" path="res://scripts/player/states/auto_explore_state.gd" id="23_autoexplore"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -104,6 +105,9 @@ script = ExtResource("9_preturn")
 
 [node name="PostTurnState" type="Node" parent="Player3D/InputStateMachine"]
 script = ExtResource("10_postturn")
+
+[node name="AutoExploreState" type="Node" parent="Player3D/InputStateMachine"]
+script = ExtResource("23_autoexplore")
 
 [node name="CameraRig" type="Node3D" parent="Player3D"]
 script = ExtResource("13_camera")

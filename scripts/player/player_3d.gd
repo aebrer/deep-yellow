@@ -64,6 +64,10 @@ var null_pool: ItemPool = null
 const AttackExecutorClass = preload("res://scripts/combat/attack_executor.gd")
 var attack_executor = null  # Initialized in _ready()
 
+# Movement tween (Anathema Interloper pattern: tree-level tween on local position)
+const MOVE_TWEEN_DURATION: float = 0.2
+var _move_tween: Tween = null
+
 # Node references
 var grid: Grid3D = null
 var move_indicator: Node3D = null  # Set by Game node
@@ -111,8 +115,8 @@ func _ready() -> void:
 			# Procedural level — find spawn via random search
 			_find_procedural_spawn()
 
-		# SNAP to grid position (turn-based = no smooth movement)
-		update_visual_position()
+		# Snap to initial grid position (no tween on spawn)
+		snap_visual_position()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -151,14 +155,41 @@ func _exit_tree() -> void:
 # ============================================================================
 
 func update_visual_position() -> void:
-	"""Update 3D position to match grid position - SNAP instantly (turn-based!)"""
+	"""Update 3D position to match grid position.
+
+	When smoothing enabled: tree-level tween on local position (Anathema Interloper pattern).
+	When smoothing disabled: instant snap.
+	"""
 	if not grid:
 		return
 
 	var world_pos = grid.grid_to_world(grid_position)
 	world_pos.y = 1.0  # Slightly above ground (adjusted for new cell size)
 
-	# TURN-BASED: Snap instantly to grid position, no lerping
+	if not Utilities.movement_smoothing:
+		global_position = world_pos
+		return
+
+	# Kill any existing movement tween
+	if _move_tween and _move_tween.is_valid():
+		_move_tween.kill()
+
+	# Tree-level tween on local position with TRANS_SINE + EASE_OUT
+	_move_tween = get_tree().create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_move_tween.tween_property(self, "position", world_pos, MOVE_TWEEN_DURATION)
+	await _move_tween.finished
+
+func snap_visual_position() -> void:
+	"""Instantly snap to grid position (for init, teleport, level transitions)."""
+	if not grid:
+		return
+
+	# Kill any running tween
+	if _move_tween and _move_tween.is_valid():
+		_move_tween.kill()
+
+	var world_pos = grid.grid_to_world(grid_position)
+	world_pos.y = 1.0
 	global_position = world_pos
 
 # ============================================================================
@@ -290,8 +321,8 @@ func _on_discovery_made(subject_type: String, _subject_id: String, exp_reward: i
 func _on_new_chunk_entered(chunk_position: Vector3i) -> void:
 	"""Called when player enters a new chunk - award exploration EXP"""
 	if stats:
-		# Flat 10 EXP per new chunk - clearance multiplier is applied in gain_exp()
-		var exp_reward = 10
+		# Flat 20 EXP per new chunk - clearance multiplier is applied in gain_exp()
+		var exp_reward = 20
 		stats.gain_exp(exp_reward, "EXPLORED NEW CHUNK")
 		Log.turn("Entered new chunk %s" % Vector2i(chunk_position.x, chunk_position.y))
 
@@ -304,8 +335,8 @@ func _on_entity_died(entity: WorldEntity) -> void:
 	kill_count += 1
 
 	# EXP reward based on entity max HP (no level scaling - kills become more frequent with corruption)
-	# Base: max_hp / 10, minimum 10 EXP
-	var exp_reward = max(10, int(entity.max_hp / 10.0))
+	# Base: max_hp / 5, minimum 15 EXP — generous enough that weak enemies still feel rewarding
+	var exp_reward = max(15, int(entity.max_hp / 5.0))
 	stats.gain_exp(exp_reward, "CREATURE KILL")
 
 	# Restore sanity based on enemy threat level (same weights used for sanity damage)

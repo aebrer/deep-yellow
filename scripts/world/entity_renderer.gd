@@ -307,12 +307,18 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		new_pos.y * 2.0 + 1.0
 	)
 
-	# Update billboard position (instant for now, can add lerp later)
-	billboard.position = new_world_3d
-
-	# Update health bar position
-	if health_bar:
-		health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
+	# Update billboard position (tween if smoothing enabled)
+	if Utilities.movement_smoothing:
+		var tween = get_tree().create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(billboard, "position", new_world_3d, Player3D.MOVE_TWEEN_DURATION)
+		if health_bar:
+			tween.parallel().tween_property(health_bar, "position",
+				new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0),
+				Player3D.MOVE_TWEEN_DURATION)
+	else:
+		billboard.position = new_world_3d
+		if health_bar:
+			health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
 
 
 # ============================================================================

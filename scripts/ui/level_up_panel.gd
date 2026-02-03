@@ -515,8 +515,11 @@ func _modify_corruption(delta: float) -> void:
 		Log.error(Log.Category.SYSTEM, "Cannot modify corruption - no ChunkManager!")
 		return
 
-	# Get current level (assume level 0 for now, could be tracked elsewhere)
-	var current_level_id: int = 0  # TODO: Get actual current level from player/game state
+	var current_level_id: int = 0
+	if LevelManager:
+		var current_level = LevelManager.get_current_level()
+		if current_level:
+			current_level_id = current_level.level_id
 
 	var current_corruption: float = ChunkManager.corruption_tracker.get_corruption(current_level_id)
 	var new_corruption: float = maxf(0.0, current_corruption + delta)

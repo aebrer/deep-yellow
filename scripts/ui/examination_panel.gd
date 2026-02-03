@@ -151,8 +151,8 @@ func show_panel(target: Examinable) -> void:
 		hide_panel()
 		return
 
-	# Get entity info
-	var info = KnowledgeDB.get_entity_info(target.entity_id)
+	# Get entity info (via Examinable for corruption-aware data)
+	var info = target.get_display_info()
 
 	# Check if this is an item (has rarity info)
 	var is_item = info.get("is_item", false)

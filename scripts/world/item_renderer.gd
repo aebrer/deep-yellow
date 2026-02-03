@@ -157,6 +157,11 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 		sprite.texture = ImageTexture.create_from_image(image)
 		sprite.pixel_size = BILLBOARD_SIZE / 16.0
 
+	# Corrupted item visual treatment: yellow tint + glitch animation
+	if item_data.get("corrupted", false):
+		sprite.modulate = Color(1.0, 0.9, 0.3, 1.0)  # Sickly yellow tint
+		_start_glitch_animation(sprite)
+
 	# Add examination support (same pattern as floor tiles)
 	var exam_body = StaticBody3D.new()
 	exam_body.name = "ExamBody"
@@ -168,6 +173,13 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 	var examinable = Examinable.new()
 	examinable.entity_id = item_resource.item_id
 	examinable.entity_type = Examinable.EntityType.ITEM
+	# Pass corruption data so examination shows [CORRUPT] info
+	if item_data.get("corrupted", false):
+		examinable.item_corruption_data = {
+			"corrupted": true,
+			"corruption_debuffs": item_data.get("corruption_debuffs", []),
+			"level": item_data.get("level", 1),
+		}
 	exam_body.add_child(examinable)
 
 	# Add collision shape to StaticBody3D (not to Examinable)
@@ -298,3 +310,48 @@ func clear_all_items() -> void:
 
 func _to_string() -> String:
 	return "ItemRenderer(items=%d)" % item_billboards.size()
+
+
+# ============================================================================
+# CORRUPTED ITEM EFFECTS
+# ============================================================================
+
+func _start_glitch_animation(sprite: Sprite3D) -> void:
+	"""Add a looping glitch animation to a corrupted item billboard.
+
+	Uses recursive tween calls so each loop gets fresh random values.
+	Offsets the sprite's world position and flickers color/opacity.
+	"""
+	_do_single_glitch.call_deferred(sprite)
+
+func _do_single_glitch(sprite: Sprite3D) -> void:
+	"""Run one glitch cycle then schedule the next."""
+	if not is_instance_valid(sprite):
+		return
+
+	var base_color = Color(1.0, 0.9, 0.3, 1.0)  # Corruption yellow
+	var base_pos = sprite.position  # Save original world position
+	var tween = create_tween()
+
+	# Glitch ON: shift position + color distortion
+	tween.tween_callback(func():
+		if not is_instance_valid(sprite):
+			return
+		sprite.position = base_pos + Vector3(randf_range(-0.06, 0.06), randf_range(-0.03, 0.03), 0.0)
+		sprite.modulate = Color(1.0, randf_range(0.4, 0.8), randf_range(0.0, 0.3), randf_range(0.5, 1.0))
+	)
+	tween.tween_interval(randf_range(0.04, 0.12))
+
+	# Glitch OFF: snap back
+	tween.tween_callback(func():
+		if not is_instance_valid(sprite):
+			return
+		sprite.position = base_pos
+		sprite.modulate = base_color
+	)
+
+	# Wait before next glitch (random each cycle)
+	tween.tween_interval(randf_range(0.3, 1.5))
+
+	# Recurse for next cycle
+	tween.tween_callback(_do_single_glitch.bind(sprite))

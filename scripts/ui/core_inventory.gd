@@ -190,7 +190,7 @@ func _update_slot(slot: HBoxContainer, pool: ItemPool, slot_index: int) -> void:
 		# Set label text with [NEW!] indicator if item has XP to award
 		var enabled_text = "[ON]" if pool.enabled[slot_index] else "[OFF]"
 		var new_indicator = "[NEW!] " if KnowledgeDB.is_item_novel(item.item_id) else ""
-		label.text = "%s%s (Lvl %d) %s" % [new_indicator, item.item_name, item.level, enabled_text]
+		label.text = "%s%s (Lvl %d) %s" % [new_indicator, item.get_display_name(), item.level, enabled_text]
 
 		# Store tooltip with clearance-based description
 		var clearance = player.stats.clearance_level if player.stats else 0
@@ -474,10 +474,10 @@ func _highlight_slot(slot: Control) -> void:
 					var pool = _get_pool(slot_info.pool_type)
 					if pool and slot_info.slot_index < pool.enabled.size():
 						var enabled_text = "[ON]" if pool.enabled[slot_info.slot_index] else "[OFF]"
-						label.text = "%s (Lvl %d) %s" % [item.item_name, item.level, enabled_text]
+						label.text = "%s (Lvl %d) %s" % [item.get_display_name(), item.level, enabled_text]
 
 		# Directly set examination panel content with item info
-		var item_name = item.item_name if item else label.text.split(" (")[0]
+		var item_name = item.get_display_name() if item else label.text.split(" (")[0]
 		examination_panel.header_label.text = "ITEM INFO"
 		examination_panel.header_label.visible = true
 		examination_panel.entity_name_label.text = item_name

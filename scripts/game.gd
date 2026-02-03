@@ -157,6 +157,8 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 				color = "#00e5ff"  # Turquoise - EXP/leveling
 			elif "examined" in msg_lower or "discovered" in msg_lower or "codex" in msg_lower:
 				color = "#e040fb"  # Magenta - lore/examination
+			elif "auto-explore" in msg_lower:
+				color = "#b0b0b0"  # Light gray - auto-explore (system-like)
 			else:
 				color = "#6bffb8"  # Bright cyan/green (default player messages)
 		Log.Level.INFO:

@@ -44,7 +44,25 @@ var sensitivity_slider: HSlider
 var sensitivity_value_label: Label
 var fov_slider: HSlider
 var fov_value_label: Label
+var smoothing_button: Button
+var ae_settings_button: Button
 var codex_button: Button
+
+# Auto-explore sub-panel
+var ae_panel: PanelContainer
+var ae_content_vbox: VBoxContainer
+var ae_speed_slider: HSlider
+var ae_speed_value_label: Label
+var ae_hp_slider: HSlider
+var ae_hp_value_label: Label
+var ae_sanity_slider: HSlider
+var ae_sanity_value_label: Label
+var ae_enemies_button: Button
+var ae_items_button: Button
+var ae_damage_button: Button
+var ae_stairs_button: Button
+var ae_back_button: Button
+var ae_focusable_controls: Array[Control] = []
 var restart_button: Button
 var quit_button: Button
 
@@ -109,6 +127,7 @@ func _build_panel() -> void:
 	panel.add_child(content_vbox)
 
 	_build_content()
+	_build_ae_panel()
 
 func _build_content() -> void:
 	"""Build all settings controls"""
@@ -193,6 +212,20 @@ func _build_content() -> void:
 		fov_value_label.add_theme_font_override("font", emoji_font)
 	fov_row.add_child(fov_value_label)
 
+	# --- Movement Smoothing ---
+	smoothing_button = _create_toggle_button(
+		"Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
+	)
+	smoothing_button.pressed.connect(_on_smoothing_toggled)
+	content_vbox.add_child(smoothing_button)
+	focusable_controls.append(smoothing_button)
+
+	# --- Auto-Explore Settings (sub-panel button) ---
+	ae_settings_button = _create_action_button("Auto-Explore Settings")
+	ae_settings_button.pressed.connect(_on_ae_settings_pressed)
+	content_vbox.add_child(ae_settings_button)
+	focusable_controls.append(ae_settings_button)
+
 	# --- Codex ---
 	codex_button = _create_action_button("Codex")
 	codex_button.pressed.connect(_on_codex_pressed)
@@ -220,6 +253,231 @@ func _build_content() -> void:
 	focusable_controls.append(quit_button)
 
 # ============================================================================
+# AUTO-EXPLORE SUB-PANEL
+# ============================================================================
+
+func _build_ae_panel() -> void:
+	"""Build the auto-explore settings sub-panel (hidden by default)"""
+	ae_panel = PanelContainer.new()
+	ae_panel.name = "AutoExplorePanel"
+	ae_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	ae_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	ae_panel.visible = false
+	add_child(ae_panel)
+
+	ae_panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0.95)
+	style.border_color = Color(0.8, 0.8, 0.5, 1)  # Yellow border for auto-explore
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	ae_panel.add_theme_stylebox_override("panel", style)
+
+	ae_content_vbox = VBoxContainer.new()
+	ae_content_vbox.add_theme_constant_override("separation", 8)
+	ae_content_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ae_panel.add_child(ae_content_vbox)
+
+	ae_focusable_controls.clear()
+
+	# Header
+	var header = Label.new()
+	header.text = "AUTO-EXPLORE"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_HEADER))
+	header.add_theme_color_override("font_color", Color(0.8, 0.8, 0.5))
+	if emoji_font:
+		header.add_theme_font_override("font", emoji_font)
+	ae_content_vbox.add_child(header)
+
+	var sep = HSeparator.new()
+	sep.add_theme_constant_override("separation", 6)
+	ae_content_vbox.add_child(sep)
+
+	# Speed slider
+	var speed_label = _create_setting_label("Speed (turns/sec)")
+	ae_content_vbox.add_child(speed_label)
+
+	var speed_row = HBoxContainer.new()
+	speed_row.add_theme_constant_override("separation", 8)
+	ae_content_vbox.add_child(speed_row)
+
+	ae_speed_slider = HSlider.new()
+	ae_speed_slider.min_value = 1.0
+	ae_speed_slider.max_value = 30.0
+	ae_speed_slider.step = 1.0
+	ae_speed_slider.value = Utilities.auto_explore_speed
+	ae_speed_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ae_speed_slider.custom_minimum_size = Vector2(150, 0)
+	ae_speed_slider.add_to_group("hud_focusable")
+	ae_speed_slider.value_changed.connect(_on_ae_speed_changed)
+	speed_row.add_child(ae_speed_slider)
+	ae_focusable_controls.append(ae_speed_slider)
+
+	ae_speed_value_label = Label.new()
+	ae_speed_value_label.text = "%d" % int(Utilities.auto_explore_speed)
+	ae_speed_value_label.custom_minimum_size = Vector2(40, 0)
+	ae_speed_value_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_LABEL))
+	if emoji_font:
+		ae_speed_value_label.add_theme_font_override("font", emoji_font)
+	speed_row.add_child(ae_speed_value_label)
+
+	# HP threshold slider
+	var hp_label = _create_setting_label("Stop HP %")
+	ae_content_vbox.add_child(hp_label)
+
+	var hp_row = HBoxContainer.new()
+	hp_row.add_theme_constant_override("separation", 8)
+	ae_content_vbox.add_child(hp_row)
+
+	ae_hp_slider = HSlider.new()
+	ae_hp_slider.min_value = 0.1
+	ae_hp_slider.max_value = 0.9
+	ae_hp_slider.step = 0.05
+	ae_hp_slider.value = Utilities.auto_explore_hp_threshold
+	ae_hp_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ae_hp_slider.custom_minimum_size = Vector2(150, 0)
+	ae_hp_slider.add_to_group("hud_focusable")
+	ae_hp_slider.value_changed.connect(_on_ae_hp_changed)
+	hp_row.add_child(ae_hp_slider)
+	ae_focusable_controls.append(ae_hp_slider)
+
+	ae_hp_value_label = Label.new()
+	ae_hp_value_label.text = "%d%%" % int(Utilities.auto_explore_hp_threshold * 100)
+	ae_hp_value_label.custom_minimum_size = Vector2(40, 0)
+	ae_hp_value_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_LABEL))
+	if emoji_font:
+		ae_hp_value_label.add_theme_font_override("font", emoji_font)
+	hp_row.add_child(ae_hp_value_label)
+
+	# Sanity threshold slider
+	var sanity_label = _create_setting_label("Stop Sanity %")
+	ae_content_vbox.add_child(sanity_label)
+
+	var sanity_row = HBoxContainer.new()
+	sanity_row.add_theme_constant_override("separation", 8)
+	ae_content_vbox.add_child(sanity_row)
+
+	ae_sanity_slider = HSlider.new()
+	ae_sanity_slider.min_value = 0.1
+	ae_sanity_slider.max_value = 0.9
+	ae_sanity_slider.step = 0.05
+	ae_sanity_slider.value = Utilities.auto_explore_sanity_threshold
+	ae_sanity_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ae_sanity_slider.custom_minimum_size = Vector2(150, 0)
+	ae_sanity_slider.add_to_group("hud_focusable")
+	ae_sanity_slider.value_changed.connect(_on_ae_sanity_changed)
+	sanity_row.add_child(ae_sanity_slider)
+	ae_focusable_controls.append(ae_sanity_slider)
+
+	ae_sanity_value_label = Label.new()
+	ae_sanity_value_label.text = "%d%%" % int(Utilities.auto_explore_sanity_threshold * 100)
+	ae_sanity_value_label.custom_minimum_size = Vector2(40, 0)
+	ae_sanity_value_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_LABEL))
+	if emoji_font:
+		ae_sanity_value_label.add_theme_font_override("font", emoji_font)
+	sanity_row.add_child(ae_sanity_value_label)
+
+	# Toggle buttons
+	ae_enemies_button = _create_toggle_button(
+		"Stop for Enemies: ON" if Utilities.auto_explore_stop_for_enemies else "Stop for Enemies: OFF"
+	)
+	ae_enemies_button.pressed.connect(_on_ae_enemies_toggled)
+	ae_content_vbox.add_child(ae_enemies_button)
+	ae_focusable_controls.append(ae_enemies_button)
+
+	ae_items_button = _create_toggle_button(
+		"Stop for Items: ON" if Utilities.auto_explore_stop_for_items else "Stop for Items: OFF"
+	)
+	ae_items_button.pressed.connect(_on_ae_items_toggled)
+	ae_content_vbox.add_child(ae_items_button)
+	ae_focusable_controls.append(ae_items_button)
+
+	ae_damage_button = _create_toggle_button(
+		"Stop on Damage: ON" if Utilities.auto_explore_stop_on_damage else "Stop on Damage: OFF"
+	)
+	ae_damage_button.pressed.connect(_on_ae_damage_toggled)
+	ae_content_vbox.add_child(ae_damage_button)
+	ae_focusable_controls.append(ae_damage_button)
+
+	ae_stairs_button = _create_toggle_button(
+		"Stop at Stairs: ON" if Utilities.auto_explore_stop_at_stairs else "Stop at Stairs: OFF"
+	)
+	ae_stairs_button.pressed.connect(_on_ae_stairs_toggled)
+	ae_content_vbox.add_child(ae_stairs_button)
+	ae_focusable_controls.append(ae_stairs_button)
+
+	# Back button
+	var sep2 = HSeparator.new()
+	sep2.add_theme_constant_override("separation", 6)
+	ae_content_vbox.add_child(sep2)
+
+	ae_back_button = _create_action_button("Back")
+	ae_back_button.pressed.connect(_on_ae_settings_back)
+	ae_content_vbox.add_child(ae_back_button)
+	ae_focusable_controls.append(ae_back_button)
+
+func _show_ae_panel() -> void:
+	"""Show the auto-explore sub-panel"""
+	ae_panel.visible = true
+	_update_ae_panel_position()
+
+	for control in ae_focusable_controls:
+		control.focus_mode = Control.FOCUS_ALL
+		control.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Set up focus neighbors
+	for i in range(ae_focusable_controls.size()):
+		var control = ae_focusable_controls[i]
+		var prev_idx = i - 1 if i > 0 else ae_focusable_controls.size() - 1
+		var next_idx = i + 1 if i < ae_focusable_controls.size() - 1 else 0
+		control.focus_neighbor_top = ae_focusable_controls[prev_idx].get_path()
+		control.focus_neighbor_bottom = ae_focusable_controls[next_idx].get_path()
+
+	if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
+		if ae_focusable_controls.size() > 0:
+			ae_focusable_controls[0].grab_focus()
+
+func _hide_ae_panel() -> void:
+	"""Hide the auto-explore sub-panel"""
+	ae_panel.visible = false
+	for control in ae_focusable_controls:
+		control.focus_mode = Control.FOCUS_NONE
+		control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _update_ae_panel_position() -> void:
+	"""Position ae panel same as main panel"""
+	if not ae_panel:
+		return
+
+	var game_ref = get_node_or_null("/root/Game")
+	var viewport_rect: Rect2
+	if game_ref and game_ref.has_method("get_game_viewport_rect"):
+		viewport_rect = game_ref.get_game_viewport_rect()
+	else:
+		viewport_rect = get_viewport_rect()
+
+	ae_panel.reset_size()
+	await get_tree().process_frame
+
+	var panel_size: Vector2 = ae_panel.size
+	var max_height: float = viewport_rect.size.y * 0.9
+	if panel_size.y > max_height:
+		panel_size.y = max_height
+		ae_panel.size = panel_size
+
+	var pos_x: float = viewport_rect.position.x + PANEL_MARGIN
+	var pos_y: float = viewport_rect.position.y + (viewport_rect.size.y - panel_size.y) / 2.0
+	ae_panel.position = Vector2(pos_x, pos_y)
+
+# ============================================================================
 # CONTROLS SECTION
 # ============================================================================
 
@@ -233,6 +491,7 @@ const CONTROL_MAPPINGS := [
 	["Zoom", "LB / RB", "Scroll Wheel"],
 	["Navigate HUD", "Left Stick", "Mouse Hover"],
 	["Minimap Zoom", "D-Pad L/R", "Arrow Keys"],
+	["Auto-Explore", "Y", "Y"],
 ]
 
 func _build_controls_section() -> void:
@@ -397,6 +656,26 @@ func _is_fullscreen() -> bool:
 	"""Check if window is in fullscreen mode"""
 	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 
+func _on_ae_settings_pressed() -> void:
+	"""Open the auto-explore settings sub-panel"""
+	if not _accepting_input:
+		return
+	panel.visible = false
+	_show_ae_panel()
+
+func _on_ae_settings_back() -> void:
+	"""Return from auto-explore sub-panel to main settings"""
+	_hide_ae_panel()
+	panel.visible = true
+	if PauseManager and PauseManager.is_paused:
+		_show_panel()
+
+func _on_ae_settings_closed() -> void:
+	"""Close auto-explore sub-panel and re-show settings"""
+	_hide_ae_panel()
+	if PauseManager and PauseManager.is_paused:
+		_show_panel()
+
 func _on_codex_pressed() -> void:
 	"""Open the codex panel"""
 	if not _accepting_input:
@@ -411,6 +690,49 @@ func _on_codex_closed() -> void:
 	"""Re-show settings panel when codex is closed"""
 	if PauseManager and PauseManager.is_paused:
 		_show_panel()
+
+func _on_smoothing_toggled() -> void:
+	"""Toggle movement smoothing"""
+	if not _accepting_input:
+		return
+	Utilities.movement_smoothing = not Utilities.movement_smoothing
+	smoothing_button.text = "Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
+
+func _on_ae_speed_changed(value: float) -> void:
+	Utilities.auto_explore_speed = value
+	ae_speed_value_label.text = "%d" % int(value)
+
+func _on_ae_hp_changed(value: float) -> void:
+	Utilities.auto_explore_hp_threshold = value
+	ae_hp_value_label.text = "%d%%" % int(value * 100)
+
+func _on_ae_sanity_changed(value: float) -> void:
+	Utilities.auto_explore_sanity_threshold = value
+	ae_sanity_value_label.text = "%d%%" % int(value * 100)
+
+func _on_ae_enemies_toggled() -> void:
+	if not _accepting_input:
+		return
+	Utilities.auto_explore_stop_for_enemies = not Utilities.auto_explore_stop_for_enemies
+	ae_enemies_button.text = "Stop for Enemies: ON" if Utilities.auto_explore_stop_for_enemies else "Stop for Enemies: OFF"
+
+func _on_ae_items_toggled() -> void:
+	if not _accepting_input:
+		return
+	Utilities.auto_explore_stop_for_items = not Utilities.auto_explore_stop_for_items
+	ae_items_button.text = "Stop for Items: ON" if Utilities.auto_explore_stop_for_items else "Stop for Items: OFF"
+
+func _on_ae_damage_toggled() -> void:
+	if not _accepting_input:
+		return
+	Utilities.auto_explore_stop_on_damage = not Utilities.auto_explore_stop_on_damage
+	ae_damage_button.text = "Stop on Damage: ON" if Utilities.auto_explore_stop_on_damage else "Stop on Damage: OFF"
+
+func _on_ae_stairs_toggled() -> void:
+	if not _accepting_input:
+		return
+	Utilities.auto_explore_stop_at_stairs = not Utilities.auto_explore_stop_at_stairs
+	ae_stairs_button.text = "Stop at Stairs: ON" if Utilities.auto_explore_stop_at_stairs else "Stop at Stairs: OFF"
 
 func _on_fullscreen_toggled() -> void:
 	"""Toggle fullscreen mode"""
@@ -542,8 +864,9 @@ func _show_panel() -> void:
 	if _is_blocking_popup_visible():
 		return
 
-	# Update fullscreen label in case it changed
+	# Update toggle labels in case they changed
 	fullscreen_button.text = "Fullscreen: ON" if _is_fullscreen() else "Fullscreen: OFF"
+	smoothing_button.text = "Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
 
 	# Sync FOV slider with current camera FOV (may have changed via zoom)
 	_sync_fov_from_camera()
@@ -574,6 +897,8 @@ func _hide_panel() -> void:
 	"""Hide the settings panel"""
 	visible = false
 	_accepting_input = false
+	_hide_ae_panel()
+	panel.visible = true  # Reset so panel shows correctly when re-opened
 
 	for control in focusable_controls:
 		control.focus_mode = Control.FOCUS_NONE
@@ -615,6 +940,12 @@ func _setup_focus_neighbors() -> void:
 # INPUT HANDLING
 # ============================================================================
 
+func _get_all_active_focusable() -> Array[Control]:
+	"""Get the currently active set of focusable controls"""
+	if ae_panel and ae_panel.visible:
+		return ae_focusable_controls
+	return focusable_controls
+
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle gamepad button presses"""
 	if not visible or not _accepting_input:
@@ -623,7 +954,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton:
 		if event.button_index == JOY_BUTTON_A and event.pressed:
 			var focused = get_viewport().gui_get_focus_owner()
-			if focused and focused is Button and focused in focusable_controls:
+			var active = _get_all_active_focusable()
+			if focused and focused is Button and focused in active:
 				focused.pressed.emit()
 				get_viewport().set_input_as_handled()
 			return
@@ -639,15 +971,17 @@ func _process(_delta: float) -> void:
 	if not _accepting_input:
 		return
 
+	var active = _get_all_active_focusable()
+
 	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
 		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused is Button and focused in focusable_controls:
+		if focused and focused is Button and focused in active:
 			focused.pressed.emit()
 			return
 
 	if Input.is_action_just_pressed("ui_accept"):
 		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused is Button and focused in focusable_controls:
+		if focused and focused is Button and focused in active:
 			focused.pressed.emit()
 			return
 

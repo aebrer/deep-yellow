@@ -106,6 +106,8 @@ func add_item(item: Item, slot_index: int, player: Player3D) -> bool:
 		# Respect item's default enabled state
 		if not item.starts_enabled:
 			enabled[slot_index] = false
+			# Remove effects that on_equip just applied (item starts disabled)
+			item.on_disable(player)
 		emit_signal("item_added", item, slot_index)
 		return true
 
@@ -183,11 +185,12 @@ func reorder(from_index: int, to_index: int) -> bool:
 	emit_signal("item_reordered", from_index, to_index)
 	return true
 
-func toggle_item(slot_index: int) -> bool:
+func toggle_item(slot_index: int, player: Player3D = null) -> bool:
 	"""Enable/disable an item slot (for tactical control).
 
 	Args:
 		slot_index: Which slot to toggle
+		player: Player reference (for corruption on_enable/on_disable callbacks)
 
 	Returns:
 		New enabled state (true/false)
@@ -195,13 +198,21 @@ func toggle_item(slot_index: int) -> bool:
 	if slot_index < 0 or slot_index >= max_slots:
 		return false
 
+	var item = items[slot_index]
+
+	# Call on_disable before toggling OFF, on_enable after toggling ON
+	if item and player:
+		if enabled[slot_index]:
+			item.on_disable(player)
+		else:
+			item.on_enable(player)
+
 	enabled[slot_index] = not enabled[slot_index]
 	emit_signal("item_toggled", slot_index, enabled[slot_index])
 
-	var item = items[slot_index]
 	if item:
 		var state = "enabled" if enabled[slot_index] else "disabled"
-		Log.player("%s %s" % [item.item_name, state])
+		Log.player("%s %s" % [item.get_display_name(), state])
 
 	return enabled[slot_index]
 

@@ -18,6 +18,8 @@ class_name CorruptionTracker extends RefCounted
 ## This creates escalating difficulty and forces the player to eventually
 ## find an exit before being overwhelmed.
 
+signal corruption_changed(level_id: int, new_value: float)
+
 # Per-level corruption values
 var corruption_by_level: Dictionary = {}  # level_id (int) -> corruption (float)
 
@@ -41,6 +43,7 @@ func increase_corruption(level_id: int, amount: float, max_value: float) -> void
 		new_value = minf(new_value, max_value)
 
 	corruption_by_level[level_id] = new_value
+	corruption_changed.emit(level_id, new_value)
 
 func get_corruption(level_id: int) -> float:
 	"""Get current corruption value for a level
@@ -55,6 +58,7 @@ func set_corruption(level_id: int, value: float) -> void:
 	Useful for testing or special events.
 	"""
 	corruption_by_level[level_id] = value
+	corruption_changed.emit(level_id, value)
 
 # ============================================================================
 # PROBABILITY CALCULATION

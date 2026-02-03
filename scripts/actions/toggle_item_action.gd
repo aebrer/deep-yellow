@@ -40,11 +40,11 @@ func execute(player) -> void:
 	if not pool:
 		return
 
-	# Toggle the item
-	pool.toggle_item(slot_index)
+	# Toggle the item (pass player for corruption on_enable/on_disable)
+	pool.toggle_item(slot_index, player)
 
 	var item = pool.items[slot_index]
-	var item_name = item.item_name if item else "Unknown"
+	var item_name = item.get_display_name() if item else "Unknown"
 	var state = "ON" if pool.enabled[slot_index] else "OFF"
 
 	# Advance turn counter (this action consumes a turn)

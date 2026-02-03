@@ -61,23 +61,46 @@ func execute(player: Player3D) -> void:
 	match action_type:
 		0:  # EQUIP_EMPTY
 			pool.add_item(item, slot_index, player)
-			Log.player("Equipped %s to slot %d" % [item.item_name, slot_index + 1])
+			Log.player("Equipped %s to slot %d" % [item.get_display_name(), slot_index + 1])
 
 		1:  # COMBINE_LEVEL_UP
 			var existing_item = pool.get_item(slot_index)
 			if existing_item:
-				existing_item.level_up()
+				# Handle corruption spreading BEFORE level_up
+				if item.corrupted or existing_item.corrupted:
+					# Remove old stat debuffs before modifying corruption state
+					if existing_item.corrupted and pool.is_slot_enabled(slot_index):
+						var corruption = CorruptionDebuffs._get_current_corruption()
+						CorruptionDebuffs.remove_stat_debuffs(existing_item.corruption_debuffs, player, corruption, existing_item.level)
+
+					# Corruption spreads: if either is corrupted, result is corrupted
+					existing_item.corrupted = true
+					existing_item.starts_enabled = false
+
+					# Merge debuff arrays (both items' debuffs apply)
+					for debuff in item.corruption_debuffs:
+						existing_item.corruption_debuffs.append(debuff.duplicate())
+
+					Log.player("Corruption spreads! %s now has %d debuffs" % [existing_item.get_display_name(), existing_item.corruption_debuffs.size()])
+
+				# Additive combining: incoming item's level is added to existing
+				existing_item.level_up(item.level)
 				pool.emit_signal("item_leveled_up", existing_item, slot_index, existing_item.level)
 
 				# Re-apply stat bonus
 				existing_item._remove_stat_bonus(player)
 				existing_item._apply_stat_bonus(player)
 
-				Log.player("Combined %s - leveled up to Level %d!" % [item.item_name, existing_item.level])
+				# Re-apply corruption stat debuffs at new level if enabled
+				if existing_item.corrupted and pool.is_slot_enabled(slot_index) and not existing_item.corruption_debuffs.is_empty():
+					var corruption = CorruptionDebuffs._get_current_corruption()
+					CorruptionDebuffs.apply_stat_debuffs(existing_item.corruption_debuffs, player, corruption, existing_item.level)
+
+				Log.player("Combined %s (+%d) - now Level %d!" % [existing_item.get_display_name(), item.level, existing_item.level])
 
 		2:  # OVERWRITE
 			pool.overwrite_item(slot_index, item, player)
-			Log.player("Equipped %s to slot %d (overwriting previous item)" % [item.item_name, slot_index + 1])
+			Log.player("Equipped %s to slot %d (overwriting previous item)" % [item.get_display_name(), slot_index + 1])
 
 	# Remove item from world
 	Action._remove_item_from_world(player, world_position)
@@ -91,4 +114,4 @@ func get_description() -> String:
 	Returns:
 		Action description string
 	"""
-	return "Pick up %s to slot %d" % [item.item_name if item else "Unknown", slot_index + 1]
+	return "Pick up %s to slot %d" % [item.get_display_name() if item else "Unknown", slot_index + 1]

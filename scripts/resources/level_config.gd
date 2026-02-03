@@ -189,8 +189,6 @@ var permitted_items: Array[Item] = []
 ## Item density (0.0 = rare, 1.0 = common)
 @export_range(0.0, 1.0) var item_density: float = 0.1
 
-## Guaranteed starting items for this level
-@export var starting_items: Array[String] = []
 
 # ============================================================================
 # EXIT CONFIGURATION

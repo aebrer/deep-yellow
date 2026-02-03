@@ -12,6 +12,9 @@ extends Area3D
 @export_group("Requirements")
 @export var requires_clearance: int = 0  ## Min clearance to examine (0 = no requirement)
 
+## Optional corruption data (set by item_renderer for corrupted world items)
+var item_corruption_data: Dictionary = {}  # {"corrupted": true, "corruption_debuffs": [...], "level": N}
+
 enum EntityType {
 	UNKNOWN,
 	ENTITY_HOSTILE,
@@ -65,4 +68,17 @@ func get_display_info() -> Dictionary:
 		}
 
 	# Get entity info from KnowledgeDB
-	return KnowledgeDB.get_entity_info(entity_id)
+	var info = KnowledgeDB.get_entity_info(entity_id)
+
+	# Apply corruption overlay if this is a corrupted world item
+	if not item_corruption_data.is_empty() and item_corruption_data.get("corrupted", false):
+		var item = KnowledgeDB._get_item_by_id(entity_id)
+		if item:
+			# Apply corruption state to a temp copy for display
+			var temp_item = item.duplicate_item()
+			temp_item.corrupted = true
+			temp_item.corruption_debuffs = item_corruption_data.get("corruption_debuffs", [])
+			temp_item.level = item_corruption_data.get("level", 1)
+			info = temp_item.get_info(KnowledgeDB.clearance_level)
+
+	return info

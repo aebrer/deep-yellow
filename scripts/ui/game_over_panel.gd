@@ -386,6 +386,9 @@ func _on_restart_pressed() -> void:
 	if ChunkManager:
 		ChunkManager.start_new_run()
 
+	# Reset vending machine inventory cache (static var persists across scene reloads)
+	VendingMachinePanel._machine_inventories.clear()
+
 	# Emit signal for game.gd to handle
 	restart_requested.emit()
 

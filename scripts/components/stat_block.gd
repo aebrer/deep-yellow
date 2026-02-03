@@ -92,9 +92,26 @@ var bonus_anomaly: float = 0.0
 # Regeneration happens in PreTurnState before action execution.
 # Formula: regen_amount = max_resource * (regen_percent / 100.0)
 
-var hp_regen_percent: float = 0.1       # % of max HP regenerated per turn (0.1% base, perks add more)
-var sanity_regen_percent: float = 0.025  # % of max Sanity regenerated per turn (0.025% base, perks add more)
-var mana_regen_percent: float = 0.0    # % of max Mana regenerated per turn (adds to base NULL/2 regen)
+var hp_regen_percent: float = 0.1:       # % of max HP regenerated per turn (0.1% base, perks add more)
+	set(value):
+		var old = hp_regen_percent
+		hp_regen_percent = value
+		if hp_regen_percent != old:
+			emit_signal("stat_changed", "hp_regen", old, hp_regen_percent)
+
+var sanity_regen_percent: float = 0.025:  # % of max Sanity regenerated per turn (0.025% base, perks add more)
+	set(value):
+		var old = sanity_regen_percent
+		sanity_regen_percent = value
+		if sanity_regen_percent != old:
+			emit_signal("stat_changed", "sanity_regen", old, sanity_regen_percent)
+
+var mana_regen_percent: float = 0.0:    # % of max Mana regenerated per turn (adds to base NULL/2 regen)
+	set(value):
+		var old = mana_regen_percent
+		mana_regen_percent = value
+		if mana_regen_percent != old:
+			emit_signal("stat_changed", "mana_regen", old, mana_regen_percent)
 
 # ============================================================================
 # CURRENT RESOURCE POOLS
@@ -234,6 +251,12 @@ func _init(template: StatTemplate = null):
 	current_hp = max_hp
 	current_sanity = max_sanity
 	current_mana = max_mana
+
+func clamp_resources() -> void:
+	"""Clamp current resources to their (possibly reduced) max values."""
+	current_hp = current_hp  # Setter clamps to max_hp and emits resource_changed
+	current_sanity = current_sanity
+	current_mana = current_mana
 
 # ============================================================================
 # STAT CALCULATION (with modifiers)
@@ -540,17 +563,17 @@ func _exp_for_next_level() -> int:
 	"""Calculate EXP cost for the NEXT level up.
 
 	Formula: BASE × ((level + 1) ^ EXPONENT)
-	BASE = 100
-	EXPONENT = 1.5
+	BASE = 75
+	EXPONENT = 1.25
 
 	Examples (cost to reach level):
-	  Level 0 → 1:  100 × (1^1.5) = 100
-	  Level 1 → 2:  100 × (2^1.5) = 283
-	  Level 4 → 5:  100 × (5^1.5) = 1118
-	  Level 9 → 10: 100 × (10^1.5) = 3162
+	  Level 0 → 1:  75 × (1^1.25) = 75
+	  Level 1 → 2:  75 × (2^1.25) = 178
+	  Level 4 → 5:  75 × (5^1.25) = 447
+	  Level 9 → 10: 75 × (10^1.25) = 1334
 	"""
-	const BASE = 100
-	const EXPONENT = 1.5
+	const BASE = 75
+	const EXPONENT = 1.25
 	return int(BASE * pow(level + 1, EXPONENT))
 
 func exp_to_next_level() -> int:

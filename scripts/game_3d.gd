@@ -92,6 +92,10 @@ func _on_level_changed(_new_level_id: int) -> void:
 			label.text = "Generating %s..." % new_level.display_name
 		loading_screen.show()
 
+	# Reset exploration tracking for new level
+	if ExplorationTracker:
+		ExplorationTracker.reset()
+
 	# Clear old level's rendered tiles and walkable cache
 	grid.grid_map.clear()
 	grid.walkable_cells.clear()
@@ -143,7 +147,7 @@ func _respawn_player_for_new_level() -> void:
 	else:
 		player._find_procedural_spawn()
 
-	player.update_visual_position()
+	player.snap_visual_position()
 
 	# Place level-defined spraypaint near spawn point
 	if current_level and not current_level.spawn_spraypaint.is_empty():
