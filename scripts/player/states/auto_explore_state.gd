@@ -4,6 +4,10 @@ extends PlayerInputState
 ## Activated by pressing Y key / Y button. Automatically moves the player
 ## toward the nearest unexplored tile at a configurable speed. Stops on
 ## various conditions (enemies, low HP, items, stairs, manual input).
+##
+## Performance optimization: Caches the full path to a distant target and
+## follows it step-by-step, only recalculating when interrupted by discoveries
+## (items, vending machines, enemies) or when the path is exhausted.
 
 # ============================================================================
 # STATE
@@ -20,6 +24,15 @@ var hp_before_step: float = 0.0
 
 ## Reference to the HUD indicator label (set by game_3d or found on enter)
 var hud_label: Label = null
+
+## Cached path to current target (array of Vector2i positions)
+var _cached_path: Array = []
+
+## Current index in cached path (next position to move to)
+var _cached_path_index: int = 0
+
+## The target position we're pathing toward
+var _cached_target: Vector2i = ExplorationTracker.NO_TARGET
 
 # ============================================================================
 # LIFECYCLE
@@ -43,7 +56,11 @@ func enter() -> void:
 	# Mark current position as explored
 	_mark_current_explored()
 
-	# Check if there's anywhere to go
+	# On fresh start (not resuming from turn), clear cached path to force recalculation
+	if not is_resuming:
+		_clear_cached_path()
+
+	# Check if there's anywhere to go (quick check, full path calculated in process_frame)
 	var target = ExplorationTracker.find_nearest_unexplored(player.grid_position)
 	if target == ExplorationTracker.NO_TARGET:
 		Log.state("Auto-explore: No unexplored tiles found, returning to idle")
@@ -117,53 +134,63 @@ func process_frame(delta: float) -> void:
 
 	_mark_current_explored()
 
-	# Check for objects to navigate toward (items, stairs)
-	var nav_target := _find_navigate_target()
-	var target := ExplorationTracker.NO_TARGET
-
-	if not nav_target.is_empty():
-		var obj_pos: Vector2i = nav_target["position"]
+	# Check for interrupt targets (items, vending machines, stairs) that should
+	# override the current path. These are things we discovered while exploring.
+	var interrupt := _check_for_interrupt_target()
+	if not interrupt.is_empty():
+		var obj_pos: Vector2i = interrupt["position"]
 		var chebyshev_dist := maxi(absi(obj_pos.x - player.grid_position.x), absi(obj_pos.y - player.grid_position.y))
 
 		if chebyshev_dist <= 1:
-			# Already adjacent — stop
-			# Mark vending machines as visited so we don't stop for them again
-			if nav_target["reason"] == "vending machine detected":
+			# Already adjacent to interrupt target — stop
+			if interrupt["reason"] == "vending machine detected":
 				ExplorationTracker.mark_vending_machine_visited(obj_pos)
-			Log.state("Auto-explore: Stopped - %s (adjacent)" % nav_target["reason"])
-			Log.player("Auto-explore stopped: %s" % nav_target["reason"])
+			Log.state("Auto-explore: Stopped - %s (adjacent)" % interrupt["reason"])
+			Log.player("Auto-explore stopped: %s" % interrupt["reason"])
 			transition_to("IdleState")
 			return
 		else:
-			# Path toward the object
-			target = obj_pos
-	else:
-		# No navigate target — find nearest unexplored tile
-		target = ExplorationTracker.find_nearest_unexplored(player.grid_position)
+			# Interrupt target found — recalculate path toward it
+			Log.state("Auto-explore: Interrupted by %s, recalculating path" % interrupt["reason"])
+			_recalculate_path(obj_pos)
 
-	if target == ExplorationTracker.NO_TARGET:
-		Log.state("Auto-explore: Fully explored, returning to idle")
-		Log.player("Auto-explore: Fully explored!")
-		transition_to("IdleState")
-		return
+	# If no cached path or path exhausted, calculate a new one
+	if _cached_path.is_empty() or _cached_path_index >= _cached_path.size():
+		var target := ExplorationTracker.find_nearest_unexplored(player.grid_position)
+		if target == ExplorationTracker.NO_TARGET:
+			Log.state("Auto-explore: Fully explored, returning to idle")
+			Log.player("Auto-explore: Fully explored!")
+			transition_to("IdleState")
+			return
+		_recalculate_path(target)
 
-	# Get path to target
-	var path := Pathfinding.find_path(player.grid_position, target)
-	if path.size() < 2:
+	# Validate cached path still exists
+	if _cached_path.is_empty() or _cached_path_index >= _cached_path.size():
 		Log.state("Auto-explore: No path to target, returning to idle")
 		Log.player("Auto-explore stopped: no path to target")
 		transition_to("IdleState")
 		return
 
-	# Extract next step direction from path
-	var next_pos = Vector2i(int(path[1].x), int(path[1].y))
-	var direction = next_pos - player.grid_position
+	# Get next position from cached path
+	var next_pos: Vector2i = _cached_path[_cached_path_index]
+
+	# Safety check: if next position isn't adjacent, path is stale — recalculate
+	var dist_to_next := maxi(absi(next_pos.x - player.grid_position.x), absi(next_pos.y - player.grid_position.y))
+	if dist_to_next != 1:
+		Log.state("Auto-explore: Path stale (next pos not adjacent), recalculating")
+		_clear_cached_path()
+		return  # Will recalculate on next frame
+
+	var direction: Vector2i = next_pos - player.grid_position
+
+	# Advance path index for next turn
+	_cached_path_index += 1
 
 	# Rotate camera to face movement direction
 	_rotate_camera_to_direction(direction)
 
 	# Check for item at target (auto-pickup)
-	var item_at_target = _get_item_at_position(next_pos)
+	var item_at_target := _get_item_at_position(next_pos)
 
 	# Create action
 	var action: Action
@@ -180,9 +207,9 @@ func process_frame(delta: float) -> void:
 		waiting_for_turn = true
 		transition_to("PreTurnState")
 	else:
-		Log.state("Auto-explore: Movement blocked, returning to idle")
-		Log.player("Auto-explore stopped: movement blocked")
-		transition_to("IdleState")
+		# Movement blocked — clear path and try again next frame
+		Log.state("Auto-explore: Movement blocked, recalculating path")
+		_clear_cached_path()
 
 # ============================================================================
 # STOP CONDITIONS
@@ -215,11 +242,12 @@ func _check_stop_conditions() -> String:
 
 	return ""
 
-func _find_navigate_target() -> Dictionary:
-	"""Find an object to navigate toward before stopping.
+func _check_for_interrupt_target() -> Dictionary:
+	"""Check for objects that should interrupt current path (items, stairs, vending machines).
 
 	Returns {"position": Vector2i, "reason": String} or empty dict if none.
-	These are objects we want to path NEXT TO before stopping (items, stairs, vending machines).
+	These are objects we want to path NEXT TO before stopping.
+	Only returns targets that aren't already our current destination (to avoid re-interrupting).
 	"""
 	if not player or not player.stats:
 		return {}
@@ -229,18 +257,18 @@ func _find_navigate_target() -> Dictionary:
 	# Check for items in perception range
 	if Utilities.auto_explore_stop_for_items:
 		var nearest_item = _nearest_item_in_range(perception_range)
-		if nearest_item != ExplorationTracker.NO_TARGET:
+		if nearest_item != ExplorationTracker.NO_TARGET and nearest_item != _cached_target:
 			return {"position": nearest_item, "reason": "item detected"}
 
 		# Vending machines follow the same rules as items
 		var nearest_vending = _nearest_vending_machine_in_range(perception_range)
-		if nearest_vending != ExplorationTracker.NO_TARGET:
+		if nearest_vending != ExplorationTracker.NO_TARGET and nearest_vending != _cached_target:
 			return {"position": nearest_vending, "reason": "vending machine detected"}
 
 	# Check for stairs nearby (within perception range, not just standing on them)
 	if Utilities.auto_explore_stop_at_stairs:
 		var stairs_pos = _find_stairs_in_range(perception_range)
-		if stairs_pos != ExplorationTracker.NO_TARGET:
+		if stairs_pos != ExplorationTracker.NO_TARGET and stairs_pos != _cached_target:
 			return {"position": stairs_pos, "reason": "stairs detected"}
 
 	return {}
@@ -323,6 +351,33 @@ func _find_stairs_in_range(perception_range: float) -> Vector2i:
 				return pos
 
 	return ExplorationTracker.NO_TARGET
+
+# ============================================================================
+# PATH CACHING
+# ============================================================================
+
+func _clear_cached_path() -> void:
+	"""Clear the cached path, forcing recalculation on next step."""
+	_cached_path.clear()
+	_cached_path_index = 0
+	_cached_target = ExplorationTracker.NO_TARGET
+
+func _recalculate_path(target: Vector2i) -> void:
+	"""Calculate and cache a new path to the given target."""
+	_cached_target = target
+	var path := Pathfinding.find_path(player.grid_position, target)
+
+	if path.size() < 2:
+		_clear_cached_path()
+		return
+
+	# Convert path to Vector2i array, skipping first element (current position)
+	_cached_path.clear()
+	for i in range(1, path.size()):
+		_cached_path.append(Vector2i(int(path[i].x), int(path[i].y)))
+	_cached_path_index = 0
+
+	Log.state("Auto-explore: Cached path with %d steps to %s" % [_cached_path.size(), str(target)])
 
 # ============================================================================
 # HELPERS
