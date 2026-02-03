@@ -200,7 +200,7 @@ func _rebuild_content() -> void:
 
 	# Item info
 	var item_name_label = Label.new()
-	item_name_label.text = "Item: %s (Level %d)" % [current_item.item_name, current_item.level]
+	item_name_label.text = "Item: %s (Level %d)" % [current_item.get_display_name(), current_item.level]
 	item_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	item_name_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_ITEM_NAME))
 	item_name_label.add_theme_color_override("font_color", ItemRarity.get_color(current_item.rarity))
@@ -275,7 +275,7 @@ func _create_slot_button(slot_index: int) -> Button:
 		# Same item - can combine to level up
 		button.text = "Slot %d: %s (Lv %d) → COMBINE (Lv %d)" % [
 			slot_index + 1,
-			existing_item.item_name,
+			existing_item.get_display_name(),
 			existing_item.level,
 			existing_item.level + 1
 		]
@@ -285,9 +285,9 @@ func _create_slot_button(slot_index: int) -> Button:
 		# Different item - can overwrite
 		button.text = "Slot %d: %s (Lv %d) → OVERWRITE with %s" % [
 			slot_index + 1,
-			existing_item.item_name,
+			existing_item.get_display_name(),
 			existing_item.level,
-			current_item.item_name
+			current_item.get_display_name()
 		]
 		button.add_theme_color_override("font_color", Color.ORANGE_RED)
 		button.pressed.connect(func(): _on_slot_selected(slot_index, ActionType.OVERWRITE))

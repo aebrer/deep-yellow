@@ -249,6 +249,14 @@ func _roll_item(available_items: Array[Item], corruption: float) -> Dictionary:
 		if guaranteed > 0:
 			duped_item.level = 1 + guaranteed
 
+	# Roll for corruption (same formula as ItemSpawner._maybe_corrupt_item)
+	if corruption > 0.0:
+		var corrupt_chance = 1.0 - exp(-corruption * 0.5)
+		if randf() < corrupt_chance:
+			duped_item.corrupted = true
+			duped_item.starts_enabled = false
+			duped_item.corruption_debuffs.append(CorruptionDebuffs.roll_debuff())
+
 	return {
 		"item": duped_item,
 		"rarity": rarity,
@@ -347,7 +355,7 @@ func _create_item_button(index: int, entry: Dictionary) -> Button:
 		var rarity_name = ItemRarity.get_rarity_name(rarity)
 		var stat_name = STAT_NAMES[stat_index]
 		var can_afford = _can_afford(cost, stat_index)
-		button.text = "%s (%s) — Cost: -%d max %s" % [item.item_name, rarity_name, cost, stat_name]
+		button.text = "%s (%s) — Cost: -%d max %s" % [item.get_display_name(), rarity_name, cost, stat_name]
 		if can_afford:
 			button.add_theme_color_override("font_color", ItemRarity.get_color(rarity))
 		else:
@@ -406,7 +414,7 @@ func _on_item_selected(index: int) -> void:
 
 	# Affordability check
 	if not _can_afford(cost, stat_index):
-		Log.player("Can't afford %s (need %d max %s) — come back later" % [item.item_name, cost, stat_display])
+		Log.player("Can't afford %s (need %d max %s) — come back later" % [item.get_display_name(), cost, stat_display])
 		return
 
 	# Apply permanent max stat reduction
@@ -428,7 +436,7 @@ func _on_item_selected(index: int) -> void:
 	# Give item to player via slot selection UI (same as pickup)
 	_give_item_to_player(item, player_ref)
 
-	Log.player("Purchased %s from vending machine (-%d max %s)" % [item.item_name, cost, stat_display])
+	Log.player("Purchased %s from vending machine (-%d max %s)" % [item.get_display_name(), cost, stat_display])
 
 	# Close panel (item slot selection will open if needed)
 	_close_panel()

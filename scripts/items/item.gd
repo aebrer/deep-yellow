@@ -54,9 +54,19 @@ var level: int = 1  ## Current level of this item (increases when duplicates pic
 var equipped: bool = false  ## Is this item currently equipped?
 var starts_enabled: bool = true  ## Whether item defaults to [ON] when first equipped
 
+# Corruption state
+var corrupted: bool = false  ## Is this item corrupted?
+var corruption_debuffs: Array[Dictionary] = []  ## Rolled debuffs (persisted)
+
 # ============================================================================
 # CORE METHODS (override in subclasses)
 # ============================================================================
+
+func get_display_name() -> String:
+	"""Get display name, prefixed with [CORRUPT] if corrupted."""
+	if corrupted:
+		return "[CORRUPT] " + item_name
+	return item_name
 
 func on_equip(player: Player3D) -> void:
 	"""Called when item is equipped to a slot.
@@ -71,6 +81,11 @@ func on_equip(player: Player3D) -> void:
 	# Default: Grant stat bonus based on pool type
 	_apply_stat_bonus(player)
 
+	# Apply corruption stat debuffs if enabled by default
+	if corrupted and starts_enabled and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+
 func on_unequip(player: Player3D) -> void:
 	"""Called when item is removed from a slot.
 
@@ -78,8 +93,13 @@ func on_unequip(player: Player3D) -> void:
 	- Remove stat modifiers
 	- Clean up effects
 	"""
+	# Remove corruption stat debuffs before unequip
+	if corrupted and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, corruption, level)
+
 	equipped = false
-	Log.player("Unequipped %s (Level %d)" % [item_name, level])
+	Log.player("Unequipped %s (Level %d)" % [get_display_name(), level])
 
 	# Default: Remove stat bonus
 	_remove_stat_bonus(player)
@@ -96,7 +116,27 @@ func on_turn(player: Player3D, turn_number: int) -> void:
 		player: The player entity
 		turn_number: Global turn counter (for even/odd logic, etc.)
 	"""
-	pass  # Override in subclasses
+	# Apply per-turn corruption debuffs
+	if corrupted and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		CorruptionDebuffs.apply_per_turn_debuffs(corruption_debuffs, player, corruption, level)
+
+func on_enable(player: Player3D) -> void:
+	"""Called when item is toggled ON. Restore all effects (stat bonus + corruption)."""
+	_apply_stat_bonus(player)
+	if corrupted and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+
+func on_disable(player: Player3D) -> void:
+	"""Called when item is toggled OFF. Remove all effects (stat bonus + corruption)."""
+	if corrupted and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, corruption, level)
+	_remove_stat_bonus(player)
+	# Clamp current resources to new (lower) max values
+	if player and player.stats:
+		player.stats.clamp_resources()
 
 func level_up(amount: int = 1) -> void:
 	"""Called when a duplicate item is picked up.
@@ -129,7 +169,7 @@ func get_description(clearance_level: int) -> String:
 	Returns:
 		Formatted description string
 	"""
-	var desc = "%s (Level %d)\n\n" % [item_name, level]
+	var desc = "%s (Level %d)\n\n" % [get_display_name(), level]
 
 	# ALWAYS show visual description (constant)
 	if visual_description:
@@ -138,6 +178,11 @@ func get_description(clearance_level: int) -> String:
 	# ALWAYS show scaling hint (constant)
 	if scaling_hint:
 		desc += "Scaling: " + scaling_hint + "\n"
+
+	# Append corruption debuff info (clearance-gated)
+	if corrupted and not corruption_debuffs.is_empty():
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		desc += CorruptionDebuffs.get_debuff_descriptions(corruption_debuffs, corruption, level, clearance_level)
 
 	# Subclasses can add additional clearance-based info by overriding
 	return desc
@@ -151,11 +196,12 @@ func get_info(clearance_level: int) -> Dictionary:
 		Dictionary with name, description, object_class, threat_level, rarity info
 	"""
 	return {
-		"name": "%s (Level %d)" % [item_name, level],
+		"name": "%s (Level %d)" % [get_display_name(), level],
 		"description": get_description(clearance_level),
 		"object_class": "Item",
 		"threat_level": 0,
 		"is_item": true,
+		"corrupted": corrupted,
 		"rarity": rarity,
 		"rarity_name": ItemRarity.get_rarity_name(rarity),
 		"rarity_color": ItemRarity.get_color(rarity)
@@ -317,8 +363,12 @@ func duplicate_item() -> Item:
 	"""Create a duplicate of this item (for pickup/stacking logic).
 
 	Note: Uses Godot's Resource.duplicate() which creates a deep copy.
+	Corruption state is explicitly copied to ensure debuff arrays are independent.
 	"""
-	return self.duplicate(true)
+	var copy = self.duplicate(true)
+	copy.corrupted = corrupted
+	copy.corruption_debuffs = corruption_debuffs.duplicate(true)
+	return copy
 
 func _to_string() -> String:
 	"""Debug representation."""

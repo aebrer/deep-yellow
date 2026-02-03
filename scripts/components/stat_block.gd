@@ -252,6 +252,12 @@ func _init(template: StatTemplate = null):
 	current_sanity = max_sanity
 	current_mana = max_mana
 
+func clamp_resources() -> void:
+	"""Clamp current resources to their (possibly reduced) max values."""
+	current_hp = current_hp  # Setter clamps to max_hp and emits resource_changed
+	current_sanity = current_sanity
+	current_mana = current_mana
+
 # ============================================================================
 # STAT CALCULATION (with modifiers)
 # ============================================================================

@@ -83,6 +83,12 @@ func _show_pickup_ui(player: Player3D) -> void:
 	var world_level = item_data.get("level", 1)
 	item.level = world_level
 
+	# Restore corruption state from world data
+	if item_data.get("corrupted", false):
+		item.corrupted = true
+		item.starts_enabled = false
+		item.corruption_debuffs = item_data.get("corruption_debuffs", []).duplicate(true)
+
 	# Get the appropriate pool based on item type
 	var pool = _get_pool_for_item(item, player)
 	if not pool:
@@ -187,7 +193,9 @@ func get_preview_info(player) -> Dictionary:
 	# Look up item resource to get display name
 	var item_id = item_data.get("item_id", "")
 	var item = _get_item_by_id(item_id, player)
-	var item_name = item.item_name if item else "Unknown Item"
+	if item and item_data.get("corrupted", false):
+		item.corrupted = true
+	var item_name = item.get_display_name() if item else "Unknown Item"
 
 	return {
 		"name": "Pick up",

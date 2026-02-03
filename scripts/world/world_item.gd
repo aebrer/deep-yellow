@@ -91,7 +91,7 @@ func to_dict() -> Dictionary:
 	Returns:
 		Dictionary with item state (for saving/loading chunks)
 	"""
-	return {
+	var data = {
 		"item_id": item_resource.item_id if item_resource else "",
 		"world_position": {"x": world_position.x, "y": world_position.y},
 		"picked_up": picked_up,
@@ -100,6 +100,13 @@ func to_dict() -> Dictionary:
 		"rarity": rarity,
 		"level": item_resource.level if item_resource else 1
 	}
+
+	# Serialize corruption state
+	if item_resource and item_resource.corrupted:
+		data["corrupted"] = true
+		data["corruption_debuffs"] = item_resource.corruption_debuffs.duplicate(true)
+
+	return data
 
 static func from_dict(data: Dictionary, item_resource: Item) -> WorldItem:
 	"""Deserialize from dictionary
@@ -128,6 +135,12 @@ static func from_dict(data: Dictionary, item_resource: Item) -> WorldItem:
 	var saved_level = data.get("level", 1)
 	if item_resource and saved_level > 1:
 		item_resource.level = saved_level
+
+	# Restore corruption state
+	if item_resource and data.get("corrupted", false):
+		item_resource.corrupted = true
+		item_resource.corruption_debuffs = data.get("corruption_debuffs", [])
+		item_resource.starts_enabled = false  # Corrupted items default to OFF
 
 	return world_item
 

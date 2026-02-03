@@ -100,6 +100,10 @@ func _execute_pool_attacks(player, pool, attack_type: int) -> void:
 	if any_hit:
 		_cooldowns[attack_type] = attack.cooldown
 
+		# Apply on-use corruption debuffs for all corrupted items in this pool
+		if pool:
+			_apply_pool_on_use_debuffs(player, pool)
+
 # ============================================================================
 # ATTACK BUILDING
 # ============================================================================
@@ -229,6 +233,16 @@ func _build_attack(player, pool: ItemPool, attack_type: int):
 	var modified_cooldown = float(attack.cooldown + cooldown_add) * cooldown_multiply
 	attack.cooldown = maxi(1, roundi(modified_cooldown))
 	attack.mana_cost = attack.mana_cost * mana_cost_multiply
+
+	# Apply corruption on-use modifiers (mana_tax + damage_penalty) from corrupted items in pool
+	if pool:
+		var corruption = CorruptionDebuffs._get_current_corruption()
+		for i in range(pool.max_slots):
+			var pool_item = pool.get_item(i)
+			if pool_item and pool.is_slot_enabled(i) and pool_item.corrupted and not pool_item.corruption_debuffs.is_empty():
+				attack.mana_cost *= CorruptionDebuffs.get_mana_tax_multiplier(pool_item.corruption_debuffs, corruption, pool_item.level)
+				attack.damage *= CorruptionDebuffs.get_damage_multiplier(pool_item.corruption_debuffs, corruption, pool_item.level)
+
 	attack.extra_attacks = extra_attacks  # Additional attacks per turn
 
 	# Apply stat scaling (STRENGTH/PERCEPTION/ANOMALY)
@@ -664,6 +678,21 @@ func reset_cooldown(attack_type: int) -> void:
 	"""
 	if _cooldowns.has(attack_type):
 		_cooldowns[attack_type] = 0
+
+# ============================================================================
+# CORRUPTION ON-USE DEBUFFS
+# ============================================================================
+
+func _apply_pool_on_use_debuffs(player, pool) -> void:
+	"""Apply on-use corruption debuffs for all corrupted items in a pool.
+
+	Called when the pool's attack successfully hits a target.
+	"""
+	var corruption = CorruptionDebuffs._get_current_corruption()
+	for i in range(pool.max_slots):
+		var item = pool.get_item(i)
+		if item and pool.is_slot_enabled(i) and item.corrupted and not item.corruption_debuffs.is_empty():
+			CorruptionDebuffs.apply_on_use_debuffs(item.corruption_debuffs, player, corruption, item.level)
 
 # ============================================================================
 # DEBUG

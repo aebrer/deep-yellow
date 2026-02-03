@@ -123,6 +123,7 @@ func spawn_items_for_chunk(
 				if item_level > 1:
 					duped_item.level = item_level
 					Log.grid("Item %s spawned at level %d (corruption %.2f)" % [duped_item.item_name, item_level, corruption])
+
 				var world_item = WorldItem.new(
 					duped_item,
 					spawn_pos,
@@ -130,6 +131,22 @@ func spawn_items_for_chunk(
 					turn_number
 				)
 				spawned_items.append(world_item)
+
+	# Bonus corrupted item spawns (extra on top of normal spawns)
+	# Gated by corruption chance: 1.0 - exp(-corruption * 0.5)
+	if corruption > 0.0:
+		var corrupt_chance = 1.0 - exp(-corruption * 0.5)
+		if randf() < corrupt_chance and not available_items.is_empty():
+			var bonus_item = available_items.pick_random()
+			var spawn_pos = _find_spawn_location(chunk, bonus_item)
+			if spawn_pos != Vector2i(-1, -1):
+				var duped = bonus_item.duplicate_item()
+				duped.level = _roll_item_level(corruption)
+				duped.corrupted = true
+				duped.starts_enabled = false
+				duped.corruption_debuffs.append(CorruptionDebuffs.roll_debuff())
+				Log.grid("BONUS corrupted %s spawned (chance was %.1f%%)" % [duped.item_name, corrupt_chance * 100.0])
+				spawned_items.append(WorldItem.new(duped, spawn_pos, bonus_item.rarity, turn_number))
 
 	return spawned_items
 
@@ -278,6 +295,24 @@ func _get_player_spawn_rate_bonus(player) -> float:
 # ============================================================================
 # UTILITY
 # ============================================================================
+
+func _maybe_corrupt_item(item: Item, corruption: float) -> void:
+	"""Roll for corruption on a spawned item.
+
+	Corruption chance: 1.0 - exp(-corruption * 0.5)
+	~39% at corruption 1.0, ~63% at 2.0, ~0% at 0.0
+
+	If corrupted, rolls a random debuff and sets starts_enabled to false.
+	"""
+	if corruption <= 0.0:
+		return
+
+	var corrupt_chance = 1.0 - exp(-corruption * 0.5)
+	if randf() < corrupt_chance:
+		item.corrupted = true
+		item.starts_enabled = false
+		item.corruption_debuffs.append(CorruptionDebuffs.roll_debuff())
+		Log.grid("Item %s CORRUPTED (chance was %.1f%%)" % [item.item_name, corrupt_chance * 100.0])
 
 func _roll_item_level(corruption: float) -> int:
 	"""Roll item level based on corruption.
@@ -506,6 +541,7 @@ func spawn_forced_item(
 	if item_level > 1:
 		duped_item.level = item_level
 		Log.grid("Forced spawn %s at level %d (corruption %.2f)" % [duped_item.item_name, item_level, corruption])
+
 	return WorldItem.new(
 		duped_item,
 		spawn_pos,
