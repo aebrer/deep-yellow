@@ -898,6 +898,7 @@ func _hide_panel() -> void:
 	visible = false
 	_accepting_input = false
 	_hide_ae_panel()
+	panel.visible = true  # Reset so panel shows correctly when re-opened
 
 	for control in focusable_controls:
 		control.focus_mode = Control.FOCUS_NONE

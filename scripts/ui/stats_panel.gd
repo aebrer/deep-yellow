@@ -102,6 +102,10 @@ func _connect_signals() -> void:
 	# Resource changes
 	player.stats.resource_changed.connect(_on_resource_changed)
 
+	# Modifier changes (items equipped/unequipped change derived stats without changing base stats)
+	player.stats.modifier_added.connect(_on_modifier_changed)
+	player.stats.modifier_removed.connect(_on_modifier_changed)
+
 	# Progression
 	player.stats.exp_gained.connect(_on_exp_gained)
 	player.stats.level_increased.connect(_on_level_increased)
@@ -111,10 +115,22 @@ func _connect_signals() -> void:
 	if player.has_signal("turn_completed") and not player.turn_completed.is_connected(_on_turn_completed):
 		player.turn_completed.connect(_on_turn_completed)
 
+	# Corruption changes (from chunk exploration, perks, items)
+	if ChunkManager and ChunkManager.corruption_tracker:
+		if not ChunkManager.corruption_tracker.corruption_changed.is_connected(_on_corruption_changed):
+			ChunkManager.corruption_tracker.corruption_changed.connect(_on_corruption_changed)
+
+func _ensure_corruption_connected() -> void:
+	"""Lazily connect to corruption_changed signal (corruption_tracker may init after us)"""
+	if ChunkManager and ChunkManager.corruption_tracker:
+		if not ChunkManager.corruption_tracker.corruption_changed.is_connected(_on_corruption_changed):
+			ChunkManager.corruption_tracker.corruption_changed.connect(_on_corruption_changed)
+
 func _update_all_stats() -> void:
 	"""Update all stat displays"""
 	if not player or not player.stats:
 		return
+	_ensure_corruption_connected()
 
 	var s = player.stats
 
@@ -165,51 +181,35 @@ func _update_all_stats() -> void:
 
 func _on_stat_changed(stat_name: String, _old_value: float, _new_value: float) -> void:
 	"""Update display when a stat changes"""
-	# Just refresh everything for simplicity
+	_update_all_stats()
+
+func _on_modifier_changed(_modifier) -> void:
+	"""Update display when a modifier is added or removed (e.g., item pickup)"""
 	_update_all_stats()
 
 func _on_turn_completed() -> void:
-	"""Update corruption display after each turn (corruption changes on exploration)"""
-	_update_corruption()
+	"""Full refresh after each turn (corruption, resources, etc. may all change)"""
+	_update_all_stats()
 
-func _on_resource_changed(resource_name: String, current: float, maximum: float) -> void:
-	"""Update resource display with regen rates"""
-	if not player or not player.stats:
-		return
-	var s = player.stats
-	match resource_name:
-		"hp":
-			if hp_label:
-				var hp_regen = maximum * (s.hp_regen_percent / 100.0)
-				hp_label.text = "HP: %.0f / %.0f (+%.2f)" % [current, maximum, hp_regen]
-		"sanity":
-			if sanity_label:
-				var san_regen = maximum * (s.sanity_regen_percent / 100.0)
-				sanity_label.text = "Sanity: %.0f / %.0f (+%.2f)" % [current, maximum, san_regen]
-		"mana":
-			if mana_label:
-				var mana_regen = s.get_mana_regen_amount()
-				mana_label.text = "Mana: %.0f / %.0f (+%.2f)" % [current, maximum, mana_regen]
+func _on_resource_changed(_resource_name: String, _current: float, _maximum: float) -> void:
+	"""Update all stats when any resource changes"""
+	_update_all_stats()
 
-func _on_exp_gained(_amount: int, new_total: int) -> void:
-	"""Update EXP display"""
-	if exp_label and player and player.stats:
-		var next_exp = player.stats.exp_to_next_level()
-		exp_label.text = "EXP: %d / %d" % [new_total, new_total + next_exp]
+func _on_exp_gained(_amount: int, _new_total: int) -> void:
+	"""Update all stats when EXP changes"""
+	_update_all_stats()
 
-func _on_level_increased(_old_level: int, new_level: int) -> void:
-	"""Update Level display"""
-	if level_label:
-		level_label.text = "Level: %d" % new_level
+func _on_level_increased(_old_level: int, _new_level: int) -> void:
+	"""Update all stats when level changes"""
+	_update_all_stats()
 
-	# Refresh EXP display (threshold changed)
-	if player and player.stats:
-		_on_exp_gained(0, player.stats.exp)
+func _on_clearance_increased(_old_level: int, _new_level: int) -> void:
+	"""Update all stats when clearance changes"""
+	_update_all_stats()
 
-func _on_clearance_increased(_old_level: int, new_level: int) -> void:
-	"""Update Clearance display"""
-	if clearance_label:
-		clearance_label.text = "Clearance: %d" % new_level
+func _on_corruption_changed(_level_id: int, _new_value: float) -> void:
+	"""Update display when corruption changes (perks, chunk exploration, items)"""
+	_update_all_stats()
 
 func _update_corruption() -> void:
 	"""Update corruption display from ChunkManager"""
