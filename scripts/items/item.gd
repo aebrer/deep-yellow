@@ -57,6 +57,7 @@ var starts_enabled: bool = true  ## Whether item defaults to [ON] when first equ
 # Corruption state
 var corrupted: bool = false  ## Is this item corrupted?
 var corruption_debuffs: Array[Dictionary] = []  ## Rolled debuffs (persisted)
+var _last_stat_corruption: float = -1.0  ## Corruption level when STAT debuffs were last applied (-1 = not active)
 
 # ============================================================================
 # CORE METHODS (override in subclasses)
@@ -85,6 +86,7 @@ func on_equip(player: Player3D) -> void:
 	if corrupted and starts_enabled and not corruption_debuffs.is_empty():
 		var corruption = CorruptionDebuffs._get_current_corruption()
 		CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+		_last_stat_corruption = corruption
 
 func on_unequip(player: Player3D) -> void:
 	"""Called when item is removed from a slot.
@@ -93,10 +95,10 @@ func on_unequip(player: Player3D) -> void:
 	- Remove stat modifiers
 	- Clean up effects
 	"""
-	# Remove corruption stat debuffs before unequip
-	if corrupted and not corruption_debuffs.is_empty():
-		var corruption = CorruptionDebuffs._get_current_corruption()
-		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, corruption, level)
+	# Remove corruption stat debuffs before unequip (only if currently applied)
+	if corrupted and not corruption_debuffs.is_empty() and _last_stat_corruption >= 0:
+		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, _last_stat_corruption, level)
+		_last_stat_corruption = -1.0
 
 	equipped = false
 	Log.player("Unequipped %s (Level %d)" % [get_display_name(), level])
@@ -104,7 +106,7 @@ func on_unequip(player: Player3D) -> void:
 	# Default: Remove stat bonus
 	_remove_stat_bonus(player)
 
-func on_turn(player: Player3D, turn_number: int) -> void:
+func on_turn(player: Player3D, _turn_number: int) -> void:
 	"""Called every turn while equipped (in execution order).
 
 	Common uses:
@@ -114,11 +116,18 @@ func on_turn(player: Player3D, turn_number: int) -> void:
 
 	Args:
 		player: The player entity
-		turn_number: Global turn counter (for even/odd logic, etc.)
+		_turn_number: Global turn counter (for even/odd logic, etc.)
 	"""
-	# Apply per-turn corruption debuffs
 	if corrupted and not corruption_debuffs.is_empty():
 		var corruption = CorruptionDebuffs._get_current_corruption()
+
+		# Recalculate STAT debuffs if corruption has changed since last application
+		if _last_stat_corruption >= 0 and corruption != _last_stat_corruption:
+			CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, _last_stat_corruption, level)
+			CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+			_last_stat_corruption = corruption
+
+		# Apply per-turn corruption debuffs (always uses current corruption)
 		CorruptionDebuffs.apply_per_turn_debuffs(corruption_debuffs, player, corruption, level)
 
 func on_enable(player: Player3D) -> void:
@@ -127,12 +136,13 @@ func on_enable(player: Player3D) -> void:
 	if corrupted and not corruption_debuffs.is_empty():
 		var corruption = CorruptionDebuffs._get_current_corruption()
 		CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+		_last_stat_corruption = corruption
 
 func on_disable(player: Player3D) -> void:
 	"""Called when item is toggled OFF. Remove all effects (stat bonus + corruption)."""
-	if corrupted and not corruption_debuffs.is_empty():
-		var corruption = CorruptionDebuffs._get_current_corruption()
-		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, corruption, level)
+	if corrupted and not corruption_debuffs.is_empty() and _last_stat_corruption >= 0:
+		CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, _last_stat_corruption, level)
+		_last_stat_corruption = -1.0
 	_remove_stat_bonus(player)
 	# Clamp current resources to new (lower) max values
 	if player and player.stats:

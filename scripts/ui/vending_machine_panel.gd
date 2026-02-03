@@ -229,11 +229,7 @@ func _roll_item(available_items: Array[Item], corruption: float) -> Dictionary:
 			selected = entry
 			break
 
-	# Calculate cost
 	var rarity = selected.rarity
-	var base_cost = RARITY_BASE_COST.get(rarity, 5)
-	var final_cost = int(ceil(base_cost * (1.0 + corruption * 0.5)))
-	final_cost = max(1, final_cost)
 
 	# Random stat type for this item's cost
 	var stat_index = randi() % 3  # 0=HP, 1=Sanity, 2=Mana
@@ -256,6 +252,13 @@ func _roll_item(available_items: Array[Item], corruption: float) -> Dictionary:
 			duped_item.corrupted = true
 			duped_item.starts_enabled = false
 			duped_item.corruption_debuffs.append(CorruptionDebuffs.roll_debuff())
+
+	# Calculate cost (scales with rarity, corruption, and item level)
+	var base_cost = RARITY_BASE_COST.get(rarity, 5)
+	# Level scaling: +10% per level above 1 (level 2 = 1.1x, level 3 = 1.2x, etc.)
+	var level_multiplier = 1.0 + (duped_item.level - 1) * 0.1
+	var final_cost = int(ceil(base_cost * (1.0 + corruption * 0.5) * level_multiplier))
+	final_cost = max(1, final_cost)
 
 	return {
 		"item": duped_item,
@@ -355,7 +358,7 @@ func _create_item_button(index: int, entry: Dictionary) -> Button:
 		var rarity_name = ItemRarity.get_rarity_name(rarity)
 		var stat_name = STAT_NAMES[stat_index]
 		var can_afford = _can_afford(cost, stat_index)
-		button.text = "%s (%s) — Cost: -%d max %s" % [item.get_display_name(), rarity_name, cost, stat_name]
+		button.text = "%s Lv%d (%s) — Cost: -%d max %s" % [item.get_display_name(), item.level, rarity_name, cost, stat_name]
 		if can_afford:
 			button.add_theme_color_override("font_color", ItemRarity.get_color(rarity))
 		else:
