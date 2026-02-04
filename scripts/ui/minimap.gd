@@ -14,8 +14,6 @@ extends Control
 ## - Spatial culling: Trail rendering skips off-screen positions
 ## - Transform rotation: Rotates TextureRect node, not pixels
 
-## Emitted when minimap scale factor changes (for high-res UI scaling)
-signal resolution_scale_changed(scale_factor: int)
 
 # ============================================================================
 # CONSTANTS
@@ -32,7 +30,6 @@ const COLOR_WALL := Color("#1a3a52")  # Dark blue-gray
 const COLOR_PLAYER := Color("#00d9ff")  # Bright cyan (fallback)
 const COLOR_TRAIL_START := Color(0.9, 0.0, 1.0, 0.3)  # Faint purple
 const COLOR_TRAIL_END := Color(0.9, 0.0, 1.0, 1.0)  # Bright purple
-const COLOR_CHUNK_BOUNDARY := Color("#404040")  # Subtle gray
 const COLOR_UNLOADED := Color("#000000")  # Black
 const COLOR_ITEM := Color("#ffff00")  # Bright yellow (discovered items)
 const COLOR_ENTITY := Color("#ff00ff")  # Magenta (entities/enemies)
@@ -42,7 +39,7 @@ const COLOR_AURA_ENTITY := Color(1.0, 0.0, 0.0, 0.45)  # Red - hostile entities
 const COLOR_AURA_ENTITY_NEUTRAL := Color(0.0, 0.5, 1.0, 0.45)  # Blue - non-hostile entities (vending machines)
 const COLOR_AURA_ENTITY_EXIT := Color(0.85, 0.75, 0.0, 0.45)  # Deep yellow - exit stairs/holes
 const COLOR_AURA_ITEM := Color(0.7, 0.2, 1.0, 0.45)  # Purple - items
-const COLOR_AURA_EXIT := Color(0.0, 0.5, 1.0, 0.45)  # Blue, semi-transparent (legacy)
+
 
 ## Sprite icon sizes per zoom level (pixels)
 ## Zoom 0: 5px, Zoom 1: 7px, Zoom 2: 11px, Zoom 3: 15px, Zoom 4: 21px
@@ -86,7 +83,6 @@ var player: Node = null
 
 ## Camera rotation (for north orientation)
 var camera_rotation: float = 0.0
-var last_camera_rotation: float = 0.0
 
 ## Dirty flag - needs visual update (movement, full redraw, etc.)
 var content_dirty: bool = true
@@ -99,9 +95,6 @@ var cached_player_pos: Vector2i = Vector2i(-99999, -99999)
 
 ## Current scale factor (for resolution-based UI scaling)
 var current_scale_factor: int = 0
-
-## Last player position for incremental rendering
-var last_player_pos: Vector2i = Vector2i(-99999, -99999)
 
 ## Player position at last tile cache render (for incremental shift calculation)
 var last_render_center: Vector2i = Vector2i(-99999, -99999)
@@ -301,7 +294,6 @@ func _update_texture_scale() -> void:
 		current_scale_factor = scale_factor
 		if UIScaleManager:
 			UIScaleManager.set_resolution_scale(scale_factor)
-		resolution_scale_changed.emit(scale_factor)  # Keep signal for any direct listeners
 
 func _on_container_resized() -> void:
 	"""Called when parent container changes size"""
@@ -528,36 +520,6 @@ func _composite_sprites() -> void:
 	# Update texture
 	map_texture.update(map_image)
 
-func _draw_chunk_boundaries(player_pos: Vector2i) -> void:
-	"""Draw chunk boundary lines (every 128 tiles)"""
-	const CHUNK_SIZE := 128
-	var half_size := MAP_SIZE / 2
-	var min_tile := player_pos - Vector2i(half_size, half_size)
-	var max_tile := player_pos + Vector2i(half_size, half_size)
-
-	# Find chunk boundaries in visible area
-	var min_chunk := Vector2i(floor(float(min_tile.x) / CHUNK_SIZE), floor(float(min_tile.y) / CHUNK_SIZE))
-	var max_chunk := Vector2i(ceil(float(max_tile.x) / CHUNK_SIZE), ceil(float(max_tile.y) / CHUNK_SIZE))
-
-	# Draw vertical lines (no rotation - TextureRect handles it)
-	for chunk_x in range(min_chunk.x, max_chunk.x + 1):
-		var world_x := chunk_x * CHUNK_SIZE
-		for y in range(min_tile.y, max_tile.y):
-			var tile_pos := Vector2i(world_x, y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if _is_valid_screen_pos(screen_pos):
-				map_image.set_pixelv(screen_pos, COLOR_CHUNK_BOUNDARY)
-
-	# Draw horizontal lines (no rotation - TextureRect handles it)
-	for chunk_y in range(min_chunk.y, max_chunk.y + 1):
-		var world_y := chunk_y * CHUNK_SIZE
-		for x in range(min_tile.x, max_tile.x):
-			var tile_pos := Vector2i(x, world_y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if _is_valid_screen_pos(screen_pos):
-				map_image.set_pixelv(screen_pos, COLOR_CHUNK_BOUNDARY)
 
 func _draw_trail_onto(target_image: Image, player_pos: Vector2i) -> void:
 	"""Draw player movement trail with fading onto target image (optimized with spatial culling)"""
@@ -714,21 +676,6 @@ func _world_to_screen(world_pos: Vector2i, player_pos: Vector2i) -> Vector2i:
 		return Vector2i(half_size + relative.x / 2, half_size + relative.y / 2)
 	return Vector2i(half_size + relative.x * zoom_level, half_size + relative.y * zoom_level)
 
-func _rotate_screen_pos(screen_pos: Vector2i, angle: float) -> Vector2i:
-	"""Rotate screen position around center by angle (radians)"""
-	var center := Vector2(MAP_SIZE / 2, MAP_SIZE / 2)
-	var offset := Vector2(screen_pos) - center
-
-	# Rotate by camera angle
-	var cos_a := cos(angle)
-	var sin_a := sin(angle)
-	var rotated := Vector2(
-		offset.x * cos_a - offset.y * sin_a,
-		offset.x * sin_a + offset.y * cos_a
-	)
-
-	var final_pos := center + rotated
-	return Vector2i(int(final_pos.x), int(final_pos.y))
 
 func _is_valid_screen_pos(pos: Vector2i) -> bool:
 	"""Check if screen position is within bounds"""
