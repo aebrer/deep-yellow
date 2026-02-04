@@ -251,6 +251,15 @@ func _on_pause_toggled(is_paused: bool) -> void:
 		# The player state will re-emit action_preview_changed when appropriate
 		action_preview_ui.hide_preview()
 
+func _on_codex_visibility_changed() -> void:
+	"""Hide action preview when codex opens, restore pause hints when it closes"""
+	if not action_preview_ui:
+		return
+	if codex_panel and codex_panel.visible:
+		action_preview_ui.hide_preview()
+	elif PauseManager and PauseManager.is_paused:
+		_on_inventory_reorder_state_changed(false)
+
 func _on_chunk_updates_completed() -> void:
 	"""Mark minimap dirty when chunks load/unload"""
 	if minimap:
@@ -521,6 +530,9 @@ func _create_codex_panel() -> void:
 	# Link codex panel to settings panel
 	if settings_panel:
 		settings_panel.codex_panel = codex_panel
+
+	# Hide action preview when codex is open
+	codex_panel.visibility_changed.connect(_on_codex_visibility_changed)
 
 func _on_player_died(cause: String) -> void:
 	"""Handle player death - show game over screen"""
