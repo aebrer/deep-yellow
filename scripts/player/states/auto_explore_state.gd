@@ -287,7 +287,7 @@ func _threatening_enemy_in_range() -> String:
 	"""Check for entities with threat level >= threshold within perception range.
 
 	Returns the entity name if a threatening entity is found, empty string otherwise.
-	Threshold 0 stops for ALL entities (including non-hostile NPCs).
+	Threshold 0 stops for all hostile entities.
 	"""
 	if not player or not player.grid or not player.grid.entity_renderer:
 		return ""
@@ -445,6 +445,8 @@ func _recalculate_path_adjacent(target: Vector2i, reason: String) -> void:
 		if path.size() >= 2 and path.size() < best_length:
 			best_path = path
 			best_length = path.size()
+			if best_length == 2:
+				break  # Can't do better than 1 step away
 
 	if best_path.size() < 2:
 		_clear_cached_path()

@@ -121,11 +121,20 @@ func on_turn(player: Player3D, _turn_number: int) -> void:
 	if corrupted and not corruption_debuffs.is_empty():
 		var corruption = CorruptionDebuffs._get_current_corruption()
 
-		# Recalculate STAT debuffs if corruption has changed since last application
+		# Recalculate STAT debuffs only if int-truncated values actually change
 		if _last_stat_corruption >= 0 and corruption != _last_stat_corruption:
-			CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, _last_stat_corruption, level)
-			CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
-			_last_stat_corruption = corruption
+			var stat_changed := false
+			for debuff in corruption_debuffs:
+				if debuff.get("category") == CorruptionDebuffs.Category.STAT:
+					var old_val = int(CorruptionDebuffs.get_effective_value(debuff, _last_stat_corruption, level))
+					var new_val = int(CorruptionDebuffs.get_effective_value(debuff, corruption, level))
+					if old_val != new_val:
+						stat_changed = true
+						break
+			if stat_changed:
+				CorruptionDebuffs.remove_stat_debuffs(corruption_debuffs, player, _last_stat_corruption, level)
+				CorruptionDebuffs.apply_stat_debuffs(corruption_debuffs, player, corruption, level)
+				_last_stat_corruption = corruption
 
 		# Apply per-turn corruption debuffs (always uses current corruption)
 		CorruptionDebuffs.apply_per_turn_debuffs(corruption_debuffs, player, corruption, level)

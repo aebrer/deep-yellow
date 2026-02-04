@@ -440,16 +440,15 @@ func _process(_delta: float) -> void:
 	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
 		var focused = get_viewport().gui_get_focus_owner()
 		# CRITICAL: Only activate if focused button is in our current slot_buttons array
-		# This prevents activating old buttons that are being queue_free()'d
-		if focused and focused is Button and focused in slot_buttons:
+		# or the cancel button. Prevents activating old buttons being queue_free()'d.
+		if focused and focused is Button and (focused in slot_buttons or focused == cancel_button):
 			focused.pressed.emit()
 			return
 
 	# Also check ui_accept (standard Godot action for button activation)
 	if Input.is_action_just_pressed("ui_accept"):
 		var focused = get_viewport().gui_get_focus_owner()
-		# CRITICAL: Only activate if focused button is in our current slot_buttons array
-		if focused and focused is Button and focused in slot_buttons:
+		if focused and focused is Button and (focused in slot_buttons or focused == cancel_button):
 			focused.pressed.emit()
 			return
 

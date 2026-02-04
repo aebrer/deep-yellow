@@ -742,7 +742,7 @@ func _get_threat_threshold_label(threshold: int) -> String:
 	Labels match EntityInfo.THREAT_LEVEL_NAMES dot patterns.
 	"""
 	match threshold:
-		0: return "All"     # All entities (including NPCs)
+		0: return "All"     # All hostile entities
 		1: return "●○○○○+"  # Daleth (weak) and above
 		2: return "●●○○○+"  # Epsilon (moderate) and above
 		3: return "●●●○○+"  # Keter (dangerous) and above
