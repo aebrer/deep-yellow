@@ -272,12 +272,13 @@ func _create_slot_button(slot_index: int) -> Button:
 		button.add_theme_color_override("font_color", Color.GREEN)
 		button.pressed.connect(func(): _on_slot_selected(slot_index, ActionType.EQUIP_EMPTY))
 	elif existing_item.item_id == current_item.item_id:
-		# Same item - can combine to level up
-		button.text = "Slot %d: %s (Lv %d) → COMBINE (Lv %d)" % [
+		# Same item - can combine to level up (additive: existing + incoming levels)
+		button.text = "Slot %d: %s (Lv %d) + (Lv %d) → COMBINE (Lv %d)" % [
 			slot_index + 1,
 			existing_item.get_display_name(),
 			existing_item.level,
-			existing_item.level + 1
+			current_item.level,
+			existing_item.level + current_item.level
 		]
 		button.add_theme_color_override("font_color", Color.CYAN)
 		button.pressed.connect(func(): _on_slot_selected(slot_index, ActionType.COMBINE_LEVEL_UP))
@@ -439,16 +440,15 @@ func _process(_delta: float) -> void:
 	if InputManager and InputManager.is_action_just_pressed("move_confirm"):
 		var focused = get_viewport().gui_get_focus_owner()
 		# CRITICAL: Only activate if focused button is in our current slot_buttons array
-		# This prevents activating old buttons that are being queue_free()'d
-		if focused and focused is Button and focused in slot_buttons:
+		# or the cancel button. Prevents activating old buttons being queue_free()'d.
+		if focused and focused is Button and (focused in slot_buttons or focused == cancel_button):
 			focused.pressed.emit()
 			return
 
 	# Also check ui_accept (standard Godot action for button activation)
 	if Input.is_action_just_pressed("ui_accept"):
 		var focused = get_viewport().gui_get_focus_owner()
-		# CRITICAL: Only activate if focused button is in our current slot_buttons array
-		if focused and focused is Button and focused in slot_buttons:
+		if focused and focused is Button and (focused in slot_buttons or focused == cancel_button):
 			focused.pressed.emit()
 			return
 

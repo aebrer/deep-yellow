@@ -264,10 +264,7 @@ func _show_level_up_immediate(player: Player3D, level: int) -> void:
 # ============================================================================
 
 func _select_random_perks(count: int) -> Array[PerkType]:
-	"""Select N random unique perks from the pool using weighted selection.
-
-	Clearance is intentionally rare since it boosts ALL EXP gains (+10%/level).
-	"""
+	"""Select N random unique perks from the pool using weighted selection."""
 	# Define weights for each perk type (higher = more common)
 	var perk_weights: Dictionary = {
 		PerkType.BODY_PLUS_1: 10,
@@ -276,7 +273,7 @@ func _select_random_perks(count: int) -> Array[PerkType]:
 		PerkType.HP_REGEN_PLUS_1: 8,
 		PerkType.SANITY_REGEN_PLUS_1: 8,
 		PerkType.MANA_REGEN_PLUS_1: 8,
-		PerkType.CLEARANCE_PLUS_1: 2,  # Rare - very powerful
+		PerkType.CLEARANCE_PLUS_1: 6,  # Uncommon - valuable for progression
 		PerkType.CORRUPTION_PLUS_5: 6,
 		PerkType.CORRUPTION_MINUS_5: 6,
 	}

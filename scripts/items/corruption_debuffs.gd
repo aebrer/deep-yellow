@@ -350,7 +350,8 @@ static func get_damage_multiplier(debuffs: Array, corruption: float, item_level:
 static func get_debuff_descriptions(debuffs: Array, corruption: float, item_level: int, clearance_level: int) -> String:
 	"""Get formatted description of all debuffs on an item.
 
-	Clearance-gated: clearance <= item_level shows [CORRUPT] ???.
+	Clearance-gated: need clearance >= item_level/2 to see debuffs.
+	(e.g., item level 3 needs clearance 2+, item level 5 needs clearance 3+)
 
 	Args:
 		debuffs: Array of debuff dictionaries
@@ -364,7 +365,7 @@ static func get_debuff_descriptions(debuffs: Array, corruption: float, item_leve
 	if debuffs.is_empty():
 		return ""
 
-	if clearance_level <= item_level:
+	if clearance_level * 2 < item_level:
 		return "\n[CORRUPT] ???"
 
 	var lines: Array[String] = ["\n[CORRUPT] Debuffs:"]
