@@ -47,41 +47,6 @@ func _init(
 	discovered = false
 
 # ============================================================================
-# STATE QUERIES
-# ============================================================================
-
-func is_available() -> bool:
-	"""Check if item can be picked up (not already picked up)"""
-	return not picked_up
-
-func should_render() -> bool:
-	"""Check if item should be rendered (available or discovered)"""
-	return not picked_up or discovered
-
-func get_distance_to(pos: Vector2i) -> float:
-	"""Get distance from this item to a position"""
-	var dx = world_position.x - pos.x
-	var dy = world_position.y - pos.y
-	return sqrt(dx * dx + dy * dy)
-
-# ============================================================================
-# STATE CHANGES
-# ============================================================================
-
-func mark_discovered() -> void:
-	"""Mark item as discovered (player has seen it)"""
-	if not discovered:
-		discovered = true
-
-func mark_picked_up() -> void:
-	"""Mark item as picked up (player has taken it)"""
-	if not picked_up:
-		picked_up = true
-		Log.player("Picked up: %s" % [
-			item_resource.item_name if item_resource else "Unknown"
-		])
-
-# ============================================================================
 # SERIALIZATION
 # ============================================================================
 
@@ -107,42 +72,6 @@ func to_dict() -> Dictionary:
 		data["corruption_debuffs"] = item_resource.corruption_debuffs.duplicate(true)
 
 	return data
-
-static func from_dict(data: Dictionary, item_resource: Item) -> WorldItem:
-	"""Deserialize from dictionary
-
-	Args:
-		data: Serialized item data
-		item_resource: Item definition (looked up by item_id)
-
-	Returns:
-		Reconstructed WorldItem
-	"""
-	var pos_data = data.get("world_position", {"x": 0, "y": 0})
-	var world_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
-
-	var world_item = WorldItem.new(
-		item_resource,
-		world_pos,
-		data.get("rarity", ItemRarity.Tier.COMMON),
-		data.get("spawn_turn", 0)
-	)
-
-	world_item.picked_up = data.get("picked_up", false)
-	world_item.discovered = data.get("discovered", false)
-
-	# Restore item level (corruption-scaled items spawn above level 1)
-	var saved_level = data.get("level", 1)
-	if item_resource and saved_level > 1:
-		item_resource.level = saved_level
-
-	# Restore corruption state
-	if item_resource and data.get("corrupted", false):
-		item_resource.corrupted = true
-		item_resource.corruption_debuffs = data.get("corruption_debuffs", [])
-		item_resource.starts_enabled = false  # Corrupted items default to OFF
-
-	return world_item
 
 # ============================================================================
 # UTILITY

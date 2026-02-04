@@ -150,10 +150,6 @@ func adjust_fov(delta_fov: float) -> void:
 	"""Adjust field of view (zoom effect)"""
 	camera.fov = clampf(camera.fov + delta_fov, fov_min, fov_max)
 
-func reset_rotation() -> void:
-	"""Reset camera to forward facing (optional utility)"""
-	h_pivot.rotation_degrees.y = 0.0
-	v_pivot.rotation_degrees.x = 0.0
 
 # ============================================================================
 # RAYCAST UTILITIES
@@ -306,85 +302,6 @@ func get_current_target() -> Examinable:
 
 	# Create new examination tile on-demand
 	return _create_examination_tile(grid_3d, grid_pos, tile_type, cache_key)
-
-# ============================================================================
-# ON-DEMAND EXAMINATION TILE HELPERS
-# ============================================================================
-
-func _raycast_gridmap() -> Dictionary:
-	"""Raycast GridMap collision layer (layer 2) for on-demand tile creation"""
-	var viewport = get_viewport()
-	var screen_center = viewport.get_visible_rect().size / 2.0
-
-	var ray_origin = camera.project_ray_origin(screen_center)
-	var ray_direction = camera.project_ray_normal(screen_center)
-
-	# Offset ray origin forward by camera near plane distance to avoid starting inside collision
-	ray_origin += ray_direction * camera.near
-
-	var ray_length = 10.0  # Examination distance
-
-	var space_state = get_world_3d().direct_space_state
-	var query = PhysicsRayQueryParameters3D.create(
-		ray_origin,
-		ray_origin + ray_direction * ray_length
-	)
-	query.collision_mask = 2  # Layer 2 = GridMap collision
-
-	var result = space_state.intersect_ray(query)
-
-	# ALWAYS log raycast attempts, even when no hit
-	if not result.is_empty():
-		var hit_pos: Vector3 = result.get("position")
-		var hit_normal: Vector3 = result.get("normal")
-		pass
-	else:
-		# Check what tiles exist at this grid position
-		var player = get_parent()
-		if player:
-			var game = player.get_parent()
-			if game:
-				var grid_3d = game.get_node_or_null("Grid3D")
-				if grid_3d:
-					var grid_pos: Vector2 = grid_3d.world_to_grid(ray_origin)
-					var floor_cell := Vector3i(grid_pos.x, 0, grid_pos.y)
-					var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
-					var floor_item = grid_3d.grid_map.get_cell_item(floor_cell)
-					var ceiling_item = grid_3d.grid_map.get_cell_item(ceiling_cell)
-					pass
-
-	return result
-
-func _get_tile_type_at_position(grid_3d, grid_pos: Vector2, hit_pos: Vector3, hit_normal: Vector3) -> String:
-	"""Determine tile type (floor/wall/ceiling) from surface normal
-
-	Uses surface normal to classify hits - ignores hit position since walls extend above ceiling.
-	"""
-	const THRESHOLD = 0.7  # ~45° tolerance for normal direction
-
-	var cell_3d := Vector3i(grid_pos.x, 0, grid_pos.y)
-	var cell_item: int = grid_3d.grid_map.get_cell_item(cell_3d)
-
-	# Calculate dot product with up vector to classify surface
-	var dot_up = hit_normal.dot(Vector3.UP)
-
-	# Ceiling: normal points DOWN (dot product with UP is negative)
-	# Check for ceiling tile at Y=1 layer
-	var ceiling_cell := Vector3i(grid_pos.x, 1, grid_pos.y)
-	var ceiling_item: int = grid_3d.grid_map.get_cell_item(ceiling_cell)
-
-	if Grid3D.is_ceiling_tile(ceiling_item) and dot_up < -THRESHOLD:
-		return "ceiling"
-
-	# Floor: normal points UP
-	if Grid3D.is_floor_tile(cell_item) and dot_up > THRESHOLD:
-		return "floor"
-
-	# Wall: horizontal normal (not up, not down)
-	if Grid3D.is_wall_tile(cell_item) or abs(dot_up) < THRESHOLD:
-		return "wall"
-
-	return ""
 
 func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cache_key: String) -> Examinable:
 	"""Create examination tile on-demand and add to cache"""

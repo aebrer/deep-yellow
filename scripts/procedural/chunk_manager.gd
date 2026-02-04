@@ -890,27 +890,6 @@ func tile_to_chunk(tile_pos: Vector2i) -> Vector2i:
 		floori(float(tile_pos.y) / CHUNK_SIZE)
 	)
 
-func chunk_to_world(chunk_pos: Vector2i) -> Vector2i:
-	"""Convert chunk position to world tile position (chunk origin)
-
-	Example:
-		chunk (0, 0) → tile (0, 0)
-		chunk (1, 1) → tile (128, 128)
-		chunk (-1, -1) → tile (-128, -128)
-	"""
-	return chunk_pos * CHUNK_SIZE
-
-func tile_to_local(tile_pos: Vector2i) -> Vector2i:
-	"""Convert tile position to local chunk position (0-127)
-
-	Example:
-		tile (100, 50) → local (100, 50)
-		tile (150, 200) → local (22, 72)  # 150%128=22, 200%128=72
-	"""
-	return Vector2i(
-		posmod(tile_pos.x, CHUNK_SIZE),
-		posmod(tile_pos.y, CHUNK_SIZE)
-	)
 
 # ============================================================================
 # BORDER HALLWAY CUTTING
@@ -1199,24 +1178,6 @@ func get_chunk_at_tile(tile_pos: Vector2i, level_id: int) -> Chunk:
 	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
 	return loaded_chunks.get(chunk_key, null)
 
-func get_chunk_at_position(chunk_pos: Vector2i, level_id: int) -> Chunk:
-	"""Get chunk at chunk coordinates
-
-	Returns null if chunk is not loaded.
-	"""
-	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
-	return loaded_chunks.get(chunk_key, null)
-
-func is_tile_walkable(tile_pos: Vector2i, level_id: int) -> bool:
-	"""Check if tile is walkable
-
-	Returns false if chunk is not loaded.
-	"""
-	var chunk := get_chunk_at_tile(tile_pos, level_id)
-	if not chunk:
-		return false
-
-	return chunk.is_walkable(tile_pos)
 
 func get_tile_type(tile_pos: Vector2i, level_id: int) -> int:
 	"""Get tile type at position
@@ -1331,16 +1292,8 @@ func _disconnect_all_entity_signals() -> void:
 					entity.moved.disconnect(connection.callable)
 
 # ============================================================================
-# CHUNK VALIDATION
-# ============================================================================
-
-# ============================================================================
 # UTILITY
 # ============================================================================
-
-func get_loaded_chunk_count() -> int:
-	"""Get number of currently loaded chunks"""
-	return loaded_chunks.size()
 
 func get_corruption(level_id: int) -> float:
 	"""Get current corruption for a level"""
