@@ -62,8 +62,8 @@ func examine_entity(entity_id: String, is_object: bool = false) -> void:
 		push_warning("[KnowledgeDB] Cannot examine entity with empty ID")
 		return
 
-	# Check for EXP reward (first time at current Clearance)
-	var key = "entity:%s" % entity_id
+	# Objects (non-hostile entities like exit holes, vending machines) go under "environment"
+	var key = "environment:%s" % entity_id if is_object else "entity:%s" % entity_id
 	if _is_novel(key):
 		_mark_examined(key)
 		var exp = _get_entity_exp()
@@ -184,22 +184,32 @@ func _get_entity_exp() -> int:
 	return 50
 
 func _get_item_by_id(item_id: String) -> Item:
-	"""Look up Item resource by item_id from current level config
+	"""Look up Item resource by item_id across all known levels
+
+	Searches the current level first, then all preloaded level configs.
+	This ensures items from other levels (e.g., tutorial meat viewed from
+	Level 0's codex) are still found.
 
 	Args:
-		item_id: Unique item identifier (e.g., "debug_item")
+		item_id: Unique item identifier (e.g., "meat")
 
 	Returns:
 		Item resource or null if not found
 	"""
+	# Search current level first (most common case)
 	var current_level = LevelManager.get_current_level()
-	if not current_level:
-		return null
+	if current_level:
+		for item in current_level.permitted_items:
+			if item.item_id == item_id:
+				return item
 
-	# Search through permitted items in level config
-	for item in current_level.permitted_items:
-		if item.item_id == item_id:
-			return item
+	# Search all preloaded level configs (for cross-level items)
+	for level_config in LevelManager.PRELOADED_CONFIGS.values():
+		if level_config == current_level:
+			continue  # Already searched
+		for item in level_config.permitted_items:
+			if item.item_id == item_id:
+				return item
 
 	return null
 
