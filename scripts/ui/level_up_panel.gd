@@ -276,7 +276,7 @@ func _select_random_perks(count: int) -> Array[PerkType]:
 		PerkType.HP_REGEN_PLUS_1: 8,
 		PerkType.SANITY_REGEN_PLUS_1: 8,
 		PerkType.MANA_REGEN_PLUS_1: 8,
-		PerkType.CLEARANCE_PLUS_1: 2,  # Rare - very powerful
+		PerkType.CLEARANCE_PLUS_1: 6,  # Uncommon - valuable for progression
 		PerkType.CORRUPTION_PLUS_5: 6,
 		PerkType.CORRUPTION_MINUS_5: 6,
 	}
