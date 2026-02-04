@@ -30,6 +30,12 @@ signal new_chunk_entered(chunk_position: Vector3i)
 ## Emitted when level changes mid-run (exit stairs). Listeners should reconfigure visuals.
 signal level_changed(new_level_id: int)
 
+## Emitted after a chunk is fully loaded into GridMap (terrain, entities, pathfinding ready)
+signal chunk_grid_loaded(chunk_pos: Vector2i)
+
+## Emitted after a chunk is unloaded from GridMap
+signal chunk_grid_unloaded(chunk_pos: Vector2i)
+
 # Constants
 const CHUNK_SIZE := 128
 const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
@@ -472,6 +478,10 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# Now render entities (after they've been added to chunk data)
 		if grid_3d.entity_renderer:
 			grid_3d.entity_renderer.render_chunk_entities(chunk)
+
+		# Signal that this chunk is fully loaded into GridMap
+		# (terrain, pathfinding, entities all ready — safe to query GridMap)
+		chunk_grid_loaded.emit(chunk_pos)
 	else:
 		# Only warn once per session
 		if loaded_chunks.size() == 1:
@@ -857,6 +867,7 @@ func _unload_chunk(chunk_key: Vector3i) -> void:
 	# Remove from Grid3D render (use cached reference)
 	if grid_3d:
 		grid_3d.unload_chunk(chunk)
+		chunk_grid_unloaded.emit(Vector2i(chunk_key.x, chunk_key.y))
 
 	# Remove from memory
 	loaded_chunks.erase(chunk_key)

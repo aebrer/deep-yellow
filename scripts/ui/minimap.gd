@@ -135,9 +135,11 @@ func _ready() -> void:
 	_cache_player_sprite()
 	_cache_entity_sprites()
 
-	# Clear cache when initial chunks finish loading
+	# Connect to ChunkManager signals for chunk lifecycle events
 	if ChunkManager:
 		ChunkManager.initial_load_completed.connect(_on_initial_load_completed)
+		ChunkManager.chunk_grid_loaded.connect(on_chunk_loaded)
+		ChunkManager.chunk_grid_unloaded.connect(on_chunk_unloaded)
 		if ChunkManager.has_signal("level_changed"):
 			ChunkManager.level_changed.connect(_on_level_changed)
 
@@ -154,6 +156,10 @@ func _exit_tree() -> void:
 	if ChunkManager:
 		if ChunkManager.initial_load_completed.is_connected(_on_initial_load_completed):
 			ChunkManager.initial_load_completed.disconnect(_on_initial_load_completed)
+		if ChunkManager.chunk_grid_loaded.is_connected(on_chunk_loaded):
+			ChunkManager.chunk_grid_loaded.disconnect(on_chunk_loaded)
+		if ChunkManager.chunk_grid_unloaded.is_connected(on_chunk_unloaded):
+			ChunkManager.chunk_grid_unloaded.disconnect(on_chunk_unloaded)
 		if ChunkManager.has_signal("level_changed") and ChunkManager.level_changed.is_connected(_on_level_changed):
 			ChunkManager.level_changed.disconnect(_on_level_changed)
 

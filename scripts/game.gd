@@ -261,11 +261,9 @@ func _on_codex_visibility_changed() -> void:
 		_on_inventory_reorder_state_changed(false)
 
 func _on_chunk_updates_completed() -> void:
-	"""Mark minimap dirty when chunks load/unload"""
-	if minimap:
-		# Chunk updates completed - mark minimap for redraw
-		# (minimap checks grid.is_walkable() for each tile, so chunk changes affect rendering)
-		minimap.content_dirty = true
+	"""Chunk generation queue emptied. Minimap handles per-chunk updates
+	directly via ChunkManager.chunk_grid_loaded/unloaded signals."""
+	pass
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
