@@ -81,18 +81,3 @@ func get_scaled_font_size(base_size: int) -> int:
 	"""Get a font size scaled for current resolution"""
 	return int(base_size * current_scale)
 
-func get_scaled_value(base_value: float) -> float:
-	"""Get any value scaled for current resolution"""
-	return base_value * current_scale
-
-func get_scaled_int(base_value: int) -> int:
-	"""Get an integer value scaled for current resolution"""
-	return int(base_value * current_scale)
-
-func is_high_res() -> bool:
-	"""Check if currently in high-res mode"""
-	return current_scale > DEFAULT_SCALE
-
-func get_minimap_scale() -> int:
-	"""Get current minimap resolution scale"""
-	return _minimap_scale

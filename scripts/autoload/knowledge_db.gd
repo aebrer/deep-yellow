@@ -127,11 +127,6 @@ func set_clearance_level(level: int) -> void:
 	"""Set player clearance level (0-5)"""
 	clearance_level = clampi(level, 0, 5)
 
-func increase_clearance() -> void:
-	"""Increase clearance level by 1 (max 5)"""
-	if clearance_level < 5:
-		clearance_level += 1
-
 # ============================================================================
 # NOVELTY TRACKING (PRIVATE)
 # ============================================================================
@@ -221,20 +216,3 @@ func reset_knowledge() -> void:
 	"""Reset all knowledge (for debugging)"""
 	examined_at_clearance.clear()
 	clearance_level = 0
-
-func get_stats() -> Dictionary:
-	"""Get knowledge statistics for debugging"""
-	return {
-		"examined_subjects": examined_at_clearance.size(),
-		"clearance_level": clearance_level,
-		"subjects": examined_at_clearance.keys()
-	}
-
-func print_stats() -> void:
-	"""Print knowledge stats to console"""
-	var stats = get_stats()
-	print("\n=== KnowledgeDB Stats ===")
-	print("Examined subjects: %d" % stats.examined_subjects)
-	print("Clearance level: %d" % stats.clearance_level)
-	print("Subjects: %s" % str(stats.subjects))
-	print("========================\n")

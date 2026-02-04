@@ -259,21 +259,6 @@ func has_entity(entity_id: String) -> bool:
 	"""Check if entity is registered"""
 	return _entities.has(entity_id)
 
-func get_all_entity_ids() -> Array[String]:
-	"""Get list of all registered entity IDs"""
-	var ids: Array[String] = []
-	for id in _entities.keys():
-		ids.append(id)
-	return ids
-
-func register_entity(entity: EntityInfo) -> void:
-	"""Register a new entity (for runtime additions)"""
-	if entity.entity_id.is_empty():
-		push_error("[EntityRegistry] Cannot register entity with empty ID")
-		return
-
-	_entities[entity.entity_id] = entity
-
 func apply_defaults(entity: WorldEntity) -> void:
 	"""Apply EntityInfo behavior defaults to a WorldEntity instance.
 	Spawn table values take priority — call this BEFORE applying spawn table overrides."""
@@ -295,14 +280,3 @@ func _get_unknown_entity_info() -> Dictionary:
 		"threat_level_name": EntityInfo.threat_level_to_name(0)
 	}
 
-# ============================================================================
-# DEBUG / DEVELOPMENT
-# ============================================================================
-
-func print_registry() -> void:
-	"""Print all registered entities to console"""
-	print("\n=== EntityRegistry ===")
-	print("Total entities: %d" % _entities.size())
-	for entity_id in _entities.keys():
-		print("  - %s" % entity_id)
-	print("======================\n")

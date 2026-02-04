@@ -42,35 +42,6 @@ func reset() -> void:
 	grid = null
 
 
-## Build navigation graph from walkable tiles in a chunk
-func build_navigation_graph(chunk_positions: Array, grid_ref: Node) -> void:
-	"""Build AStar2D graph from walkable tiles in specified chunks
-
-	Args:
-		chunk_positions: Array of Vector2i chunk positions to include
-		grid_ref: Reference to Grid3D for tile queries
-	"""
-	grid = grid_ref
-
-	# Clear existing graph
-	astar.clear()
-	pos_to_id.clear()
-	id_to_pos.clear()
-	next_id = 0
-
-	var start_time := Time.get_ticks_msec()
-
-	# Add all walkable tiles as points
-	for chunk_pos in chunk_positions:
-		_add_chunk_to_graph(chunk_pos)
-
-	# Connect adjacent walkable tiles
-	for point_id in astar.get_point_ids():
-		var pos: Vector2i = id_to_pos[point_id]
-		_connect_neighbors(pos, point_id)
-
-	var build_time := Time.get_ticks_msec() - start_time
-
 ## Add all walkable tiles from a chunk to the graph
 func _add_chunk_to_graph(chunk_pos: Vector2i) -> void:
 	"""Add walkable tiles from a chunk to the navigation graph"""
