@@ -34,6 +34,12 @@ var _cached_path_index: int = 0
 ## The target position we're pathing toward
 var _cached_target: Vector2i = ExplorationTracker.NO_TARGET
 
+## If true, we're pathing to be adjacent to an interrupt target (stop when path ends)
+var _pathing_to_interrupt: bool = false
+
+## Reason for the interrupt (for logging when we stop)
+var _interrupt_reason: String = ""
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -150,12 +156,23 @@ func process_frame(delta: float) -> void:
 			transition_to("IdleState")
 			return
 		else:
-			# Interrupt target found — recalculate path toward it
+			# Interrupt target found — recalculate path to adjacent cell
 			Log.state("Auto-explore: Interrupted by %s, recalculating path" % interrupt["reason"])
-			_recalculate_path(obj_pos)
+			_recalculate_path_adjacent(obj_pos, interrupt["reason"])
 
-	# If no cached path or path exhausted, calculate a new one
+	# If no cached path or path exhausted, check what to do next
 	if _cached_path.is_empty() or _cached_path_index >= _cached_path.size():
+		# If we were pathing to an interrupt target, stop now (we've arrived adjacent)
+		if _pathing_to_interrupt:
+			# Mark vending machine as visited if that's what we stopped for
+			if _interrupt_reason == "vending machine detected":
+				ExplorationTracker.mark_vending_machine_visited(_cached_target)
+			Log.state("Auto-explore: Stopped - %s (arrived adjacent)" % _interrupt_reason)
+			Log.player("Auto-explore stopped: %s" % _interrupt_reason)
+			transition_to("IdleState")
+			return
+
+		# Otherwise, find a new exploration target
 		var target := ExplorationTracker.find_nearest_unexplored(player.grid_position)
 		if target == ExplorationTracker.NO_TARGET:
 			Log.state("Auto-explore: Fully explored, returning to idle")
@@ -189,15 +206,8 @@ func process_frame(delta: float) -> void:
 	# Rotate camera to face movement direction
 	_rotate_camera_to_direction(direction)
 
-	# Check for item at target (auto-pickup)
-	var item_at_target := _get_item_at_position(next_pos)
-
-	# Create action
-	var action: Action
-	if item_at_target and not item_at_target.is_empty():
-		action = PickupItemAction.new(next_pos, item_at_target)
-	else:
-		action = MovementAction.new(direction)
+	# Create movement action
+	var action: Action = MovementAction.new(direction)
 
 	# Validate and submit
 	if action.can_execute(player):
@@ -235,10 +245,10 @@ func _check_stop_conditions() -> String:
 	if sanity_pct < Utilities.auto_explore_sanity_threshold:
 		return "Sanity below threshold (%.0f%%)" % (sanity_pct * 100)
 
-	# Check for enemies in perception range
-	if Utilities.auto_explore_stop_for_enemies:
-		if _enemies_in_range():
-			return "enemy detected"
+	# Check for enemies in perception range (based on threat threshold)
+	var threat_enemy = _threatening_enemy_in_range()
+	if not threat_enemy.is_empty():
+		return "enemy detected (%s)" % threat_enemy
 
 	return ""
 
@@ -273,19 +283,41 @@ func _check_for_interrupt_target() -> Dictionary:
 
 	return {}
 
-func _enemies_in_range() -> bool:
+func _threatening_enemy_in_range() -> String:
+	"""Check for entities with threat level >= threshold within perception range.
+
+	Returns the entity name if a threatening entity is found, empty string otherwise.
+	Threshold 0 stops for ALL entities (including non-hostile NPCs).
+	"""
 	if not player or not player.grid or not player.grid.entity_renderer:
-		return false
+		return ""
 
 	var perception_range: float = 15.0 + (player.stats.perception * 5.0)
+	var threshold: int = Utilities.auto_explore_enemy_threat_threshold
 	var entity_positions = player.grid.entity_renderer.get_all_entity_positions()
 
 	for entity_pos in entity_positions:
 		var dist := Vector2(player.grid_position).distance_to(Vector2(entity_pos))
-		if dist <= perception_range:
-			return true
+		if dist > perception_range:
+			continue
 
-	return false
+		# Get entity - only check hostile entities
+		var entity = player.grid.entity_renderer.get_entity_at(entity_pos)
+		if not entity or not entity.hostile:
+			continue
+
+		# Look up threat level from EntityRegistry
+		var threat_level: int = 1  # default
+		var entity_name: String = entity.entity_type
+		if EntityRegistry and EntityRegistry.has_entity(entity.entity_type):
+			var info = EntityRegistry.get_info(entity.entity_type, 0)
+			threat_level = info.get("threat_level", 1)
+			entity_name = info.get("name", entity.entity_type)
+
+		if threat_level >= threshold:
+			return entity_name
+
+	return ""
 
 func _nearest_item_in_range(perception_range: float) -> Vector2i:
 	"""Find the nearest discovered item within perception range. Returns NO_TARGET if none."""
@@ -361,10 +393,14 @@ func _clear_cached_path() -> void:
 	_cached_path.clear()
 	_cached_path_index = 0
 	_cached_target = ExplorationTracker.NO_TARGET
+	_pathing_to_interrupt = false
+	_interrupt_reason = ""
 
 func _recalculate_path(target: Vector2i) -> void:
-	"""Calculate and cache a new path to the given target."""
+	"""Calculate and cache a new path to the given target (exploration target)."""
 	_cached_target = target
+	_pathing_to_interrupt = false
+	_interrupt_reason = ""
 	var path := Pathfinding.find_path(player.grid_position, target)
 
 	if path.size() < 2:
@@ -378,6 +414,49 @@ func _recalculate_path(target: Vector2i) -> void:
 	_cached_path_index = 0
 
 	Log.state("Auto-explore: Cached path with %d steps to %s" % [_cached_path.size(), str(target)])
+
+func _recalculate_path_adjacent(target: Vector2i, reason: String) -> void:
+	"""Calculate path to a walkable cell adjacent to target (for items, vending machines, stairs)."""
+	_cached_target = target
+	_pathing_to_interrupt = true
+	_interrupt_reason = reason
+
+	# Find the best adjacent walkable cell (closest to player)
+	var adjacent_cells: Array[Vector2i] = []
+	for dy in [-1, 0, 1]:
+		for dx in [-1, 0, 1]:
+			if dx == 0 and dy == 0:
+				continue
+			var adj_pos := target + Vector2i(dx, dy)
+			if Pathfinding.has_point(adj_pos):
+				adjacent_cells.append(adj_pos)
+
+	if adjacent_cells.is_empty():
+		Log.state("Auto-explore: No walkable cells adjacent to %s" % reason)
+		_clear_cached_path()
+		return
+
+	# Find path to nearest adjacent cell
+	var best_path: Array = []
+	var best_length: int = 999999
+
+	for adj_pos in adjacent_cells:
+		var path := Pathfinding.find_path(player.grid_position, adj_pos)
+		if path.size() >= 2 and path.size() < best_length:
+			best_path = path
+			best_length = path.size()
+
+	if best_path.size() < 2:
+		_clear_cached_path()
+		return
+
+	# Convert path to Vector2i array, skipping first element (current position)
+	_cached_path.clear()
+	for i in range(1, best_path.size()):
+		_cached_path.append(Vector2i(int(best_path[i].x), int(best_path[i].y)))
+	_cached_path_index = 0
+
+	Log.state("Auto-explore: Cached path with %d steps to adjacent cell of %s" % [_cached_path.size(), reason])
 
 # ============================================================================
 # HELPERS

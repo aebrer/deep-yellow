@@ -28,7 +28,9 @@ static var movement_smoothing: bool = true
 static var auto_explore_speed: float = 10.0  # turns per second
 static var auto_explore_hp_threshold: float = 0.5  # stop below this % of max HP
 static var auto_explore_sanity_threshold: float = 0.5  # stop below this % of max sanity
-static var auto_explore_stop_for_enemies: bool = false
+## Enemy threat threshold: stop for enemies with threat_level >= this value
+## 0 = all hostiles, 1 = weak+, 2 = moderate+, 3 = dangerous+, 4 = elite+, 5 = boss only, 6 = never
+static var auto_explore_enemy_threat_threshold: int = 2  # default: stop for moderate+ threats
 static var auto_explore_stop_for_items: bool = true
 static var auto_explore_stop_on_damage: bool = false
 static var auto_explore_stop_at_stairs: bool = true

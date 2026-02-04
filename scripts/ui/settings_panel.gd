@@ -57,7 +57,8 @@ var ae_hp_slider: HSlider
 var ae_hp_value_label: Label
 var ae_sanity_slider: HSlider
 var ae_sanity_value_label: Label
-var ae_enemies_button: Button
+var ae_enemies_slider: HSlider
+var ae_enemies_value_label: Label
 var ae_items_button: Button
 var ae_damage_button: Button
 var ae_stairs_button: Button
@@ -385,14 +386,35 @@ func _build_ae_panel() -> void:
 		ae_sanity_value_label.add_theme_font_override("font", emoji_font)
 	sanity_row.add_child(ae_sanity_value_label)
 
-	# Toggle buttons
-	ae_enemies_button = _create_toggle_button(
-		"Stop for Enemies: ON" if Utilities.auto_explore_stop_for_enemies else "Stop for Enemies: OFF"
-	)
-	ae_enemies_button.pressed.connect(_on_ae_enemies_toggled)
-	ae_content_vbox.add_child(ae_enemies_button)
-	ae_focusable_controls.append(ae_enemies_button)
+	# Enemy threat threshold slider
+	var enemies_label = _create_setting_label("Stop for Enemies")
+	ae_content_vbox.add_child(enemies_label)
 
+	var enemies_row = HBoxContainer.new()
+	enemies_row.add_theme_constant_override("separation", 8)
+	ae_content_vbox.add_child(enemies_row)
+
+	ae_enemies_slider = HSlider.new()
+	ae_enemies_slider.min_value = 0
+	ae_enemies_slider.max_value = 6
+	ae_enemies_slider.step = 1
+	ae_enemies_slider.value = Utilities.auto_explore_enemy_threat_threshold
+	ae_enemies_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ae_enemies_slider.custom_minimum_size = Vector2(100, 0)
+	ae_enemies_slider.add_to_group("hud_focusable")
+	ae_enemies_slider.value_changed.connect(_on_ae_enemies_changed)
+	enemies_row.add_child(ae_enemies_slider)
+	ae_focusable_controls.append(ae_enemies_slider)
+
+	ae_enemies_value_label = Label.new()
+	ae_enemies_value_label.text = _get_threat_threshold_label(Utilities.auto_explore_enemy_threat_threshold)
+	ae_enemies_value_label.custom_minimum_size = Vector2(100, 0)
+	ae_enemies_value_label.add_theme_font_size_override("font_size", _get_font_size(FONT_SIZE_LABEL - 2))
+	if emoji_font:
+		ae_enemies_value_label.add_theme_font_override("font", emoji_font)
+	enemies_row.add_child(ae_enemies_value_label)
+
+	# Toggle buttons
 	ae_items_button = _create_toggle_button(
 		"Stop for Items: ON" if Utilities.auto_explore_stop_for_items else "Stop for Items: OFF"
 	)
@@ -710,11 +732,23 @@ func _on_ae_sanity_changed(value: float) -> void:
 	Utilities.auto_explore_sanity_threshold = value
 	ae_sanity_value_label.text = "%d%%" % int(value * 100)
 
-func _on_ae_enemies_toggled() -> void:
-	if not _accepting_input:
-		return
-	Utilities.auto_explore_stop_for_enemies = not Utilities.auto_explore_stop_for_enemies
-	ae_enemies_button.text = "Stop for Enemies: ON" if Utilities.auto_explore_stop_for_enemies else "Stop for Enemies: OFF"
+func _on_ae_enemies_changed(value: float) -> void:
+	Utilities.auto_explore_enemy_threat_threshold = int(value)
+	ae_enemies_value_label.text = _get_threat_threshold_label(int(value))
+
+func _get_threat_threshold_label(threshold: int) -> String:
+	"""Get display label for enemy threat threshold slider.
+
+	Labels match EntityInfo.THREAT_LEVEL_NAMES dot patterns.
+	"""
+	match threshold:
+		0: return "All"     # All entities (including NPCs)
+		1: return "●○○○○+"  # Daleth (weak) and above
+		2: return "●●○○○+"  # Epsilon (moderate) and above
+		3: return "●●●○○+"  # Keter (dangerous) and above
+		4: return "●●●●○+"  # Aleph (elite) and above
+		5: return "●●●●●"   # Boss only
+		_: return "Never"
 
 func _on_ae_items_toggled() -> void:
 	if not _accepting_input:
