@@ -28,7 +28,7 @@ signal exp_gained(amount: int, new_total: int)
 signal level_increased(old_level: int, new_level: int)  # Auto-increases, triggers perk selection
 signal clearance_increased(old_level: int, new_level: int)  # Manual only, unlocks knowledge
 signal entity_died(cause: String)
-signal damage_negated(source: String, amount: float)
+
 
 # ============================================================================
 # DAMAGE SHIELDS (absorb next damage instance)
@@ -363,7 +363,6 @@ func take_damage(amount: float) -> void:
 		var callback: Callable = interceptor["callback"]
 		# Validate callable is still valid (item could be unequipped during same frame)
 		if callback.is_valid() and callback.call(amount):
-			emit_signal("damage_negated", interceptor["source"], amount)
 			return  # Damage was intercepted
 
 	# Check for pre-activated damage shields
@@ -372,7 +371,6 @@ func take_damage(amount: float) -> void:
 		shield["remaining_uses"] -= 1
 		if shield["remaining_uses"] <= 0:
 			damage_shields.remove_at(0)
-		emit_signal("damage_negated", shield["source"], amount)
 		Log.player("DAMAGE NEGATED by %s! (%.0f damage blocked)" % [shield["source"], amount])
 		return
 
@@ -594,91 +592,6 @@ func _invalidate_cache() -> void:
 	"""Mark all cached stats as dirty."""
 	for key in _cache_dirty.keys():
 		_cache_dirty[key] = true
-
-func get_stat_breakdown(stat_name: String) -> Dictionary:
-	"""Get detailed breakdown of a stat for tooltips.
-
-	Returns:
-	{
-		"base": 50.0,
-		"percentage_bonus": 5.0,
-		"modifiers": [
-			{"source": "Leather Armor", "value": 20.0, "type": "ADD"},
-			{"source": "Rage Potion", "value": 1.5, "type": "MULTIPLY"}
-		],
-		"final": 78.75
-	}
-	"""
-	var breakdown = {
-		"base": 0.0,
-		"percentage_bonus": 0.0,
-		"modifiers": [],
-		"final": 0.0
-	}
-
-	# Determine base stat and multiplier
-	var base_stat = 0
-	var multiplier = 0.0
-	var direct_bonus = 0.0
-
-	match stat_name:
-		"hp":
-			base_stat = body
-			multiplier = 10.0
-			direct_bonus = bonus_hp
-		"sanity":
-			base_stat = mind
-			multiplier = 10.0
-			direct_bonus = bonus_sanity
-		"mana":
-			base_stat = null_stat
-			multiplier = 10.0
-			direct_bonus = bonus_mana
-		"strength":
-			base_stat = body
-			multiplier = 1.0
-			direct_bonus = bonus_strength
-		"perception":
-			base_stat = mind
-			multiplier = 1.0
-			direct_bonus = bonus_perception
-		"anomaly":
-			base_stat = null_stat
-			multiplier = 1.0
-			direct_bonus = bonus_anomaly
-
-	# Calculate base (before percentage)
-	var base = (base_stat * multiplier) + direct_bonus
-
-	# Add ADD modifiers to base
-	for mod in modifiers:
-		if mod.stat_name == stat_name and mod.type == StatModifier.ModifierType.ADD:
-			base += mod.value
-			breakdown["modifiers"].append({
-				"source": mod.source,
-				"value": mod.value,
-				"type": "ADD"
-			})
-
-	breakdown["base"] = base
-	breakdown["percentage_bonus"] = base_stat
-
-	# Apply percentage scaling
-	var effective = base * (1.0 + base_stat / 100.0)
-
-	# Apply MULTIPLY modifiers
-	for mod in modifiers:
-		if mod.stat_name == stat_name and mod.type == StatModifier.ModifierType.MULTIPLY:
-			effective *= mod.value
-			breakdown["modifiers"].append({
-				"source": mod.source,
-				"value": mod.value,
-				"type": "MULTIPLY"
-			})
-
-	breakdown["final"] = round(effective)
-
-	return breakdown
 
 func _to_string() -> String:
 	"""Debug representation."""

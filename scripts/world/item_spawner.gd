@@ -296,24 +296,6 @@ func _get_player_spawn_rate_bonus(player) -> float:
 # UTILITY
 # ============================================================================
 
-func _maybe_corrupt_item(item: Item, corruption: float) -> void:
-	"""Roll for corruption on a spawned item.
-
-	Corruption chance: 1.0 - exp(-corruption * 0.5)
-	~39% at corruption 1.0, ~63% at 2.0, ~0% at 0.0
-
-	If corrupted, rolls a random debuff and sets starts_enabled to false.
-	"""
-	if corruption <= 0.0:
-		return
-
-	var corrupt_chance = 1.0 - exp(-corruption * 0.5)
-	if randf() < corrupt_chance:
-		item.corrupted = true
-		item.starts_enabled = false
-		item.corruption_debuffs.append(CorruptionDebuffs.roll_debuff())
-		Log.grid("Item %s CORRUPTED (chance was %.1f%%)" % [item.item_name, corrupt_chance * 100.0])
-
 func _roll_item_level(corruption: float) -> int:
 	"""Roll item level based on corruption.
 

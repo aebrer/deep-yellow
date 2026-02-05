@@ -508,11 +508,6 @@ func _rotate_camera_to_direction(direction: Vector2i) -> void:
 	if player.camera_rig:
 		tween.tween_property(player.camera_rig.h_pivot, "rotation_degrees:y", final_yaw, 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
-func _get_item_at_position(grid_pos: Vector2i) -> Dictionary:
-	if not player or not player.grid or not player.grid.item_renderer:
-		return {}
-	return player.grid.item_renderer.get_item_at(grid_pos)
-
 func _show_hud_indicator(visible: bool) -> void:
 	"""Show or hide the AUTO-EXPLORE HUD indicator"""
 	if not hud_label and player:

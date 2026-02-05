@@ -498,10 +498,6 @@ func _get_threat_color(threat: int) -> Color:
 		5: return Color.RED
 		_: return Color.GRAY
 
-func _set_threat_colors(threat: int) -> void:
-	"""Set label colors based on threat level"""
-	threat_level_label.add_theme_color_override("font_color", _get_threat_color(threat))
-
 # ============================================================================
 # UI SCALING
 # ============================================================================

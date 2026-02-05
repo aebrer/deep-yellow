@@ -788,45 +788,6 @@ func spawn_hit_vfx(world_pos: Vector2i, emoji: String, damage: float) -> void:
 		_spawn_hit_emoji_at_world_pos(world_pos, emoji, damage)
 
 # ============================================================================
-# BILLBOARD REMOVAL
-# ============================================================================
-
-func remove_entity_at(world_pos: Vector2i) -> bool:
-	"""Remove entity billboard (when killed or despawned)
-
-	Args:
-		world_pos: World tile coordinates
-
-	Returns:
-		true if entity was found and removed
-	"""
-	if not entity_billboards.has(world_pos):
-		return false
-
-	# Get entity for reverse lookup cleanup
-	var entity = entity_cache.get(world_pos, null)
-
-	# Remove billboard
-	var billboard = entity_billboards[world_pos]
-	if is_instance_valid(billboard):
-		billboard.queue_free()
-	entity_billboards.erase(world_pos)
-	entity_cache.erase(world_pos)
-
-	# Remove from reverse lookup
-	if entity:
-		entity_to_pos.erase(entity)
-
-	# Remove health bar
-	if entity_health_bars.has(world_pos):
-		var health_bar = entity_health_bars[world_pos]
-		if is_instance_valid(health_bar):
-			health_bar.queue_free()
-		entity_health_bars.erase(world_pos)
-
-	return true
-
-# ============================================================================
 # HIT VFX
 # ============================================================================
 

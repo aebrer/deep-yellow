@@ -245,7 +245,7 @@ func _roll_item(available_items: Array[Item], corruption: float) -> Dictionary:
 		if guaranteed > 0:
 			duped_item.level = 1 + guaranteed
 
-	# Roll for corruption (same formula as ItemSpawner._maybe_corrupt_item)
+	# Roll for corruption
 	if corruption > 0.0:
 		var corrupt_chance = 1.0 - exp(-corruption * 0.5)
 		if randf() < corrupt_chance:
