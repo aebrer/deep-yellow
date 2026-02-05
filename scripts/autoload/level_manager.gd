@@ -192,6 +192,10 @@ func transition_to_level(target_level_id: int) -> void:
 func get_current_level() -> LevelConfig:
 	return _current_level
 
+## Get preloaded level configs (runtime accessor for bytecode export compatibility)
+func get_preloaded_configs() -> Dictionary:
+	return PRELOADED_CONFIGS
+
 ## Check if a level is loaded in cache
 func is_level_cached(level_id: int) -> bool:
 	return _level_cache.has(level_id)

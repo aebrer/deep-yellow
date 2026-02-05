@@ -1,6 +1,10 @@
 extends Node
 ## KnowledgeDB - Singleton for tracking player knowledge and discoveries
 ##
+## NOTE: LevelManager const access uses a runtime method call (get_preloaded_configs())
+## instead of direct const access because Godot's bytecode compiler can't resolve
+## const members on autoload-only scripts (no class_name) at compile time.
+##
 ## This autoload handles:
 ## - Novelty tracking per Clearance level (for EXP rewards)
 ## - Clearance level tracking (now managed by Player's StatBlock)
@@ -199,7 +203,7 @@ func _get_item_by_id(item_id: String) -> Item:
 				return item
 
 	# Search all preloaded level configs (for cross-level items)
-	for level_config in LevelManager.PRELOADED_CONFIGS.values():
+	for level_config in LevelManager.get_preloaded_configs().values():
 		if level_config == current_level:
 			continue  # Already searched
 		for item in level_config.permitted_items:
