@@ -33,7 +33,6 @@ var player: Node3D
 ## Layout management for responsive design
 enum LayoutMode { LANDSCAPE, PORTRAIT }
 var current_layout: LayoutMode = LayoutMode.LANDSCAPE
-var last_viewport_size: Vector2 = Vector2.ZERO
 var _switching_layout: bool = false  # Guard flag to prevent feedback loop
 
 ## References to layout containers
@@ -99,10 +98,6 @@ func _ready() -> void:
 		if grid:
 			minimap.set_grid(grid)
 			minimap.set_player(player)
-
-			# Connect to ChunkManager autoload for chunk updates
-			if ChunkManager:
-				ChunkManager.chunk_updates_completed.connect(_on_chunk_updates_completed)
 		else:
 			Log.error(Log.Category.SYSTEM, "Failed to find Grid3D for minimap")
 
@@ -123,18 +118,8 @@ func _process(_delta: float) -> void:
 
 func _on_window_size_changed() -> void:
 	"""Handle window/canvas resize events (triggered by browser resize)"""
-	var window_size := get_window().size
 	_check_aspect_ratio()
 
-func add_log_message(message: String, color: String = "white") -> void:
-	"""Add a message to the game log with optional color"""
-	log_text.append_text("[color=%s]> %s[/color]\n" % [color, message])
-
-func set_examine_text(description: String) -> void:
-	"""Display examine description in log panel (for look mode)"""
-	log_text.clear()
-	log_text.append_text("[color=cyan]examining:[/color]\n")
-	log_text.append_text("[color=white]%s[/color]" % description)
 
 func _on_log_message(category: Log.Category, level: Log.Level, message: String) -> void:
 	"""Handle log messages and display them in the UI"""
@@ -251,12 +236,14 @@ func _on_pause_toggled(is_paused: bool) -> void:
 		# The player state will re-emit action_preview_changed when appropriate
 		action_preview_ui.hide_preview()
 
-func _on_chunk_updates_completed() -> void:
-	"""Mark minimap dirty when chunks load/unload"""
-	if minimap:
-		# Chunk updates completed - mark minimap for redraw
-		# (minimap checks grid.is_walkable() for each tile, so chunk changes affect rendering)
-		minimap.content_dirty = true
+func _on_codex_visibility_changed() -> void:
+	"""Hide action preview when codex opens, restore pause hints when it closes"""
+	if not action_preview_ui:
+		return
+	if codex_panel and codex_panel.visible:
+		action_preview_ui.hide_preview()
+	elif PauseManager and PauseManager.is_paused:
+		_on_inventory_reorder_state_changed(false)
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
@@ -521,6 +508,9 @@ func _create_codex_panel() -> void:
 	# Link codex panel to settings panel
 	if settings_panel:
 		settings_panel.codex_panel = codex_panel
+
+	# Hide action preview when codex is open
+	codex_panel.visibility_changed.connect(_on_codex_visibility_changed)
 
 func _on_player_died(cause: String) -> void:
 	"""Handle player death - show game over screen"""

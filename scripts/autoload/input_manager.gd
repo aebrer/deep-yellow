@@ -3,14 +3,13 @@ extends Node
 ##
 ## This autoload singleton provides:
 ## - Unified controller + keyboard input
-## - Deadzone handling and configuration
-## - Analog → 8-direction grid conversion
-## - Debug input visualization
+## - Trigger handling (analog → digital with threshold)
+## - Mouse button input parity (LMB = RT, RMB = LT)
+## - Device auto-detection (gamepad ↔ mouse+keyboard)
 ##
 ## Usage:
-##   InputManager.get_aim_direction() -> Vector2
-##   InputManager.get_aim_direction_grid() -> Vector2i
 ##   InputManager.is_action_just_pressed("action_name") -> bool
+##   InputManager.is_action_pressed("action_name") -> bool
 
 # ============================================================================
 # INPUT DEVICE TRACKING
@@ -31,12 +30,6 @@ var current_input_device: InputDevice = InputDevice.MOUSE_KEYBOARD
 # CONFIGURATION
 # ============================================================================
 
-## Analog stick deadzone for aim direction (radial)
-@export var aim_deadzone: float = 0.15  # Reduced for better sensitivity
-
-## Enable debug printing for input events
-@export var debug_input: bool = true
-
 ## Trigger threshold - treat trigger as "pressed" when above this value (0.0-1.0)
 const TRIGGER_THRESHOLD: float = 0.5
 
@@ -47,12 +40,6 @@ const TRIGGER_AXIS_RIGHT: int = 5  # RT (Right Trigger)
 # ============================================================================
 # INPUT STATE
 # ============================================================================
-
-## Current aim direction (Vector2 normalized, or ZERO if below deadzone)
-var aim_direction: Vector2 = Vector2.ZERO
-
-## Grid-snapped aim direction (Vector2i for 8-way movement)
-var aim_direction_grid: Vector2i = Vector2i.ZERO
 
 ## Track which actions were just pressed this frame
 var _actions_this_frame: Dictionary = {}  # String -> bool
@@ -99,9 +86,6 @@ func _process(_delta: float) -> void:
 	# Update mouse button state
 	_update_mouse_buttons()
 
-	# Update continuous aim direction every frame
-	_update_aim_direction()
-
 func _input(event: InputEvent) -> void:
 	# Detect input device from event type (use _input so we catch all events, even consumed ones)
 	_detect_input_device(event)
@@ -123,63 +107,6 @@ func _detect_input_device(event: InputEvent) -> void:
 	if new_device != current_input_device:
 		current_input_device = new_device
 		input_device_changed.emit(new_device)
-
-# ============================================================================
-# AIM DIRECTION (Continuous analog input)
-# ============================================================================
-
-func _update_aim_direction() -> void:
-	"""Read left stick / WASD for aim direction with deadzone handling"""
-	# Godot's Input.get_vector handles per-axis deadzones from project.godot
-	# We add radial deadzone on top for better 8-way precision
-	var raw_input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-
-	# Apply radial deadzone (more precise than per-axis for diagonals)
-	if raw_input.length() > aim_deadzone:
-		aim_direction = raw_input.normalized()
-
-		# Convert to 8-way grid direction using angle-based snapping
-		var new_grid_dir = _analog_to_grid_8_direction(raw_input)
-		aim_direction_grid = new_grid_dir
-	else:
-		aim_direction = Vector2.ZERO
-		aim_direction_grid = Vector2i.ZERO
-
-func _analog_to_grid_8_direction(analog: Vector2) -> Vector2i:
-	"""Convert analog stick input to 8-direction grid movement"""
-	if analog.length() < aim_deadzone:
-		return Vector2i.ZERO
-
-	# Use angle-based approach for cleaner diagonal snapping
-	var angle = analog.angle()
-
-	# Convert angle to octant (8 directions)
-	# Each octant is PI/4 radians (45 degrees)
-	var octant = int(round(angle / (PI / 4.0))) % 8
-
-	# Map octants to 8 cardinal/diagonal directions
-	# NOTE: In grid space, +X=right, +Y=down (forward in 3D world is +Z)
-	var directions := [
-		Vector2i(1, 0),   # 0: Right (0°)
-		Vector2i(1, 1),   # 1: Down-Right (45°) = +X,+Z in world
-		Vector2i(0, 1),   # 2: Down (90°) = +Z in world
-		Vector2i(-1, 1),  # 3: Down-Left (135°) = -X,+Z in world
-		Vector2i(-1, 0),  # 4: Left (180°)
-		Vector2i(-1, -1), # 5: Up-Left (225°) = -X,-Z in world
-		Vector2i(0, -1),  # 6: Up (270°) = -Z in world
-		Vector2i(1, -1)   # 7: Up-Right (315°) = +X,-Z in world
-	]
-
-	var result = directions[octant]
-	return result
-
-## Get current aim direction (normalized Vector2, or ZERO if below deadzone)
-func get_aim_direction() -> Vector2:
-	return aim_direction
-
-## Get grid-snapped aim direction (Vector2i for 8-way movement)
-func get_aim_direction_grid() -> Vector2i:
-	return aim_direction_grid
 
 # ============================================================================
 # TRIGGER HANDLING
@@ -273,28 +200,3 @@ func is_action_pressed(action: String) -> bool:
 
 	# For other actions, use Godot's built-in system
 	return Input.is_action_pressed(action)
-
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
-
-func set_aim_deadzone(deadzone: float) -> void:
-	"""Set aim deadzone (0.0 to 0.9)"""
-	aim_deadzone = clampf(deadzone, 0.0, 0.9)
-
-func set_debug_mode(enabled: bool) -> void:
-	"""Enable/disable debug logging"""
-	debug_input = enabled
-
-# ============================================================================
-# DEBUG UTILITIES
-# ============================================================================
-
-func get_debug_info() -> Dictionary:
-	"""Get current input state for debugging UI"""
-	return {
-		"aim_direction": aim_direction,
-		"aim_direction_grid": aim_direction_grid,
-		"actions_this_frame": _actions_this_frame.keys(),
-		"deadzone": aim_deadzone
-	}

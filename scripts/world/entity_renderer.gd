@@ -68,6 +68,10 @@ const BILLBOARD_SIZE = 1.0
 ## Matches player Y position (1.0) so entities float at same height
 const BILLBOARD_HEIGHT = 1.0
 
+## Max render distance (world units). Entities beyond this are culled.
+## Set beyond fog_end (35.0) with margin for tactical camera zoom offset (~25 units).
+const VISIBILITY_RANGE_END = 60.0
+
 ## Entity type colors (fallback when no texture)
 const ENTITY_COLORS = {
 	"debug_enemy": Color(1.0, 0.0, 1.0),       # Magenta
@@ -346,7 +350,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	sprite.shaded = true
-	sprite.alpha_cut = Sprite3D.ALPHA_CUT_OPAQUE_PREPASS
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
 
 	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
@@ -371,6 +375,8 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 			_apply_fallback_texture(sprite, entity_type, scale_mult)
 	else:
 		_apply_fallback_texture(sprite, entity_type, scale_mult)
+
+	sprite.visibility_range_end = VISIBILITY_RANGE_END
 
 	sprite.set_meta("grid_position", world_pos)
 	sprite.set_meta("entity_type", entity_type)
@@ -431,6 +437,7 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 		world_pos.y * 2.0 + 1.0
 	)
 	mesh_inst.position = world_3d
+	mesh_inst.visibility_range_end = VISIBILITY_RANGE_END
 
 	mesh_inst.set_meta("grid_position", world_pos)
 	mesh_inst.set_meta("entity_type", entity_type)
@@ -554,6 +561,7 @@ func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
 	material.set_shader_parameter("health", 1.0)
 
 	mesh_instance.material_override = material
+	mesh_instance.visibility_range_end = VISIBILITY_RANGE_END
 
 	return mesh_instance
 
@@ -778,45 +786,6 @@ func spawn_hit_vfx(world_pos: Vector2i, emoji: String, damage: float) -> void:
 	else:
 		# Target isn't an entity (likely the player) - spawn VFX at world position
 		_spawn_hit_emoji_at_world_pos(world_pos, emoji, damage)
-
-# ============================================================================
-# BILLBOARD REMOVAL
-# ============================================================================
-
-func remove_entity_at(world_pos: Vector2i) -> bool:
-	"""Remove entity billboard (when killed or despawned)
-
-	Args:
-		world_pos: World tile coordinates
-
-	Returns:
-		true if entity was found and removed
-	"""
-	if not entity_billboards.has(world_pos):
-		return false
-
-	# Get entity for reverse lookup cleanup
-	var entity = entity_cache.get(world_pos, null)
-
-	# Remove billboard
-	var billboard = entity_billboards[world_pos]
-	if is_instance_valid(billboard):
-		billboard.queue_free()
-	entity_billboards.erase(world_pos)
-	entity_cache.erase(world_pos)
-
-	# Remove from reverse lookup
-	if entity:
-		entity_to_pos.erase(entity)
-
-	# Remove health bar
-	if entity_health_bars.has(world_pos):
-		var health_bar = entity_health_bars[world_pos]
-		if is_instance_valid(health_bar):
-			health_bar.queue_free()
-		entity_health_bars.erase(world_pos)
-
-	return true
 
 # ============================================================================
 # HIT VFX

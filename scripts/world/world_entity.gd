@@ -205,47 +205,6 @@ func to_dict() -> Dictionary:
 		data["last_seen_player_pos"] = {"x": last_seen_player_pos.x, "y": last_seen_player_pos.y}
 	return data
 
-static func from_dict(data: Dictionary) -> WorldEntity:
-	"""Deserialize from dictionary
-
-	Args:
-		data: Serialized entity data
-
-	Returns:
-		Reconstructed WorldEntity
-	"""
-	var pos_data = data.get("world_position", {"x": 0, "y": 0})
-	var world_pos = Vector2i(pos_data.get("x", 0), pos_data.get("y", 0))
-
-	var world_entity = WorldEntity.new(
-		data.get("entity_type", "unknown"),
-		world_pos,
-		data.get("max_hp", 100.0),
-		data.get("spawn_turn", 0)
-	)
-
-	world_entity.current_hp = data.get("current_hp", world_entity.max_hp)
-	world_entity.is_dead = data.get("is_dead", false)
-
-	# Restore AI state
-	world_entity.moves_remaining = data.get("moves_remaining", 0)
-	world_entity.attack_cooldown = data.get("attack_cooldown", 0)
-	world_entity.must_wait = data.get("must_wait", false)
-	world_entity.spawn_cooldown = data.get("spawn_cooldown", 0)
-	world_entity.attack_damage = data.get("attack_damage", 5.0)
-	world_entity.attack_range = data.get("attack_range", 1.5)
-	world_entity.hostile = data.get("hostile", true)
-	world_entity.blocks_movement = data.get("blocks_movement", true)
-	world_entity.is_exit = data.get("is_exit", false)
-	world_entity.faction = data.get("faction", "")
-
-	# Restore last_seen_player_pos if present
-	if data.has("last_seen_player_pos"):
-		var lsp = data["last_seen_player_pos"]
-		world_entity.last_seen_player_pos = Vector2i(lsp.get("x", 0), lsp.get("y", 0))
-
-	return world_entity
-
 # ============================================================================
 # UTILITY
 # ============================================================================

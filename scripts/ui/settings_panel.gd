@@ -932,6 +932,8 @@ func _hide_panel() -> void:
 	visible = false
 	_accepting_input = false
 	_hide_ae_panel()
+	if codex_panel and codex_panel.visible:
+		codex_panel.hide_codex()
 	panel.visible = true  # Reset so panel shows correctly when re-opened
 
 	for control in focusable_controls:

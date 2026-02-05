@@ -89,6 +89,12 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		print("[StartMenu] Web export detected - click will enable mouse capture")
 
+	# In headless mode, skip the menu and load straight into the game
+	if DisplayServer.get_name() == "headless":
+		print("[StartMenu] Headless mode — skipping to game")
+		_starting = true
+		get_tree().change_scene_to_file.call_deferred("res://scenes/game.tscn")
+
 func _process(delta: float) -> void:
 	_time += delta
 

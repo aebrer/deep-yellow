@@ -36,6 +36,12 @@ func _execute_turn() -> void:
 	player.pending_action.execute(player)
 	player.pending_action = null
 
+	# Update exploration tracking at NEW position (after movement)
+	# PreTurnState marks explored at the old position; this marks the new position
+	if player.stats and ExplorationTracker:
+		var perception_range: float = 15.0 + (player.stats.perception * 5.0)
+		ExplorationTracker.mark_explored(player.grid_position, perception_range)
+
 	# Execute all item pools (BODY → MIND → NULL)
 	player.execute_item_pools()
 

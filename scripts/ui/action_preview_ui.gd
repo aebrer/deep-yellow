@@ -272,18 +272,6 @@ func _update_header() -> void:
 
 	header_label.text = "%s Move  •  %s Wait" % [move_btn, wait_btn]
 
-func _show_pause_message() -> void:
-	"""Show pause message instead of action preview"""
-	# Clear action list (use free() for immediate removal)
-	for child in action_list.get_children():
-		child.free()
-
-	# Update header to show pause state
-	header_label.text = "GAME PAUSED"
-
-	# Show panel
-	panel.visible = true
-
 # ============================================================================
 # SIGNALS
 # ============================================================================

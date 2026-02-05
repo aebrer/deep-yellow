@@ -151,6 +151,4 @@ func get_camera_forward() -> Vector3:
 	"""Get forward direction in world space (for aiming)"""
 	return -camera.global_transform.basis.z
 
-func get_camera_right() -> Vector3:
-	"""Get right direction in world space"""
-	return camera.global_transform.basis.x
+

@@ -97,14 +97,6 @@ func calculate_spawn_probability(
 # RESET
 # ============================================================================
 
-func reset_level(level_id: int) -> void:
-	"""Reset corruption for a specific level
-
-	Useful if player somehow cleanses corruption or for special events.
-	"""
-	corruption_by_level.erase(level_id)
-	Log.turn("Corruption reset on Level %d" % level_id)
-
 func reset_all() -> void:
 	"""Reset all corruption (new run)"""
 	corruption_by_level.clear()

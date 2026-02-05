@@ -244,17 +244,6 @@ func has_item_at(world_pos: Vector2i) -> bool:
 	"""
 	return item_billboards.has(world_pos)
 
-func get_all_item_positions() -> Array[Vector2i]:
-	"""Get world positions of all rendered items
-
-	Returns:
-		Array of world tile positions with items
-	"""
-	var positions: Array[Vector2i] = []
-	for pos in item_billboards.keys():
-		positions.append(pos)
-	return positions
-
 func get_discovered_item_positions() -> Array[Vector2i]:
 	"""Get world positions of discovered items (for minimap)
 

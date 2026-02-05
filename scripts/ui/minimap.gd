@@ -8,13 +8,12 @@ extends Control
 ## - Colorblind-safe palette
 ##
 ## Performance Optimizations:
+## - Incremental rendering: Shifts cached tiles on movement, queries only new strip (~256 vs 65k)
+## - Three-layer pipeline: tile_cache (shifted) → base_map (+ trail) → map_image (+ sprites)
 ## - Direct GridMap queries: Bypasses is_walkable() abstraction (major speedup)
 ## - Spatial culling: Trail rendering skips off-screen positions
 ## - Transform rotation: Rotates TextureRect node, not pixels
-## - Full renders every turn: ~65k tile queries, but direct GridMap access is fast
 
-## Emitted when minimap scale factor changes (for high-res UI scaling)
-signal resolution_scale_changed(scale_factor: int)
 
 # ============================================================================
 # CONSTANTS
@@ -31,7 +30,6 @@ const COLOR_WALL := Color("#1a3a52")  # Dark blue-gray
 const COLOR_PLAYER := Color("#00d9ff")  # Bright cyan (fallback)
 const COLOR_TRAIL_START := Color(0.9, 0.0, 1.0, 0.3)  # Faint purple
 const COLOR_TRAIL_END := Color(0.9, 0.0, 1.0, 1.0)  # Bright purple
-const COLOR_CHUNK_BOUNDARY := Color("#404040")  # Subtle gray
 const COLOR_UNLOADED := Color("#000000")  # Black
 const COLOR_ITEM := Color("#ffff00")  # Bright yellow (discovered items)
 const COLOR_ENTITY := Color("#ff00ff")  # Magenta (entities/enemies)
@@ -41,7 +39,7 @@ const COLOR_AURA_ENTITY := Color(1.0, 0.0, 0.0, 0.45)  # Red - hostile entities
 const COLOR_AURA_ENTITY_NEUTRAL := Color(0.0, 0.5, 1.0, 0.45)  # Blue - non-hostile entities (vending machines)
 const COLOR_AURA_ENTITY_EXIT := Color(0.85, 0.75, 0.0, 0.45)  # Deep yellow - exit stairs/holes
 const COLOR_AURA_ITEM := Color(0.7, 0.2, 1.0, 0.45)  # Purple - items
-const COLOR_AURA_EXIT := Color(0.0, 0.5, 1.0, 0.45)  # Blue, semi-transparent (legacy)
+
 
 ## Sprite icon sizes per zoom level (pixels)
 ## Zoom 0: 5px, Zoom 1: 7px, Zoom 2: 11px, Zoom 3: 15px, Zoom 4: 21px
@@ -66,6 +64,9 @@ var map_image: Image
 ## Base map image (tiles + trail, no sprites) — rendered once per turn
 var base_map_image: Image
 
+## Pure tile data cache (no trail, no sprites) — shifted incrementally
+var tile_cache_image: Image
+
 ## Texture displayed on screen
 var map_texture: ImageTexture
 
@@ -82,10 +83,12 @@ var player: Node = null
 
 ## Camera rotation (for north orientation)
 var camera_rotation: float = 0.0
-var last_camera_rotation: float = 0.0
 
-## Dirty flag - needs full content redraw (tiles + trail + sprites)
+## Dirty flag - needs visual update (movement, full redraw, etc.)
 var content_dirty: bool = true
+
+## Force full tile redraw (zoom change, chunk load/unload, level change, grid change)
+var _needs_full_redraw: bool = true
 
 ## Cached player position for sprite overlay (updated per turn)
 var cached_player_pos: Vector2i = Vector2i(-99999, -99999)
@@ -93,8 +96,8 @@ var cached_player_pos: Vector2i = Vector2i(-99999, -99999)
 ## Current scale factor (for resolution-based UI scaling)
 var current_scale_factor: int = 0
 
-## Last player position for incremental rendering
-var last_player_pos: Vector2i = Vector2i(-99999, -99999)
+## Player position at last tile cache render (for incremental shift calculation)
+var last_render_center: Vector2i = Vector2i(-99999, -99999)
 
 ## Zoom level: 0 = 2 tiles/pixel, 1 = 1 tile/pixel (default), 2-4 = N pixels/tile
 var zoom_level: int = 1
@@ -112,6 +115,7 @@ func _ready() -> void:
 	# Create images and texture
 	map_image = Image.create(MAP_SIZE, MAP_SIZE, false, Image.FORMAT_RGBA8)
 	base_map_image = Image.create(MAP_SIZE, MAP_SIZE, false, Image.FORMAT_RGBA8)
+	tile_cache_image = Image.create(MAP_SIZE, MAP_SIZE, false, Image.FORMAT_RGBA8)
 	map_texture = ImageTexture.create_from_image(map_image)
 	map_texture_rect.texture = map_texture
 
@@ -124,9 +128,11 @@ func _ready() -> void:
 	_cache_player_sprite()
 	_cache_entity_sprites()
 
-	# Clear cache when initial chunks finish loading
+	# Connect to ChunkManager signals for chunk lifecycle events
 	if ChunkManager:
 		ChunkManager.initial_load_completed.connect(_on_initial_load_completed)
+		ChunkManager.chunk_grid_loaded.connect(on_chunk_loaded)
+		ChunkManager.chunk_grid_unloaded.connect(on_chunk_unloaded)
 		if ChunkManager.has_signal("level_changed"):
 			ChunkManager.level_changed.connect(_on_level_changed)
 
@@ -143,6 +149,10 @@ func _exit_tree() -> void:
 	if ChunkManager:
 		if ChunkManager.initial_load_completed.is_connected(_on_initial_load_completed):
 			ChunkManager.initial_load_completed.disconnect(_on_initial_load_completed)
+		if ChunkManager.chunk_grid_loaded.is_connected(on_chunk_loaded):
+			ChunkManager.chunk_grid_loaded.disconnect(on_chunk_loaded)
+		if ChunkManager.chunk_grid_unloaded.is_connected(on_chunk_unloaded):
+			ChunkManager.chunk_grid_unloaded.disconnect(on_chunk_unloaded)
 		if ChunkManager.has_signal("level_changed") and ChunkManager.level_changed.is_connected(_on_level_changed):
 			ChunkManager.level_changed.disconnect(_on_level_changed)
 
@@ -190,6 +200,7 @@ func _change_zoom(direction: int) -> void:
 	var new_zoom := clampi(zoom_level + direction, MIN_ZOOM, MAX_ZOOM)
 	if new_zoom != zoom_level:
 		zoom_level = new_zoom
+		_needs_full_redraw = true
 		content_dirty = true
 
 # ============================================================================
@@ -199,6 +210,7 @@ func _change_zoom(direction: int) -> void:
 func set_grid(grid_ref: Node) -> void:
 	"""Set grid reference for tile queries"""
 	grid = grid_ref
+	_needs_full_redraw = true
 	content_dirty = true
 
 func set_player(player_ref: Node) -> void:
@@ -222,24 +234,28 @@ func clear_trail() -> void:
 		player_trail[i] = Vector2i(-99999, -99999)
 	trail_index = 0
 	trail_valid_count = 0
+	_needs_full_redraw = true
 	content_dirty = true
 
 func on_chunk_loaded(_chunk_pos: Vector2i) -> void:
 	"""Called when chunk loads - mark dirty for full redraw"""
+	_needs_full_redraw = true
 	content_dirty = true
 
 func on_chunk_unloaded(_chunk_pos: Vector2i) -> void:
 	"""Called when chunk unloads - mark dirty for full redraw"""
+	_needs_full_redraw = true
 	content_dirty = true
 
 func _on_initial_load_completed() -> void:
 	"""Called when ChunkManager finishes initial chunk loading"""
+	_needs_full_redraw = true
 	content_dirty = true
 
 func _on_level_changed(_new_level_id: int) -> void:
 	"""Clear trail and redraw when level changes mid-run"""
 	clear_trail()
-	content_dirty = true
+	# _needs_full_redraw already set by clear_trail()
 
 func _update_texture_scale() -> void:
 	"""Dynamically scale texture by largest integer that fits container (pixel-perfect scaling)"""
@@ -278,7 +294,6 @@ func _update_texture_scale() -> void:
 		current_scale_factor = scale_factor
 		if UIScaleManager:
 			UIScaleManager.set_resolution_scale(scale_factor)
-		resolution_scale_changed.emit(scale_factor)  # Keep signal for any direct listeners
 
 func _on_container_resized() -> void:
 	"""Called when parent container changes size"""
@@ -289,21 +304,17 @@ func _on_container_resized() -> void:
 # ============================================================================
 
 func _render_map() -> void:
-	"""Render minimap (always full render for correctness)"""
+	"""Render minimap tiles, using incremental shift when possible.
+
+	Three-layer pipeline:
+	  Layer 1: tile_cache_image  (tiles only, shifted incrementally)
+	  Layer 2: base_map_image    (tiles + trail, rebuilt each turn)
+	  Layer 3: map_image         (tiles + trail + sprites, rebuilt every frame)
+	"""
 	if not grid or not player:
 		return
 
 	var player_pos: Vector2i = player.grid_position
-
-	# Always do full render - direct GridMap queries are fast enough
-	# Incremental rendering would require image scrolling (complex)
-	_render_full_map(player_pos)
-
-func _render_full_map(player_pos: Vector2i) -> void:
-	"""Full render of minimap. At zoom >= 1, each tile = N×N pixels.
-	At zoom 0, 2×2 tiles map to 1 pixel (zoomed out overview)."""
-	# Clear to unloaded color
-	map_image.fill(COLOR_UNLOADED)
 
 	# Get GridMap reference for direct tile queries
 	var grid_map: GridMap = grid.grid_map
@@ -311,20 +322,47 @@ func _render_full_map(player_pos: Vector2i) -> void:
 		Log.warn(Log.Category.SYSTEM, "Minimap: No GridMap found on grid node")
 		return
 
+	if _needs_full_redraw:
+		# Full redraw: zoom change, chunk load/unload, level change, etc.
+		_render_full_tiles(player_pos, grid_map)
+		_needs_full_redraw = false
+	elif zoom_level >= 1:
+		# Incremental shift for normal movement at zoom >= 1
+		var delta := player_pos - last_render_center
+		if delta == Vector2i.ZERO:
+			# No movement (wait action) — tile cache is still valid, just re-composite trail
+			pass
+		else:
+			var pixel_shift := delta * zoom_level
+			var max_shift := MAP_SIZE / 2
+			if absi(pixel_shift.x) >= max_shift or absi(pixel_shift.y) >= max_shift:
+				# Teleport or huge move — fall back to full redraw
+				_render_full_tiles(player_pos, grid_map)
+			else:
+				_render_incremental_tiles(player_pos, grid_map, delta, pixel_shift)
+	else:
+		# Zoom 0 always does full redraw (different sampling logic)
+		_render_full_tiles(player_pos, grid_map)
+
+	# Layer 2: copy tile cache → base_map, then draw trail on top
+	base_map_image.copy_from(tile_cache_image)
+	_draw_trail_onto(base_map_image, player_pos)
+	cached_player_pos = player_pos
+
+func _render_full_tiles(player_pos: Vector2i, grid_map: GridMap) -> void:
+	"""Full render of all tiles into tile_cache_image."""
+	tile_cache_image.fill(COLOR_UNLOADED)
+
 	if zoom_level == 0:
 		# ZOOMED OUT: 2 tiles per pixel, check 2×2 area per pixel
-		# Shows 512×512 tiles in 256×256 pixels
 		var view_radius := MAP_SIZE  # 256 tiles each direction = 512 total
 		var min_tile := player_pos - Vector2i(view_radius, view_radius)
 
 		for py in range(MAP_SIZE):
 			for px in range(MAP_SIZE):
-				# Map pixel to 2×2 tile area
 				var world_x := min_tile.x + px * 2
 				var world_y := min_tile.y + py * 2
 
-				# Check all 4 tiles in the 2×2 area — use best info available
-				# Priority: wall > floor > unloaded (prevents blank chunk artifacts)
 				var has_wall := false
 				var has_floor := false
 				for ty in range(2):
@@ -344,7 +382,7 @@ func _render_full_map(player_pos: Vector2i) -> void:
 				else:
 					color = COLOR_UNLOADED
 
-				map_image.set_pixelv(Vector2i(px, py), color)
+				tile_cache_image.set_pixelv(Vector2i(px, py), color)
 	else:
 		# NORMAL/ZOOMED IN: At zoom N, show MAP_SIZE/N tiles per axis
 		var view_radius := MAP_SIZE / (2 * zoom_level)
@@ -363,21 +401,87 @@ func _render_full_map(player_pos: Vector2i) -> void:
 				else:
 					color = COLOR_WALKABLE
 
-				# Fill N×N pixel block for this tile
 				var tile_pos := Vector2i(x, y)
 				var screen_origin := _world_to_screen(tile_pos, player_pos)
 				for ppy in range(zoom_level):
 					for ppx in range(zoom_level):
 						var pixel := screen_origin + Vector2i(ppx, ppy)
 						if _is_valid_screen_pos(pixel):
-							map_image.set_pixelv(pixel, color)
+							tile_cache_image.set_pixelv(pixel, color)
 
-	# Draw trail onto base map
-	_draw_trail(player_pos)
+	last_render_center = player_pos
 
-	# Save base map (tiles + trail) for per-frame sprite compositing
-	base_map_image.copy_from(map_image)
-	cached_player_pos = player_pos
+func _render_incremental_tiles(player_pos: Vector2i, grid_map: GridMap, delta: Vector2i, pixel_shift: Vector2i) -> void:
+	"""Shift tile_cache_image by pixel_shift and render only the newly exposed strips.
+
+	Uses base_map_image as temporary workspace for the shift operation.
+	"""
+	# Shift existing tiles: blit the still-valid region to its new position
+	var src_x := maxi(pixel_shift.x, 0)
+	var src_y := maxi(pixel_shift.y, 0)
+	var dst_x := maxi(-pixel_shift.x, 0)
+	var dst_y := maxi(-pixel_shift.y, 0)
+	var blit_w := MAP_SIZE - absi(pixel_shift.x)
+	var blit_h := MAP_SIZE - absi(pixel_shift.y)
+
+	# Use base_map_image as workspace for the shift
+	base_map_image.fill(COLOR_UNLOADED)
+	base_map_image.blit_rect(tile_cache_image, Rect2i(src_x, src_y, blit_w, blit_h), Vector2i(dst_x, dst_y))
+
+	# Copy shifted result back to tile cache
+	tile_cache_image.copy_from(base_map_image)
+
+	# Now render the newly exposed strips
+	var view_radius := MAP_SIZE / (2 * zoom_level)
+	var min_tile := player_pos - Vector2i(view_radius, view_radius)
+	var max_tile := player_pos + Vector2i(view_radius, view_radius)
+
+	# Vertical strip (new columns from horizontal movement)
+	if delta.x != 0:
+		var strip_tiles := absi(delta.x)
+		if delta.x > 0:
+			# Moved right — new tiles on the right edge
+			var strip_start_x := max_tile.x - strip_tiles
+			_render_tile_rect(grid_map, player_pos, strip_start_x, min_tile.y, max_tile.x, max_tile.y)
+		else:
+			# Moved left — new tiles on the left edge
+			var strip_end_x := min_tile.x + strip_tiles
+			_render_tile_rect(grid_map, player_pos, min_tile.x, min_tile.y, strip_end_x, max_tile.y)
+
+	# Horizontal strip (new rows from vertical movement)
+	if delta.y != 0:
+		var strip_tiles := absi(delta.y)
+		if delta.y > 0:
+			# Moved down — new tiles on the bottom edge
+			var strip_start_y := max_tile.y - strip_tiles
+			_render_tile_rect(grid_map, player_pos, min_tile.x, strip_start_y, max_tile.x, max_tile.y)
+		else:
+			# Moved up — new tiles on the top edge
+			var strip_end_y := min_tile.y + strip_tiles
+			_render_tile_rect(grid_map, player_pos, min_tile.x, min_tile.y, max_tile.x, strip_end_y)
+
+	last_render_center = player_pos
+
+func _render_tile_rect(grid_map: GridMap, player_pos: Vector2i, x_start: int, y_start: int, x_end: int, y_end: int) -> void:
+	"""Render a rectangular region of tiles into tile_cache_image."""
+	for y in range(y_start, y_end):
+		for x in range(x_start, x_end):
+			var cell_item := grid_map.get_cell_item(Vector3i(x, 0, y))
+
+			var color: Color
+			if cell_item == -1:
+				color = COLOR_UNLOADED
+			elif Grid3D.is_wall_tile(cell_item):
+				color = COLOR_WALL
+			else:
+				color = COLOR_WALKABLE
+
+			var screen_origin := _world_to_screen(Vector2i(x, y), player_pos)
+			for ppy in range(zoom_level):
+				for ppx in range(zoom_level):
+					var pixel := screen_origin + Vector2i(ppx, ppy)
+					if _is_valid_screen_pos(pixel):
+						tile_cache_image.set_pixelv(pixel, color)
 
 func _composite_sprites() -> void:
 	"""Composite rotated sprites onto base map every frame.
@@ -416,39 +520,9 @@ func _composite_sprites() -> void:
 	# Update texture
 	map_texture.update(map_image)
 
-func _draw_chunk_boundaries(player_pos: Vector2i) -> void:
-	"""Draw chunk boundary lines (every 128 tiles)"""
-	const CHUNK_SIZE := 128
-	var half_size := MAP_SIZE / 2
-	var min_tile := player_pos - Vector2i(half_size, half_size)
-	var max_tile := player_pos + Vector2i(half_size, half_size)
 
-	# Find chunk boundaries in visible area
-	var min_chunk := Vector2i(floor(float(min_tile.x) / CHUNK_SIZE), floor(float(min_tile.y) / CHUNK_SIZE))
-	var max_chunk := Vector2i(ceil(float(max_tile.x) / CHUNK_SIZE), ceil(float(max_tile.y) / CHUNK_SIZE))
-
-	# Draw vertical lines (no rotation - TextureRect handles it)
-	for chunk_x in range(min_chunk.x, max_chunk.x + 1):
-		var world_x := chunk_x * CHUNK_SIZE
-		for y in range(min_tile.y, max_tile.y):
-			var tile_pos := Vector2i(world_x, y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if _is_valid_screen_pos(screen_pos):
-				map_image.set_pixelv(screen_pos, COLOR_CHUNK_BOUNDARY)
-
-	# Draw horizontal lines (no rotation - TextureRect handles it)
-	for chunk_y in range(min_chunk.y, max_chunk.y + 1):
-		var world_y := chunk_y * CHUNK_SIZE
-		for x in range(min_tile.x, max_tile.x):
-			var tile_pos := Vector2i(x, world_y)
-			var screen_pos := _world_to_screen(tile_pos, player_pos)
-
-			if _is_valid_screen_pos(screen_pos):
-				map_image.set_pixelv(screen_pos, COLOR_CHUNK_BOUNDARY)
-
-func _draw_trail(player_pos: Vector2i) -> void:
-	"""Draw player movement trail with fading (optimized with spatial culling)"""
+func _draw_trail_onto(target_image: Image, player_pos: Vector2i) -> void:
+	"""Draw player movement trail with fading onto target image (optimized with spatial culling)"""
 	# Pre-calculate visible bounds for spatial culling (zoom-aware)
 	var view_radius: int
 	if zoom_level == 0:
@@ -484,7 +558,7 @@ func _draw_trail(player_pos: Vector2i) -> void:
 		var screen_pos := _world_to_screen(trail_pos, player_pos)
 
 		# Draw trail pixel
-		map_image.set_pixelv(screen_pos, color)
+		target_image.set_pixelv(screen_pos, color)
 
 func _draw_discovered_items(player_pos: Vector2i) -> void:
 	"""Draw discovered items on minimap using sprite icons (within PERCEPTION range).
@@ -602,21 +676,6 @@ func _world_to_screen(world_pos: Vector2i, player_pos: Vector2i) -> Vector2i:
 		return Vector2i(half_size + relative.x / 2, half_size + relative.y / 2)
 	return Vector2i(half_size + relative.x * zoom_level, half_size + relative.y * zoom_level)
 
-func _rotate_screen_pos(screen_pos: Vector2i, angle: float) -> Vector2i:
-	"""Rotate screen position around center by angle (radians)"""
-	var center := Vector2(MAP_SIZE / 2, MAP_SIZE / 2)
-	var offset := Vector2(screen_pos) - center
-
-	# Rotate by camera angle
-	var cos_a := cos(angle)
-	var sin_a := sin(angle)
-	var rotated := Vector2(
-		offset.x * cos_a - offset.y * sin_a,
-		offset.x * sin_a + offset.y * cos_a
-	)
-
-	var final_pos := center + rotated
-	return Vector2i(int(final_pos.x), int(final_pos.y))
 
 func _is_valid_screen_pos(pos: Vector2i) -> bool:
 	"""Check if screen position is within bounds"""

@@ -12,11 +12,10 @@ Usage:
 
 Signals:
 	pause_toggled(is_paused: bool) - When pause state changes
-	hud_focus_changed(focused_element: Control) - When HUD focus changes
 """
 
 signal pause_toggled(is_paused: bool)
-signal hud_focus_changed(focused_element: Control)
+
 
 var is_paused: bool = false
 var current_focus: Control = null
@@ -136,31 +135,6 @@ func _exit_hud_mode():
 		current_focus.release_focus()
 	current_focus = null
 
-func _find_subviewport() -> SubViewport:
-	"""Find the game SubViewport dynamically (works in portrait and landscape layouts)"""
-	# Search for SubViewportContainer anywhere in the tree
-	var root = get_tree().root
-	var containers = _find_nodes_by_type(root, "SubViewportContainer")
-
-	for container in containers:
-		for child in container.get_children():
-			if child is SubViewport:
-				return child
-
-	return null
-
-func _find_nodes_by_type(node: Node, type_name: String) -> Array:
-	"""Recursively find all nodes of a specific type"""
-	var result = []
-
-	if node.get_class() == type_name:
-		result.append(node)
-
-	for child in node.get_children():
-		result.append_array(_find_nodes_by_type(child, type_name))
-
-	return result
-
 func _refresh_focusable_elements():
 	"""Find all HUD elements that can be focused."""
 	# Disconnect old focus signals
@@ -217,8 +191,6 @@ func set_hud_focus(element: Control):
 
 	current_focus = element
 	element.grab_focus()
-	emit_signal("hud_focus_changed", element)
-
 	# Remember this as last HUD focus (if it's not a popup button)
 	_update_last_hud_focus(element)
 

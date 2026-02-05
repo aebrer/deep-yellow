@@ -39,10 +39,6 @@ func _ready() -> void:
 		var first_state_name = states.keys()[0]
 		change_state(first_state_name)
 
-	# Connect to PauseManager (camera mode persists through pause now)
-	if PauseManager:
-		PauseManager.pause_toggled.connect(_on_pause_toggled)
-
 
 func _register_state(state: PlayerInputState) -> void:
 	"""Register a state and connect its signals"""
@@ -69,13 +65,6 @@ func change_state(new_state_name: String) -> void:
 	current_state = states[new_state_name]
 	current_state.enter()
 
-func get_current_state_name() -> String:
-	"""Get name of current state for debugging"""
-	if current_state:
-		return current_state.name
-	else:
-		return ""
-
 # ============================================================================
 # INPUT DELEGATION
 # ============================================================================
@@ -97,11 +86,3 @@ func process_frame(delta: float) -> void:
 func _on_state_transition_requested(new_state_name: String) -> void:
 	"""Handle state transition requests from states"""
 	change_state(new_state_name)
-
-func _on_pause_toggled(_is_paused: bool) -> void:
-	"""Handle pause state changes
-
-	Camera mode (FPV vs Tactical) now persists through pause/unpause.
-	No state change needed - IdleState handles both modes.
-	"""
-	pass

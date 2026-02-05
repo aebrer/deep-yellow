@@ -30,6 +30,12 @@ signal new_chunk_entered(chunk_position: Vector3i)
 ## Emitted when level changes mid-run (exit stairs). Listeners should reconfigure visuals.
 signal level_changed(new_level_id: int)
 
+## Emitted after a chunk is fully loaded into GridMap (terrain, entities, pathfinding ready)
+signal chunk_grid_loaded(chunk_pos: Vector2i)
+
+## Emitted after a chunk is unloaded from GridMap
+signal chunk_grid_unloaded(chunk_pos: Vector2i)
+
 # Constants
 const CHUNK_SIZE := 128
 const GENERATION_RADIUS := 2  # Chunks to pre-generate (5×5 = 25 chunks)
@@ -472,6 +478,10 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# Now render entities (after they've been added to chunk data)
 		if grid_3d.entity_renderer:
 			grid_3d.entity_renderer.render_chunk_entities(chunk)
+
+		# Signal that this chunk is fully loaded into GridMap
+		# (terrain, pathfinding, entities all ready — safe to query GridMap)
+		chunk_grid_loaded.emit(chunk_pos)
 	else:
 		# Only warn once per session
 		if loaded_chunks.size() == 1:
@@ -857,6 +867,7 @@ func _unload_chunk(chunk_key: Vector3i) -> void:
 	# Remove from Grid3D render (use cached reference)
 	if grid_3d:
 		grid_3d.unload_chunk(chunk)
+		chunk_grid_unloaded.emit(Vector2i(chunk_key.x, chunk_key.y))
 
 	# Remove from memory
 	loaded_chunks.erase(chunk_key)
@@ -879,27 +890,6 @@ func tile_to_chunk(tile_pos: Vector2i) -> Vector2i:
 		floori(float(tile_pos.y) / CHUNK_SIZE)
 	)
 
-func chunk_to_world(chunk_pos: Vector2i) -> Vector2i:
-	"""Convert chunk position to world tile position (chunk origin)
-
-	Example:
-		chunk (0, 0) → tile (0, 0)
-		chunk (1, 1) → tile (128, 128)
-		chunk (-1, -1) → tile (-128, -128)
-	"""
-	return chunk_pos * CHUNK_SIZE
-
-func tile_to_local(tile_pos: Vector2i) -> Vector2i:
-	"""Convert tile position to local chunk position (0-127)
-
-	Example:
-		tile (100, 50) → local (100, 50)
-		tile (150, 200) → local (22, 72)  # 150%128=22, 200%128=72
-	"""
-	return Vector2i(
-		posmod(tile_pos.x, CHUNK_SIZE),
-		posmod(tile_pos.y, CHUNK_SIZE)
-	)
 
 # ============================================================================
 # BORDER HALLWAY CUTTING
@@ -1188,24 +1178,6 @@ func get_chunk_at_tile(tile_pos: Vector2i, level_id: int) -> Chunk:
 	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
 	return loaded_chunks.get(chunk_key, null)
 
-func get_chunk_at_position(chunk_pos: Vector2i, level_id: int) -> Chunk:
-	"""Get chunk at chunk coordinates
-
-	Returns null if chunk is not loaded.
-	"""
-	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
-	return loaded_chunks.get(chunk_key, null)
-
-func is_tile_walkable(tile_pos: Vector2i, level_id: int) -> bool:
-	"""Check if tile is walkable
-
-	Returns false if chunk is not loaded.
-	"""
-	var chunk := get_chunk_at_tile(tile_pos, level_id)
-	if not chunk:
-		return false
-
-	return chunk.is_walkable(tile_pos)
 
 func get_tile_type(tile_pos: Vector2i, level_id: int) -> int:
 	"""Get tile type at position
@@ -1320,16 +1292,8 @@ func _disconnect_all_entity_signals() -> void:
 					entity.moved.disconnect(connection.callable)
 
 # ============================================================================
-# CHUNK VALIDATION
-# ============================================================================
-
-# ============================================================================
 # UTILITY
 # ============================================================================
-
-func get_loaded_chunk_count() -> int:
-	"""Get number of currently loaded chunks"""
-	return loaded_chunks.size()
 
 func get_corruption(level_id: int) -> float:
 	"""Get current corruption for a level"""
