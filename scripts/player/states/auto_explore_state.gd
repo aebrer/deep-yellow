@@ -43,6 +43,10 @@ var _interrupt_reason: String = ""
 ## If true, navigating to a specific "Go To" target — skip item/vending interrupt checks
 var _goto_mode: bool = false
 
+## Persistent goto target position — survives path recalculations so we can retry
+## when the target chunk loads
+var _goto_target: Vector2i = Vector2i(-999999, -999999)
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -65,23 +69,34 @@ func enter() -> void:
 	# Mark current position as explored
 	_mark_current_explored()
 
-	# On fresh start (not resuming from turn), clear cached path to force recalculation
+	# On fresh start (not resuming from turn), clear cached path and goto state
 	if not is_resuming:
 		_clear_cached_path()
+		_goto_mode = false
+		_goto_target = Vector2i(-999999, -999999)
 
 	# Check for "Go To" target from map overlay (takes priority over exploration)
 	if not is_resuming and player.goto_target != Vector2i(-999999, -999999):
-		var goto_pos: Vector2i = player.goto_target
+		_goto_target = player.goto_target
 		player.goto_target = Vector2i(-999999, -999999)  # Consume the target
-		_recalculate_path(goto_pos)
-		_pathing_to_interrupt = true
 		_goto_mode = true  # Skip item/vending interrupt checks during goto
-		_interrupt_reason = "arrived at marker"
+		_recalculate_path(_goto_target)
 		if not _cached_path.is_empty():
-			Log.state("Auto-explore: Go To target at %s" % str(goto_pos))
+			_pathing_to_interrupt = true
+			_interrupt_reason = "arrived at marker"
+			Log.state("Auto-explore: Go To target at %s" % str(_goto_target))
 			Log.player("Navigating to marker...")
 			return
-		# If path failed, fall through to normal exploration
+		# Path failed (target likely in unloaded chunk) — find intermediate waypoint
+		Log.state("Auto-explore: Go To target unreachable, finding waypoint")
+		var waypoint := _find_goto_waypoint()
+		if waypoint != Vector2i(-999999, -999999):
+			_recalculate_path(waypoint)
+			if not _cached_path.is_empty():
+				Log.player("Navigating toward marker...")
+				return
+		# No waypoint found either — fall through to normal exploration
+		Log.player("Navigating toward marker...")
 
 	# Check if there's anywhere to go (quick check, full path calculated in process_frame)
 	var target = ExplorationTracker.find_nearest_unexplored(player.grid_position)
@@ -189,6 +204,29 @@ func process_frame(delta: float) -> void:
 			Log.player("Auto-explore stopped: %s" % _interrupt_reason)
 			transition_to("IdleState")
 			return
+
+		# If in goto mode, retry pathing to target (chunk may now be loaded)
+		if _goto_mode:
+			# Check if we've arrived at the exact goto position
+			if player.grid_position == _goto_target:
+				Log.state("Auto-explore: Arrived at goto target")
+				Log.player("Arrived at marker")
+				transition_to("IdleState")
+				return
+			# Try direct path first
+			_recalculate_path(_goto_target)
+			if not _cached_path.is_empty():
+				_pathing_to_interrupt = true
+				_interrupt_reason = "arrived at marker"
+				Log.state("Auto-explore: Direct path to goto target found")
+				return
+			# Direct path failed — find intermediate waypoint
+			var waypoint := _find_goto_waypoint()
+			if waypoint != Vector2i(-999999, -999999):
+				_recalculate_path(waypoint)
+				if not _cached_path.is_empty():
+					Log.state("Auto-explore: Waypoint toward goto target at %s" % str(waypoint))
+					return
 
 		# Otherwise, find a new exploration target
 		var target := ExplorationTracker.find_nearest_unexplored(player.grid_position)
@@ -406,13 +444,35 @@ func _find_stairs_in_range(perception_range: float) -> Vector2i:
 # PATH CACHING
 # ============================================================================
 
+func _find_goto_waypoint() -> Vector2i:
+	"""Find an intermediate waypoint toward the goto target within loaded chunks.
+
+	When the goto target is in an unloaded chunk, we can't pathfind to it directly.
+	This walks a line from the player toward the target at decreasing distances,
+	returning the furthest reachable tile. The player moves there, chunks load,
+	and we retry the full path.
+	"""
+	var dir := Vector2(_goto_target - player.grid_position).normalized()
+	# Try progressively closer distances along the line toward the target
+	for dist in [30, 25, 20, 15, 10, 7, 5]:
+		var candidate: Vector2i = player.grid_position + Vector2i(roundi(dir.x * dist), roundi(dir.y * dist))
+		if candidate == player.grid_position:
+			continue
+		if not Pathfinding.has_point(candidate):
+			continue
+		var path := Pathfinding.find_path(player.grid_position, candidate)
+		if path.size() >= 2:
+			return candidate
+	return Vector2i(-999999, -999999)
+
 func _clear_cached_path() -> void:
-	"""Clear the cached path, forcing recalculation on next step."""
+	"""Clear the cached path, forcing recalculation on next step.
+	Note: _goto_mode and _goto_target are NOT cleared here — they persist across
+	path segments so we can retry reaching the target as chunks load."""
 	_cached_path.clear()
 	_cached_path_index = 0
 	_cached_target = ExplorationTracker.NO_TARGET
 	_pathing_to_interrupt = false
-	_goto_mode = false
 	_interrupt_reason = ""
 
 func _recalculate_path(target: Vector2i) -> void:
