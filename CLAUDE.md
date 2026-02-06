@@ -1348,4 +1348,6 @@ VERSION=$(git describe --tags --abbrev=0)
 
 **Test before commit** - seriously, this is the most important lesson. User will tell you when they're ready to commit.
 
+**Steam integration is a future goal** - achievement ideas are tracked in `docs/achievement_brainstorming.md`. GodotSteam GDExtension will be the integration path when the time comes.
+
 **Investigate the truth!** - the codebase itself is the best source of truth in the repo. Before major changes, make sure you read all the files you need to, in full, to get as much appropriate context as possible prior to planning.
