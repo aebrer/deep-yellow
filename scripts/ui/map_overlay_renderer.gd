@@ -256,7 +256,7 @@ func _draw_trail() -> void:
 		if not _is_valid(screen):
 			continue
 
-		var age := float(i) / float(_trail_valid_count)
+		var age := clampf(float(i) / float(_trail_valid_count), 0.0, 1.0)
 		var color := COLOR_TRAIL_START.lerp(COLOR_TRAIL_END, age)
 
 		# At higher zoom, draw larger trail dots

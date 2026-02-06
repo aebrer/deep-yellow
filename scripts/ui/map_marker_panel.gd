@@ -120,7 +120,10 @@ func _rebuild_list() -> void:
 	for btn in _entry_buttons:
 		btn.queue_free()
 	_entry_buttons.clear()
+	_gamepad_focus_idx = -1
 	if _action_hbox:
+		# remove_child immediately so it doesn't affect index calculations below
+		_list_vbox.remove_child(_action_hbox)
 		_action_hbox.queue_free()
 		_action_hbox = null
 
@@ -203,8 +206,9 @@ func _on_marker_selected(index: int) -> void:
 
 func _show_inline_actions(index: int) -> void:
 	"""Show Go To / Delete buttons for selected marker."""
-	# Remove previous action bar
+	# Remove previous action bar immediately so it doesn't affect index calculations
 	if _action_hbox:
+		_list_vbox.remove_child(_action_hbox)
 		_action_hbox.queue_free()
 		_action_hbox = null
 

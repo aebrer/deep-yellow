@@ -31,8 +31,6 @@ signal goto_requested(position: Vector2i)
 # COLUMN NAVIGATION
 # ============================================================================
 
-enum Column { MARKERS, MAP, ENEMIES }
-var active_column: Column = Column.MAP
 
 # ============================================================================
 # NODE REFERENCES
@@ -209,7 +207,6 @@ func show_overlay(player: Node, grid: Node) -> void:
 
 	# Set visible BEFORE pausing so settings panel's _is_blocking_popup_visible() sees us
 	visible = true
-	active_column = Column.MAP
 	_accepting_input = false
 
 	# Pause (store previous state)
@@ -219,6 +216,8 @@ func show_overlay(player: Node, grid: Node) -> void:
 
 	# Start accepting input after delay, then give initial focus to Place Marker button
 	get_tree().create_timer(INPUT_ACCEPT_DELAY, true).timeout.connect(func():
+		if not visible:
+			return  # Overlay was closed before delay expired
 		_accepting_input = true
 		if marker_panel and marker_panel._place_button:
 			marker_panel._place_button.grab_focus()
@@ -367,76 +366,6 @@ func _on_marker_goto_requested(world_pos: Vector2i) -> void:
 	"""Close overlay and auto-explore to marker position."""
 	goto_requested.emit(world_pos)
 	hide_overlay()
-
-# ============================================================================
-# GAMEPAD / KEYBOARD NAVIGATION
-# ============================================================================
-
-func _switch_column(direction: int) -> void:
-	"""Switch active column left (-1) or right (+1)."""
-	var col_int := int(active_column) + direction
-	col_int = clampi(col_int, 0, 2)
-	var new_column: Column = col_int as Column
-
-	if new_column == active_column:
-		return
-
-	# Clear focus on old column
-	_clear_panel_focus()
-	active_column = new_column
-	_update_column_indicator()
-
-func _navigate_entry(direction: int) -> void:
-	"""Navigate entries within the active side panel."""
-	match active_column:
-		Column.MARKERS:
-			if marker_panel:
-				marker_panel.gamepad_navigate(direction)
-		Column.ENEMIES:
-			if enemy_list_panel:
-				enemy_list_panel.gamepad_navigate(direction)
-		Column.MAP:
-			pass  # Map column has no navigable entries
-
-func _activate_entry() -> void:
-	"""Activate the focused entry in the active side panel."""
-	match active_column:
-		Column.MARKERS:
-			if marker_panel:
-				marker_panel.gamepad_activate()
-		Column.ENEMIES:
-			if enemy_list_panel:
-				enemy_list_panel.gamepad_activate()
-		Column.MAP:
-			pass
-
-func _clear_panel_focus() -> void:
-	"""Clear gamepad focus on all side panels."""
-	if marker_panel and marker_panel.has_method("clear_gamepad_focus"):
-		marker_panel.clear_gamepad_focus()
-	if enemy_list_panel and enemy_list_panel.has_method("clear_gamepad_focus"):
-		enemy_list_panel.clear_gamepad_focus()
-
-func _update_column_indicator() -> void:
-	"""Update visual border to show active column."""
-	_set_panel_active(left_panel_container, active_column == Column.MARKERS)
-	_set_panel_active(right_panel_container, active_column == Column.ENEMIES)
-
-func _set_panel_active(panel: PanelContainer, active: bool) -> void:
-	"""Set panel border style to indicate active/inactive state."""
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.05, 0.1, 0.95)
-	style.content_margin_left = 8
-	style.content_margin_right = 8
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	if active:
-		style.border_color = Color(0.5, 0.5, 0.8, 1.0)
-		style.set_border_width_all(2)
-	else:
-		style.border_color = Color(0.25, 0.25, 0.35, 1.0)
-		style.set_border_width_all(1)
-	panel.add_theme_stylebox_override("panel", style)
 
 # ============================================================================
 # FOOTER

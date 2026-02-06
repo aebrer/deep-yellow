@@ -174,8 +174,9 @@ func process_frame(delta: float) -> void:
 
 	# Check for interrupt targets (items, vending machines, stairs) that should
 	# override the current path. These are things we discovered while exploring.
-	# Skip during goto mode — user explicitly wants to go to a specific location.
-	var interrupt := _check_for_interrupt_target() if not _goto_mode else {}
+	# Skip only when actively pathing to a goto target (not during fallback exploration).
+	var _on_goto_path := _goto_mode and _pathing_to_interrupt
+	var interrupt := _check_for_interrupt_target() if not _on_goto_path else {}
 	if not interrupt.is_empty():
 		var obj_pos: Vector2i = interrupt["position"]
 		var chebyshev_dist := maxi(absi(obj_pos.x - player.grid_position.x), absi(obj_pos.y - player.grid_position.y))

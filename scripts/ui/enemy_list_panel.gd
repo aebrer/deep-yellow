@@ -159,6 +159,7 @@ func _rebuild_list() -> void:
 	for btn in _entry_buttons:
 		btn.queue_free()
 	_entry_buttons.clear()
+	_gamepad_focus_idx = -1
 
 	if _entries.is_empty():
 		_empty_label.visible = true
