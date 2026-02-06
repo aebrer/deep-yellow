@@ -27,6 +27,9 @@ var settings_panel: SettingsPanel = null
 ## Codex panel (created dynamically, opened from settings)
 var codex_panel: CodexPanel = null
 
+## Map overlay panel (created dynamically, opened with X key/button)
+var map_overlay_panel: MapOverlayPanel = null
+
 ## Access to player in 3D scene
 var player: Node3D
 
@@ -82,6 +85,9 @@ func _ready() -> void:
 
 	# Create settings panel (shown when paused)
 	_create_settings_panel()
+
+	# Create map overlay panel (opened with X key/button)
+	_create_map_overlay_panel()
 
 	# Wire up stats panel to player
 	if stats_panel:
@@ -511,6 +517,41 @@ func _create_codex_panel() -> void:
 
 	# Hide action preview when codex is open
 	codex_panel.visibility_changed.connect(_on_codex_visibility_changed)
+
+func _create_map_overlay_panel() -> void:
+	"""Create the map overlay panel (opened with X key/button)"""
+	map_overlay_panel = MapOverlayPanel.new()
+	map_overlay_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	map_overlay_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(map_overlay_panel)
+
+	# Wire up signals
+	map_overlay_panel.overlay_closed.connect(_on_map_overlay_closed)
+	map_overlay_panel.goto_requested.connect(_on_map_goto_requested)
+
+	# Hide action preview when map overlay is open
+	map_overlay_panel.visibility_changed.connect(_on_map_overlay_visibility_changed)
+
+func _on_map_overlay_closed() -> void:
+	"""Handle map overlay being closed."""
+	# goto_target is checked by idle_state on the next frame, triggering auto-explore
+	pass
+
+func _on_map_overlay_visibility_changed() -> void:
+	"""Hide action preview when map overlay opens, restore pause hints when it closes."""
+	if not action_preview_ui:
+		return
+	if map_overlay_panel and map_overlay_panel.visible:
+		# Deferred so it runs AFTER PauseManager.toggle_pause() signal handlers
+		# (which would otherwise re-show the preview via _on_pause_toggled)
+		action_preview_ui.call_deferred("hide_preview")
+	elif PauseManager and PauseManager.is_paused:
+		_on_inventory_reorder_state_changed(false)
+
+func _on_map_goto_requested(target_pos: Vector2i) -> void:
+	"""Handle Go To request from map overlay (marker navigation)."""
+	if player:
+		player.goto_target = target_pos
 
 func _on_player_died(cause: String) -> void:
 	"""Handle player death - show game over screen"""

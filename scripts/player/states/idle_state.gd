@@ -12,6 +12,7 @@ const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
 const _ItemStatusAction = preload("res://scripts/actions/item_status_action.gd")
 const _SanityDamageAction = preload("res://scripts/actions/sanity_damage_action.gd")
 const _AutoExploreState = preload("res://scripts/player/states/auto_explore_state.gd")
+const _MapOverlayPanel = preload("res://scripts/ui/map_overlay_panel.gd")
 
 # ============================================================================
 # CAMERA MODE
@@ -230,11 +231,24 @@ func process_frame(delta: float) -> void:
 	# Update action preview
 	_update_action_preview()
 
+	# Check for "Go To" target from map overlay
+	if player and player.goto_target != Vector2i(-999999, -999999):
+		transition_to("AutoExploreState")
+		return
+
 	# Check for auto-explore toggle (skip if just cancelled on this frame)
 	if Input.is_action_just_pressed("auto_explore"):
 		if _AutoExploreState.cancelled_on_frame != Engine.get_process_frames():
 			transition_to("AutoExploreState")
 			return
+
+	# Check for map overlay toggle (skip if overlay was just closed this frame)
+	if Input.is_action_just_pressed("open_map"):
+		if _MapOverlayPanel.closed_on_frame != Engine.get_process_frames():
+			var game_node = get_node_or_null("/root/Game")
+			if game_node and game_node.map_overlay_panel:
+				game_node.map_overlay_panel.show_overlay(player, player.grid)
+		return
 
 	# Check for camera toggle (use Godot's native check - doesn't need InputManager synthesis)
 	if Input.is_action_just_pressed("toggle_camera"):

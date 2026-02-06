@@ -59,6 +59,10 @@ var initial_load_complete: bool = false  # Track if initial area load is done
 # chunks that unloaded and reloaded would be missing their side of the hallway.
 var chunks_without_items: int = 0  # Pity timer: consecutive chunks without items spawned
 
+## Tile cache for map overlay — persists tile types after chunk unload
+## Key: Vector2i (world tile position), Value: int (SubChunk.TileType)
+var tile_cache: Dictionary = {}
+
 # Pity timer configuration
 const PITY_TIMER_THRESHOLD := 5  # Force item spawn after this many empty chunks
 
@@ -464,6 +468,9 @@ func _load_chunk_to_grid(chunk: Chunk, chunk_key: Vector3i) -> void:
 		# First load terrain into GridMap (needed for is_walkable)
 		grid_3d.load_chunk(chunk)
 
+		# Cache tile types for map overlay (persists after chunk unload)
+		_cache_chunk_tiles(chunk)
+
 		# Add chunk to pathfinding graph (after terrain is loaded)
 		# Note: autoload is named "Pathfinding" in project.godot
 		var pathfinder = get_node_or_null("/root/Pathfinding")
@@ -491,6 +498,26 @@ func _load_chunk_immediate(chunk: Chunk, chunk_key: Vector3i) -> void:
 	"""Load chunk immediately (fallback for synchronous generation)"""
 	loaded_chunks[chunk_key] = chunk
 	_load_chunk_to_grid(chunk, chunk_key)
+
+# ============================================================================
+# TILE CACHE (for map overlay)
+# ============================================================================
+
+func _cache_chunk_tiles(chunk: Chunk) -> void:
+	"""Cache tile types from a chunk into tile_cache for map overlay.
+
+	Iterates all sub_chunks and stores floor-layer tile types keyed by
+	world position. This data persists after chunks unload, giving the
+	map overlay fog-of-war (visited = cached, unvisited = black).
+	"""
+	var chunk_world_pos := chunk.position * CHUNK_SIZE
+	for sub_chunk in chunk.sub_chunks:
+		var sub_world := sub_chunk.world_position
+		for y in range(SubChunk.SIZE):
+			for x in range(SubChunk.SIZE):
+				var tile_type: int = sub_chunk.tile_data[y][x]
+				var world_pos := sub_world + Vector2i(x, y)
+				tile_cache[world_pos] = tile_type
 
 # ============================================================================
 # ENTITY SPAWNING
@@ -1214,7 +1241,13 @@ func start_new_run(new_seed: int = -1) -> void:
 	loaded_chunks.clear()
 	generating_chunks.clear()
 	visited_chunks.clear()
+	tile_cache.clear()
 	chunks_without_items = 0  # Reset pity timer for new run
+
+	# Reset map markers for new run
+	var marker_mgr = get_node_or_null("/root/MapMarkerManager")
+	if marker_mgr:
+		marker_mgr.reset()
 	last_player_chunk = Vector3i(-999, -999, -999)
 	initial_load_complete = false  # Reset for new run
 	corruption_tracker.reset_all()
@@ -1252,6 +1285,7 @@ func change_level(target_level_id: int) -> void:
 	# Clear spatial state for old level
 	loaded_chunks.clear()
 	generating_chunks.clear()
+	tile_cache.clear()
 	last_player_chunk = Vector3i(-999, -999, -999)
 	initial_load_complete = false
 	hit_chunk_limit = false

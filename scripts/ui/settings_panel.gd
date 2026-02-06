@@ -471,6 +471,8 @@ func _hide_ae_panel() -> void:
 	"""Hide the auto-explore sub-panel"""
 	ae_panel.visible = false
 	for control in ae_focusable_controls:
+		if control.has_focus():
+			control.release_focus()
 		control.focus_mode = Control.FOCUS_NONE
 		control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -514,6 +516,7 @@ const CONTROL_MAPPINGS := [
 	["Navigate HUD", "Left Stick", "Mouse Hover"],
 	["Minimap Zoom", "D-Pad L/R", "Arrow Keys"],
 	["Auto-Explore", "Y", "Y"],
+	["Map Overlay", "X", "X"],
 ]
 
 func _build_controls_section() -> void:
@@ -937,11 +940,19 @@ func _hide_panel() -> void:
 	panel.visible = true  # Reset so panel shows correctly when re-opened
 
 	for control in focusable_controls:
+		if control.has_focus():
+			control.release_focus()
 		control.focus_mode = Control.FOCUS_NONE
 		control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _is_blocking_popup_visible() -> bool:
 	"""Check if a popup that should suppress the settings panel is visible"""
+	# Check map overlay directly (its children aren't in hud_focusable group)
+	var game_node = get_node_or_null("/root/Game")
+	if game_node and game_node.get("map_overlay_panel"):
+		if game_node.map_overlay_panel and game_node.map_overlay_panel.visible:
+			return true
+
 	for node in get_tree().get_nodes_in_group("hud_focusable"):
 		var parent = node.get_parent()
 		while parent:
