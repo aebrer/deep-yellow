@@ -47,6 +47,7 @@ var return_state: String = "IdleState"  # State to return to after turn complete
 var suppress_input_next_frame: bool = false  # Skip input for one frame (prevents UI->movement double-trigger)
 var turn_count: int = 0
 var kill_count: int = 0  # Entities killed (for SCORE)
+var goto_target: Vector2i = Vector2i(-999999, -999999)  # Map overlay "Go To" target
 
 # Stats (NEW)
 var stats: StatBlock = null

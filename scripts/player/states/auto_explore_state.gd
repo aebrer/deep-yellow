@@ -40,6 +40,9 @@ var _pathing_to_interrupt: bool = false
 ## Reason for the interrupt (for logging when we stop)
 var _interrupt_reason: String = ""
 
+## If true, navigating to a specific "Go To" target — skip item/vending interrupt checks
+var _goto_mode: bool = false
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -65,6 +68,20 @@ func enter() -> void:
 	# On fresh start (not resuming from turn), clear cached path to force recalculation
 	if not is_resuming:
 		_clear_cached_path()
+
+	# Check for "Go To" target from map overlay (takes priority over exploration)
+	if not is_resuming and player.goto_target != Vector2i(-999999, -999999):
+		var goto_pos: Vector2i = player.goto_target
+		player.goto_target = Vector2i(-999999, -999999)  # Consume the target
+		_recalculate_path(goto_pos)
+		_pathing_to_interrupt = true
+		_goto_mode = true  # Skip item/vending interrupt checks during goto
+		_interrupt_reason = "arrived at marker"
+		if not _cached_path.is_empty():
+			Log.state("Auto-explore: Go To target at %s" % str(goto_pos))
+			Log.player("Navigating to marker...")
+			return
+		# If path failed, fall through to normal exploration
 
 	# Check if there's anywhere to go (quick check, full path calculated in process_frame)
 	var target = ExplorationTracker.find_nearest_unexplored(player.grid_position)
@@ -142,7 +159,8 @@ func process_frame(delta: float) -> void:
 
 	# Check for interrupt targets (items, vending machines, stairs) that should
 	# override the current path. These are things we discovered while exploring.
-	var interrupt := _check_for_interrupt_target()
+	# Skip during goto mode — user explicitly wants to go to a specific location.
+	var interrupt := _check_for_interrupt_target() if not _goto_mode else {}
 	if not interrupt.is_empty():
 		var obj_pos: Vector2i = interrupt["position"]
 		var chebyshev_dist := maxi(absi(obj_pos.x - player.grid_position.x), absi(obj_pos.y - player.grid_position.y))
@@ -394,6 +412,7 @@ func _clear_cached_path() -> void:
 	_cached_path_index = 0
 	_cached_target = ExplorationTracker.NO_TARGET
 	_pathing_to_interrupt = false
+	_goto_mode = false
 	_interrupt_reason = ""
 
 func _recalculate_path(target: Vector2i) -> void:
