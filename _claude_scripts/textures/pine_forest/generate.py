@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
 Pine Forest Wall Texture Generator
-Generates a tileable 128×128 texture of a dark pine forest silhouette.
+Generates a tileable 128×256 texture of a dark pine forest silhouette.
 Uses proper tree-drawing algorithm with recognizable pine/conifer shapes.
+The 128x256 (1:2) aspect ratio matches BoxMesh wall faces (2 wide x 4 tall).
 """
 
 import numpy as np
 from PIL import Image
 import random
 
-SIZE = 128
+WIDTH = 128
+HEIGHT = 256
 
 def hex_to_rgb(hex_color):
     """Convert hex color to RGB tuple"""
@@ -26,7 +28,7 @@ def draw_pine_tree(img_array, trunk_x, ground_y, height, trunk_width, branch_lay
     - Branches droop slightly downward
 
     Args:
-        img_array: The image array to draw on (SIZE x SIZE x 3)
+        img_array: The image array to draw on (HEIGHT x WIDTH x 3)
         trunk_x: X position of tree trunk center
         ground_y: Y position of tree base
         height: Total height of the tree
@@ -51,11 +53,11 @@ def draw_pine_tree(img_array, trunk_x, ground_y, height, trunk_width, branch_lay
 
     # Draw trunk (visible below foliage)
     for y in range(trunk_top, ground_y):
-        y_coord = y % SIZE
-        if y_coord < 0 or y_coord >= SIZE:
+        y_coord = y % HEIGHT
+        if y_coord < 0 or y_coord >= HEIGHT:
             continue
         for dx in range(-trunk_width//2, trunk_width//2 + 1):
-            x_coord = (trunk_x + dx) % SIZE
+            x_coord = (trunk_x + dx) % WIDTH
             img_array[y_coord, x_coord] = trunk_color
 
     # Draw foliage as one large triangular silhouette (classic pine shape)
@@ -65,7 +67,7 @@ def draw_pine_tree(img_array, trunk_x, ground_y, height, trunk_width, branch_lay
 
     for dy in range(foliage_height):
         y = foliage_apex_y + dy
-        y_coord = y % SIZE
+        y_coord = y % HEIGHT
         # Don't wrap foliage to top of image — skip if out of bounds above
         if y < 0:
             continue
@@ -79,7 +81,7 @@ def draw_pine_tree(img_array, trunk_x, ground_y, height, trunk_width, branch_lay
         width_at_y = max(1, width_at_y + edge_variation)
 
         for dx in range(-width_at_y, width_at_y + 1):
-            x_coord = (trunk_x + dx) % SIZE
+            x_coord = (trunk_x + dx) % WIDTH
             # Small random gaps for needle texture
             if random.random() > 0.08:
                 img_array[y_coord, x_coord] = foliage_color
@@ -92,11 +94,11 @@ def generate_pine_forest():
     bg_light = np.array([10, 14, 10])  # #0a0e0a
 
     # Create background with slight vertical gradient and noise
-    img_array = np.zeros((SIZE, SIZE, 3), dtype=np.uint8)
-    for y in range(SIZE):
-        gradient_factor = y / SIZE  # 0.0 at top, 1.0 at bottom
+    img_array = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    for y in range(HEIGHT):
+        gradient_factor = y / HEIGHT  # 0.0 at top, 1.0 at bottom
         bg_color = (bg_dark + (bg_light - bg_dark) * gradient_factor).astype(np.int16)  # Use int16 to avoid overflow
-        for x in range(SIZE):
+        for x in range(WIDTH):
             noise = random.randint(-2, 2)
             color = np.clip(bg_color + noise, 0, 255).astype(np.uint8)
             img_array[y, x] = color
@@ -110,25 +112,25 @@ def generate_pine_forest():
         # depth_factor: 1.0 = front/closest (LIGHTER), 0.0 = back/furthest (DARKER)
 
         # Back layer (darker, smaller, further away)
-        (15, SIZE, 50, 4, 5, 0.2),
-        (55, SIZE, 45, 4, 5, 0.25),
-        (100, SIZE, 48, 4, 5, 0.22),
+        (15, HEIGHT, 100, 4, 5, 0.2),
+        (55, HEIGHT, 90, 4, 5, 0.25),
+        (100, HEIGHT, 95, 4, 5, 0.22),
 
         # Middle layer
-        (35, SIZE, 70, 6, 6, 0.5),
-        (80, SIZE, 65, 6, 6, 0.55),
-        (115, SIZE, 68, 6, 6, 0.48),
+        (35, HEIGHT, 140, 6, 6, 0.5),
+        (80, HEIGHT, 130, 6, 6, 0.55),
+        (115, HEIGHT, 135, 6, 6, 0.48),
 
         # Front layer (lightest, tallest, closest) — thicker trunks
         # Heights extend past top edge for wall effect and better tiling
-        (10, SIZE, 135, 8, 7, 0.85),
-        (48, SIZE, 140, 8, 7, 0.95),
-        (88, SIZE, 138, 8, 7, 0.9),
-        (120, SIZE, 132, 8, 7, 0.88),
+        (10, HEIGHT, 270, 8, 7, 0.85),
+        (48, HEIGHT, 280, 8, 7, 0.95),
+        (88, HEIGHT, 275, 8, 7, 0.9),
+        (120, HEIGHT, 265, 8, 7, 0.88),
 
         # Edge-wrapping trees for seamless horizontal tiling
-        (0, SIZE, 120, 7, 6, 0.7),
-        (SIZE, SIZE, 125, 7, 6, 0.75),
+        (0, HEIGHT, 240, 7, 6, 0.7),
+        (WIDTH, HEIGHT, 250, 7, 6, 0.75),
     ]
 
     # Draw trees from back to front (so front trees overlap background trees)
@@ -139,8 +141,8 @@ def generate_pine_forest():
 
     # Add final PSX grain/noise overlay
     random.seed(42)  # Reset seed for consistent grain
-    for y in range(SIZE):
-        for x in range(SIZE):
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
             noise = random.randint(-3, 3)
             pixel = img_array[y, x].astype(np.int16) + noise
             img_array[y, x] = np.clip(pixel, 0, 255).astype(np.uint8)
@@ -154,7 +156,7 @@ def main():
     # Convert to PIL Image and save
     img = Image.fromarray(img_array, mode='RGB')
     img.save('output.png')
-    print(f"✓ Generated output.png ({SIZE}×{SIZE}, tileable)")
+    print(f"Generated output.png ({WIDTH}x{HEIGHT}, tileable)")
     print("  - Multiple pine tree silhouettes with depth layering")
     print("  - Triangular conifer shape with branch tiers")
     print("  - Dark, ominous forest atmosphere")

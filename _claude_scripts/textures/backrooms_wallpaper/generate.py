@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Backrooms Level 0 Yellow Wallpaper Generator
-Generates a tileable 128x128 texture with vertical lines and chevron patterns.
+Generates a tileable 128x256 texture with vertical lines and chevron patterns.
+The 1:2 aspect ratio matches BoxMesh faces (2 wide x 4 tall).
 """
 
 from PIL import Image, ImageDraw
@@ -9,7 +10,8 @@ import numpy as np
 import random
 
 # Configuration
-SIZE = 128
+WIDTH = 128
+HEIGHT = 256
 BASE_COLOR = (212, 197, 160)  # Greyish-yellow base
 HIGHLIGHT_COLOR = (232, 217, 152)  # Lighter yellow for variation
 PATTERN_COLOR = (140, 125, 90)  # MUCH darker for arrows to stand out
@@ -17,28 +19,32 @@ LINE_COLOR = (130, 115, 80)  # Darker for vertical lines to be more visible
 SHADOW_COLOR = (200, 185, 145)  # Subtle shadows
 
 # Pattern spacing
-VERTICAL_REPEAT = 32  # Pattern repeats every 32px vertically (128÷32=4 exact rows for tiling)
+VERTICAL_REPEAT = 32  # Pattern repeats every 32px vertically (256÷32=8 exact rows for tiling)
 COLUMN_WIDTH = 16  # Width of each pattern column (128÷16=8 exact columns for tiling)
 
 
 def add_base_texture(img_array):
     """Add prominent noise and color variation to simulate aged wallpaper."""
     # Add more visible paper texture grain
-    noise = np.random.normal(0, 8, (SIZE, SIZE, 3))
+    noise = np.random.normal(0, 8, (HEIGHT, WIDTH, 3))
     img_array = np.clip(img_array + noise, 0, 255)
 
     # Add larger-scale noise for surface variation
+    # Generate at reduced resolution and scale up with np.repeat to guarantee
+    # seamless tiling — block boundaries align exactly with texture edges since
+    # HEIGHT and WIDTH are exact multiples of both scales.
     for scale in [16, 32]:
-        coarse_noise = np.zeros((SIZE, SIZE, 3))
-        for i in range(0, SIZE, scale):
-            for j in range(0, SIZE, scale):
-                value = np.random.normal(0, 12)
-                coarse_noise[i:i+scale, j:j+scale] = value
+        rows = HEIGHT // scale
+        cols = WIDTH // scale
+        small_noise = np.random.normal(0, 12, (rows, cols, 1))
+        # Broadcast to 3 channels, then repeat each cell to fill scale x scale blocks
+        small_noise = np.broadcast_to(small_noise, (rows, cols, 3)).copy()
+        coarse_noise = np.repeat(np.repeat(small_noise, scale, axis=0), scale, axis=1)
         img_array = np.clip(img_array + coarse_noise, 0, 255)
 
     # Add more pronounced water damage stains
     for _ in range(8):
-        cx, cy = random.randint(0, SIZE), random.randint(0, SIZE)
+        cx, cy = random.randint(0, WIDTH), random.randint(0, HEIGHT)
         radius = random.randint(15, 50)
         variation = np.random.randint(-35, -15)
 
@@ -48,8 +54,8 @@ def add_base_texture(img_array):
                 dist = np.sqrt(dx**2 + dy**2)
                 if dist <= radius:
                     # Calculate wrapped coordinates
-                    y_coord = (cy + dy) % SIZE
-                    x_coord = (cx + dx) % SIZE
+                    y_coord = (cy + dy) % HEIGHT
+                    x_coord = (cx + dx) % WIDTH
 
                     # Apply falloff effect
                     falloff = max(0, 1 - (dist / radius))
@@ -118,8 +124,8 @@ def draw_thick_line_wrapped(img_array, x0, y0, x1, y1, thickness, color):
         for dy_offset in range(-thickness // 2, thickness // 2 + 1):
             for dx_offset in range(-thickness // 2, thickness // 2 + 1):
                 # Use modulo wrapping to ensure seamless tiling
-                y_coord = (y + dy_offset) % SIZE
-                x_coord = (x + dx_offset) % SIZE
+                y_coord = (y + dy_offset) % HEIGHT
+                x_coord = (x + dx_offset) % WIDTH
                 img_array[y_coord, x_coord] = color
 
         # Check if we've reached the end
@@ -164,7 +170,7 @@ def draw_vertical_line(img_array, x, y_start, y_end, jitter=True):
 def generate_wallpaper():
     """Generate the complete wallpaper texture."""
     # Create base image with greyish-yellow
-    img_array = np.full((SIZE, SIZE, 3), BASE_COLOR, dtype=np.float32)
+    img_array = np.full((HEIGHT, WIDTH, 3), BASE_COLOR, dtype=np.float32)
 
     # Add base texture variations
     img_array = add_base_texture(img_array)
@@ -172,20 +178,20 @@ def generate_wallpaper():
     # Draw repeating pattern directly on numpy array
     # Pattern: vertical line, arrows, vertical line, arrows...
     # Use exact division for perfect tiling (no extra drawings)
-    num_columns = SIZE // COLUMN_WIDTH  # Exactly 8 columns
+    num_columns = WIDTH // COLUMN_WIDTH  # Exactly 8 columns
 
     for col in range(num_columns):
         x = col * COLUMN_WIDTH + COLUMN_WIDTH // 2  # Center elements in each column
 
         if col % 2 == 0:
             # Draw vertical lines column
-            for row in range(SIZE // VERTICAL_REPEAT):  # Exactly 4 rows
+            for row in range(HEIGHT // VERTICAL_REPEAT):  # Exactly 8 rows
                 y_start = row * VERTICAL_REPEAT
                 y_end = y_start + VERTICAL_REPEAT
                 draw_vertical_line(img_array, x, y_start, y_end, jitter=True)
         else:
             # Draw chevrons column
-            for row in range(SIZE // VERTICAL_REPEAT):  # Exactly 4 rows
+            for row in range(HEIGHT // VERTICAL_REPEAT):  # Exactly 8 rows
                 y_base = row * VERTICAL_REPEAT
 
                 # Small chevron at top of cycle (adjusted for 32px repeat)
@@ -197,12 +203,12 @@ def generate_wallpaper():
                 draw_chevron_up(img_array, x, large_chevron_bottom, height=16, width=26, jitter=True)
 
     # Add more pronounced grain overlay for aged paper texture
-    grain = np.random.normal(0, 6, (SIZE, SIZE, 3))
+    grain = np.random.normal(0, 6, (HEIGHT, WIDTH, 3))
     img_array = np.clip(img_array + grain, 0, 255)
 
     # Add random faded spots (wear patterns)
     for _ in range(12):
-        cx, cy = random.randint(0, SIZE), random.randint(0, SIZE)
+        cx, cy = random.randint(0, WIDTH), random.randint(0, HEIGHT)
         radius = random.randint(8, 25)
         fade_amount = np.random.randint(10, 25)
 
@@ -212,8 +218,8 @@ def generate_wallpaper():
                 dist = np.sqrt(dx**2 + dy**2)
                 if dist <= radius:
                     # Calculate wrapped coordinates
-                    y_coord = (cy + dy) % SIZE
-                    x_coord = (cx + dx) % SIZE
+                    y_coord = (cy + dy) % HEIGHT
+                    x_coord = (cx + dx) % WIDTH
 
                     # Apply falloff effect
                     falloff = max(0, 1 - (dist / radius))
@@ -225,22 +231,51 @@ def generate_wallpaper():
                     )
 
     # Add subtle streaking/drip marks (vertical wear)
+    # Streak length is kept to a max of HEIGHT so it wraps at most once,
+    # and modulo wrapping ensures seamless tiling at vertical boundaries.
     for _ in range(6):
-        x = random.randint(0, SIZE)
-        y_start = random.randint(0, SIZE // 2)
-        y_end = random.randint(y_start + 20, SIZE)
+        x = random.randint(0, WIDTH)
+        y_start = random.randint(0, HEIGHT)
+        streak_length = random.randint(20, HEIGHT // 2)
         width = random.randint(2, 5)
 
-        for y in range(y_start, y_end):
+        for dy in range(streak_length):
+            y = (y_start + dy) % HEIGHT  # Modulo wrapping for seamless tiling
             x_wobble = x + random.randint(-1, 1)
             for dx in range(-width//2, width//2 + 1):
                 # Apply with modulo wrapping for seamless tiling
-                y_coord = y % SIZE
-                x_coord = (x_wobble + dx) % SIZE
+                x_coord = (x_wobble + dx) % WIDTH
                 darken = random.randint(-12, -5)
-                img_array[y_coord, x_coord] = np.clip(
-                    img_array[y_coord, x_coord] + darken, 0, 255
+                img_array[y, x_coord] = np.clip(
+                    img_array[y, x_coord] + darken, 0, 255
                 )
+
+    # Equalize row brightness to prevent vertical gradient (belt-and-suspenders)
+    # With proper modulo wrapping on all effects, this shouldn't be needed much,
+    # but it guards against any remaining asymmetry. Only corrects rows that
+    # deviate by more than a threshold from the global mean — this preserves
+    # intentional local variation (water stains, faded spots) while still
+    # preventing visible banding at tile boundaries.
+    row_means = img_array.mean(axis=1)  # shape (HEIGHT, 3)
+    global_mean = img_array.mean(axis=(0, 1))  # shape (3,)
+    EQUALIZE_THRESHOLD = 0.05  # Only correct if row mean deviates >5% from global
+    for y in range(HEIGHT):
+        for c in range(3):
+            if row_means[y, c] > 0:
+                deviation = abs(row_means[y, c] - global_mean[c]) / global_mean[c]
+                if deviation > EQUALIZE_THRESHOLD:
+                    # Blend toward global mean rather than snapping to it —
+                    # correct 50% of the deviation to soften the effect
+                    correction_factor = global_mean[c] / row_means[y, c]
+                    gentle_factor = 1.0 + 0.5 * (correction_factor - 1.0)
+                    img_array[y, :, c] = np.clip(
+                        img_array[y, :, c] * gentle_factor,
+                        0, 255
+                    )
+
+    # Final grain (applied AFTER equalization so it doesn't get normalized out)
+    final_grain = np.random.normal(0, 3, (HEIGHT, WIDTH, 3))
+    img_array = np.clip(img_array + final_grain, 0, 255)
 
     # Final image
     final_img = Image.fromarray(img_array.astype(np.uint8))
@@ -253,8 +288,8 @@ def main():
     print("Generating Backrooms Level 0 wallpaper texture...")
 
     # Set random seed for reproducibility (but with variation)
-    random.seed(42)
-    np.random.seed(42)
+    random.seed(2)
+    np.random.seed(2)
 
     # Generate texture
     wallpaper = generate_wallpaper()
@@ -264,7 +299,7 @@ def main():
     wallpaper.save(output_path, "PNG")
 
     print(f"✓ Texture generated successfully!")
-    print(f"  Size: {SIZE}x{SIZE} pixels")
+    print(f"  Size: {WIDTH}x{HEIGHT} pixels (1:2 aspect ratio for BoxMesh faces)")
     print(f"  Output: {output_path}")
     print(f"  Pattern: Vertical lines + chevron symbols (∧)")
     print(f"  Style: Aged, institutional wallpaper with subtle water damage")

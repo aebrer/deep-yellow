@@ -454,7 +454,7 @@ func _ensure_floor_percentage_range(grid: Array, rng: RandomNumberGenerator) -> 
 # ============================================================================
 
 ## Door spawn probability per eligible hallway tile
-const DOOR_SPAWN_CHANCE := 0.02  # 2% per eligible tile
+const DOOR_SPAWN_CHANCE := 0.30  # 30% per eligible tile (TEMP: revert to 0.02 after testing)
 ## Minimum distance between doors (in tiles)
 const DOOR_MIN_SPACING := 8
 ## Margin from chunk edges (avoid doors right at borders where hallway cutting happens)
@@ -494,6 +494,18 @@ func _place_doors(grid: Array, rng: RandomNumberGenerator) -> void:
 			)
 
 			if not is_horizontal and not is_vertical:
+				continue
+
+			# Check no adjacent door in cardinal directions (prevents door clusters)
+			var has_adjacent_door := false
+			for offset in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nx: int = x + offset.x
+				var ny: int = y + offset.y
+				if nx >= 0 and nx < Chunk.SIZE and ny >= 0 and ny < Chunk.SIZE:
+					if SubChunk.is_door_type(grid[ny][nx]):
+						has_adjacent_door = true
+						break
+			if has_adjacent_door:
 				continue
 
 			# Check minimum spacing from existing doors
