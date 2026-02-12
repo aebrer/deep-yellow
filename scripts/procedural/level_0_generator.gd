@@ -454,7 +454,7 @@ func _ensure_floor_percentage_range(grid: Array, rng: RandomNumberGenerator) -> 
 # ============================================================================
 
 ## Door spawn probability per eligible hallway tile
-const DOOR_SPAWN_CHANCE := 0.30  # 30% per eligible tile (TEMP: revert to 0.02 after testing)
+const DOOR_SPAWN_CHANCE := 0.30  # 30% per eligible tile
 ## Minimum distance between doors (in tiles)
 const DOOR_MIN_SPACING := 8
 ## Margin from chunk edges (avoid doors right at borders where hallway cutting happens)

@@ -14,29 +14,19 @@ func _init(dir: Vector2i) -> void:
 	direction = dir
 	action_name = "Move(%d, %d)" % [dir.x, dir.y]
 
-## Whether this movement opened a door (set during can_execute, used by execute)
-var _opened_door: bool = false
-
 func can_execute(player) -> bool:
-	"""Check if movement is valid (not wall, in bounds)
+	"""Check if movement is valid (not wall, in bounds). Pure check — no side effects.
 
 	For procedural generation, Grid3D handles infinite world bounds.
 	For static levels, Grid3D checks against grid_size.
-	Closed doors are opened automatically when the player moves into them.
+	Closed doors count as walkable (they'll be opened in execute).
 	"""
-	_opened_door = false
-
 	# Calculate target position
 	var target_pos = player.grid_position + direction
 
-	# Check if tile is walkable (Grid3D handles bounds checking)
+	# Check if tile is walkable or a closed door (doors are opened during execute)
 	if not player.grid.is_walkable(target_pos):
-		# Not walkable — but is it a closed door? If so, open it.
-		if player.grid.is_closed_door(target_pos):
-			player.grid.toggle_door(target_pos)
-			_opened_door = true
-			# Tile is now walkable — continue with movement validation
-		else:
+		if not player.grid.is_closed_door(target_pos):
 			return false
 
 	# Diagonal wall gap check: block only when BOTH adjacent cardinals are walls
@@ -53,10 +43,15 @@ func can_execute(player) -> bool:
 	return true
 
 func execute(player) -> void:
-	"""Execute the movement"""
+	"""Execute the movement, opening any closed door at the target first."""
 	if not can_execute(player):
 		push_warning("MovementAction.execute() called but movement is invalid!")
 		return
+
+	# Open closed door at target if needed (before moving)
+	var target_pos = player.grid_position + direction
+	if player.grid.is_closed_door(target_pos):
+		player.grid.toggle_door(target_pos)
 
 	var old_pos = player.grid_position
 
