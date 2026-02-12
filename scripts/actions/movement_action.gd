@@ -14,18 +14,30 @@ func _init(dir: Vector2i) -> void:
 	direction = dir
 	action_name = "Move(%d, %d)" % [dir.x, dir.y]
 
+## Whether this movement opened a door (set during can_execute, used by execute)
+var _opened_door: bool = false
+
 func can_execute(player) -> bool:
 	"""Check if movement is valid (not wall, in bounds)
 
 	For procedural generation, Grid3D handles infinite world bounds.
 	For static levels, Grid3D checks against grid_size.
+	Closed doors are opened automatically when the player moves into them.
 	"""
+	_opened_door = false
+
 	# Calculate target position
 	var target_pos = player.grid_position + direction
 
 	# Check if tile is walkable (Grid3D handles bounds checking)
 	if not player.grid.is_walkable(target_pos):
-		return false
+		# Not walkable — but is it a closed door? If so, open it.
+		if player.grid.is_closed_door(target_pos):
+			player.grid.toggle_door(target_pos)
+			_opened_door = true
+			# Tile is now walkable — continue with movement validation
+		else:
+			return false
 
 	# Diagonal wall gap check: block only when BOTH adjacent cardinals are walls
 	# (entities don't fully block a tile visually, so allow squeezing past them)
@@ -53,6 +65,11 @@ func execute(player) -> void:
 
 	# Update visual position and camera
 	player.update_visual_position()
+
+	# Auto-close: if the tile we just left is an open door, close it behind us
+	var old_tile: int = player.grid._get_subchunk_tile_type(old_pos)
+	if SubChunk.is_door_open(old_tile):
+		player.grid.toggle_door(old_pos)
 
 	# Advance turn counter
 	player.turn_count += 1

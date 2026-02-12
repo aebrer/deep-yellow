@@ -19,10 +19,16 @@ enum TileType {
 	# Floor variants (10-19)
 	FLOOR_PUDDLE = 10,
 	FLOOR_CARDBOARD = 11,
+	FLOOR_DOOR_A_OPEN = 12,
+	FLOOR_DOOR_B_OPEN = 13,
+	FLOOR_DOOR_C_OPEN = 14,
 	# Wall variants (20-29)
 	WALL_CRACKED = 20,
 	WALL_HOLE = 21,
 	WALL_MOULDY = 22,
+	WALL_DOOR_A_CLOSED = 23,
+	WALL_DOOR_B_CLOSED = 24,
+	WALL_DOOR_C_CLOSED = 25,
 	# Ceiling variants (30-39)
 	CEILING_STAIN = 30,
 	CEILING_HOLE = 31,
@@ -43,6 +49,39 @@ static func is_wall_type(tile: int) -> bool:
 static func is_ceiling_type(tile: int) -> bool:
 	"""Check if tile is any ceiling variant (CEILING, CEILING_STAIN, CEILING_HOLE)"""
 	return tile == TileType.CEILING or (tile >= 30 and tile <= 39)
+
+static func is_door_closed(tile: int) -> bool:
+	"""Check if tile is a closed door (wall variant that can be opened)"""
+	return tile >= TileType.WALL_DOOR_A_CLOSED and tile <= TileType.WALL_DOOR_C_CLOSED
+
+static func is_door_open(tile: int) -> bool:
+	"""Check if tile is an open door (floor variant that can be closed)"""
+	return tile >= TileType.FLOOR_DOOR_A_OPEN and tile <= TileType.FLOOR_DOOR_C_OPEN
+
+static func is_door_type(tile: int) -> bool:
+	"""Check if tile is any door (open or closed)"""
+	return is_door_closed(tile) or is_door_open(tile)
+
+## Door pairing: maps closed wall variant ↔ open floor variant
+## WALL_DOOR_A_CLOSED (23) ↔ FLOOR_DOOR_A_OPEN (12), etc.
+const DOOR_CLOSED_TO_OPEN: Dictionary = {
+	23: 12,  # A
+	24: 13,  # B
+	25: 14,  # C
+}
+const DOOR_OPEN_TO_CLOSED: Dictionary = {
+	12: 23,  # A
+	13: 24,  # B
+	14: 25,  # C
+}
+
+static func get_door_pair(tile: int) -> int:
+	"""Get the opposite state for a door tile. Returns -1 if not a door."""
+	if DOOR_CLOSED_TO_OPEN.has(tile):
+		return DOOR_CLOSED_TO_OPEN[tile]
+	if DOOR_OPEN_TO_CLOSED.has(tile):
+		return DOOR_OPEN_TO_CLOSED[tile]
+	return -1
 
 # Position
 var local_position: Vector2i  # Position within parent chunk (0-7, 0-7)

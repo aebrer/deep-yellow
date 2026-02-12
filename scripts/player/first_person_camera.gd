@@ -325,12 +325,23 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 	var entity_id := ""
 	var world_pos: Vector3 = grid_3d.grid_to_world(grid_pos)
 
+	# Check if this tile is a door (closed doors are walls, open doors are floors)
+	var cell_pos := Vector3i(grid_pos.x, 0, grid_pos.y)
+	var cell_item: int = grid_3d.grid_map.get_cell_item(cell_pos)
+	var is_door := Grid3D.is_door_tile(cell_item)
+
 	match tile_type:
 		"floor":
-			entity_id = level_prefix + "_floor"
+			if is_door:
+				entity_id = level_prefix + "_door_open"
+			else:
+				entity_id = level_prefix + "_floor"
 			world_pos.y = 0.0
 		"wall":
-			entity_id = level_prefix + "_wall"
+			if is_door:
+				entity_id = level_prefix + "_door"
+			else:
+				entity_id = level_prefix + "_wall"
 			world_pos.y = 2.0
 		"ceiling":
 			entity_id = level_prefix + "_ceiling"

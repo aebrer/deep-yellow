@@ -46,6 +46,8 @@ entity density: very low"""
 		20: 5,  # WALL_CRACKED → WallCracked
 		21: 6,  # WALL_HOLE → WallHole
 		22: 7,  # WALL_MOULDY → WallMouldy
+		12: 11, # FLOOR_DOOR_A_OPEN → DoorOpen
+		23: 10, # WALL_DOOR_A_CLOSED → DoorClosed
 		30: 8,  # CEILING_STAIN → CeilingStain
 		31: 9,  # CEILING_HOLE → CeilingHole
 	}

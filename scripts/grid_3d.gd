@@ -54,6 +54,7 @@ var exit_tile_positions: Dictionary = {}  # Vector2i -> true (world positions of
 static var _floor_items: Dictionary = {}  # {item_id: true}
 static var _wall_items: Dictionary = {}   # {item_id: true}
 static var _ceiling_items: Dictionary = {} # {item_id: true}
+static var _door_items: Dictionary = {}    # {item_id: true} (doors in any state)
 # Cached tile_mapping from current level
 static var _tile_mapping: Dictionary = {}
 
@@ -62,9 +63,12 @@ static func _rebuild_tile_category_cache(tile_mapping: Dictionary) -> void:
 	_floor_items.clear()
 	_wall_items.clear()
 	_ceiling_items.clear()
+	_door_items.clear()
 	_tile_mapping = tile_mapping
 	for subchunk_type in tile_mapping:
 		var item_id: int = tile_mapping[subchunk_type]
+		if SubChunk.is_door_type(subchunk_type):
+			_door_items[item_id] = true
 		if SubChunk.is_floor_type(subchunk_type):
 			_floor_items[item_id] = true
 		elif SubChunk.is_wall_type(subchunk_type):
@@ -87,6 +91,10 @@ static func is_wall_tile(item_id: int) -> bool:
 static func is_ceiling_tile(item_id: int) -> bool:
 	"""Check if a GridMap cell item is any ceiling variant in the current level"""
 	return _ceiling_items.has(item_id)
+
+static func is_door_tile(item_id: int) -> bool:
+	"""Check if a GridMap cell item is a door (open or closed) in the current level"""
+	return _door_items.has(item_id)
 
 static func subchunk_to_gridmap_item(tile_type: int) -> int:
 	"""Convert SubChunk.TileType to MeshLibrary item ID using current level's mapping"""
@@ -448,6 +456,120 @@ func update_tile(world_tile_pos: Vector2i, tile_type: int, ceiling_type: int = -
 	# Update ceiling layer if requested
 	if ceiling_type >= 0:
 		grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_type)
+
+
+# ============================================================================
+# DOOR SYSTEM (tile swapping between wall/floor variants)
+# ============================================================================
+
+func toggle_door(world_tile_pos: Vector2i) -> bool:
+	"""Toggle a door between open (floor variant) and closed (wall variant).
+
+	Handles:
+	- GridMap cell swap (visual)
+	- walkable_cells update
+	- SubChunk tile_data persistence (via ChunkManager)
+	- Pathfinding graph update (via PathfindingManager)
+	- Ceiling add/remove (open doors need ceilings, closed doors don't)
+
+	Returns:
+		true if door was toggled, false if tile at position is not a door
+	"""
+	# Get current tile type from SubChunk data (authoritative source)
+	var current_tile := _get_subchunk_tile_type(world_tile_pos)
+	if current_tile < 0:
+		return false
+
+	if not SubChunk.is_door_type(current_tile):
+		return false
+
+	var new_tile: int = SubChunk.get_door_pair(current_tile)
+	if new_tile < 0:
+		return false
+
+	# Convert new tile type to GridMap item ID
+	var new_item: int = Grid3D.subchunk_to_gridmap_item(new_tile)
+	var grid_pos := Vector3i(world_tile_pos.x, 0, world_tile_pos.y)
+
+	# Swap tile in GridMap
+	grid_map.set_cell_item(grid_pos, new_item)
+
+	# Update walkable_cells
+	if SubChunk.is_floor_type(new_tile):
+		# Door opened → now walkable
+		walkable_cells[world_tile_pos] = true
+		# Add ceiling above open door
+		var ceiling_item: int = Grid3D.subchunk_to_gridmap_item(SubChunk.TileType.CEILING)
+		grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), ceiling_item)
+		# Update pathfinding
+		Pathfinding.add_walkable_tile(world_tile_pos)
+	else:
+		# Door closed → now impassable
+		walkable_cells.erase(world_tile_pos)
+		# Remove ceiling above closed door (walls have no ceiling)
+		grid_map.set_cell_item(Vector3i(world_tile_pos.x, 1, world_tile_pos.y), GridMap.INVALID_CELL_ITEM)
+		# Remove from pathfinding
+		Pathfinding.remove_walkable_tile(world_tile_pos)
+
+	# Persist to SubChunk data (survives chunk unload/reload)
+	_set_subchunk_tile_type(world_tile_pos, new_tile)
+	# Also persist ceiling layer
+	if SubChunk.is_floor_type(new_tile):
+		_set_subchunk_tile_at_layer(world_tile_pos, 1, SubChunk.TileType.CEILING)
+	else:
+		_set_subchunk_tile_at_layer(world_tile_pos, 1, -1)
+
+	Log.grid("Door toggled at %s: %d → %d" % [world_tile_pos, current_tile, new_tile])
+	return true
+
+
+func is_closed_door(world_tile_pos: Vector2i) -> bool:
+	"""Check if tile at position is a closed door"""
+	var tile := _get_subchunk_tile_type(world_tile_pos)
+	return SubChunk.is_door_closed(tile)
+
+
+func _get_chunk_for_tile(world_tile_pos: Vector2i) -> Chunk:
+	"""Get the loaded Chunk containing a world tile position (via ChunkManager)"""
+	var cm = get_node_or_null("/root/ChunkManager")
+	if not cm:
+		return null
+	var level_id := 0
+	var current := LevelManager.get_current_level()
+	if current:
+		level_id = current.level_id
+	var chunk_pos := Vector2i(
+		floori(float(world_tile_pos.x) / Chunk.SIZE),
+		floori(float(world_tile_pos.y) / Chunk.SIZE)
+	)
+	var chunk_key := Vector3i(chunk_pos.x, chunk_pos.y, level_id)
+	if not cm.loaded_chunks.has(chunk_key):
+		return null
+	return cm.loaded_chunks[chunk_key]
+
+
+func _get_subchunk_tile_type(world_tile_pos: Vector2i) -> int:
+	"""Get SubChunk tile type at world position"""
+	var chunk := _get_chunk_for_tile(world_tile_pos)
+	if not chunk:
+		return -1
+	return chunk.get_tile(world_tile_pos)
+
+
+func _set_subchunk_tile_type(world_tile_pos: Vector2i, tile_type: int) -> void:
+	"""Set SubChunk tile type at world position"""
+	var chunk := _get_chunk_for_tile(world_tile_pos)
+	if not chunk:
+		return
+	chunk.set_tile(world_tile_pos, tile_type)
+
+
+func _set_subchunk_tile_at_layer(world_tile_pos: Vector2i, layer: int, tile_type: int) -> void:
+	"""Set SubChunk tile at world position and layer"""
+	var chunk := _get_chunk_for_tile(world_tile_pos)
+	if not chunk:
+		return
+	chunk.set_tile_at_layer(world_tile_pos, layer, tile_type)
 
 
 func _cache_wall_materials() -> void:
