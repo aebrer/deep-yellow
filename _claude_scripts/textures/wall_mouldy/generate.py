@@ -11,7 +11,8 @@ import random
 import math
 
 # Configuration
-SIZE = 128
+WIDTH = 128
+HEIGHT = 256
 BASE_TEXTURE_PATH = "../../../assets/levels/level_00/textures/wallpaper_yellow.png"
 OUTPUT_PATH = "output.png"
 
@@ -47,7 +48,7 @@ def draw_vein(mask, start_x, start_y, angle, length, thickness, decay=0.9):
                     draw_x = int(x + dx)
 
                     # Stay within bounds and away from edges
-                    if 15 <= draw_y < SIZE - 15 and 15 <= draw_x < SIZE - 15:
+                    if 15 <= draw_y < HEIGHT - 15 and 15 <= draw_x < WIDTH - 15:
                         # Gaussian falloff from center of vein segment
                         intensity = math.exp(-0.5 * (dist / max(radius, 1)) ** 2)
                         mask[draw_y, draw_x] = max(mask[draw_y, draw_x], intensity * 0.9)
@@ -73,23 +74,24 @@ def draw_vein(mask, start_x, start_y, angle, length, thickness, decay=0.9):
             draw_vein(mask, x, y, branch_angle, branch_length, branch_thickness, decay * 1.05)
 
 
-def generate_mould_mask(size, num_colonies=3):
+def generate_mould_mask(num_colonies=5):
     """
     Generate a mask for mould growth with colonies and veiny tendrils.
     Returns a float array [0.0-1.0] representing mould intensity.
     """
-    mask = np.zeros((size, size), dtype=np.float32)
+    mask = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
 
     # Keep colonies away from edges for tileability
-    margin = 25
+    margin_x = 25
+    margin_y = 25
 
     colonies = []
 
     # Generate main mould colonies
     for i in range(num_colonies):
         # Random position (away from edges)
-        cx = random.randint(margin, size - margin)
-        cy = random.randint(margin, size - margin)
+        cx = random.randint(margin_x, WIDTH - margin_x)
+        cy = random.randint(margin_y, HEIGHT - margin_y)
 
         # Vary colony sizes
         if i == 0:
@@ -116,7 +118,7 @@ def generate_mould_mask(size, num_colonies=3):
                     y = cy + dy
                     x = cx + dx
 
-                    if 0 <= y < size and 0 <= x < size:
+                    if 0 <= y < HEIGHT and 0 <= x < WIDTH:
                         mask[y, x] = max(mask[y, x], intensity)
 
     # Generate veiny tendrils spreading from colonies
@@ -133,18 +135,18 @@ def generate_mould_mask(size, num_colonies=3):
             start_x = cx + math.cos(angle) * start_offset
             start_y = cy + math.sin(angle) * start_offset
 
-            # Vein properties
-            vein_length = random.uniform(15, 35)
+            # Vein properties (longer for taller texture)
+            vein_length = random.uniform(20, 45)
             vein_thickness = random.uniform(1.2, 2.5)
 
             # Draw the vein with branching
             draw_vein(mask, start_x, start_y, angle, vein_length, vein_thickness)
 
     # Add some smaller spot details between colonies
-    num_spots = random.randint(8, 12)
+    num_spots = random.randint(12, 18)
     for _ in range(num_spots):
-        sx = random.randint(margin, size - margin)
-        sy = random.randint(margin, size - margin)
+        sx = random.randint(margin_x, WIDTH - margin_x)
+        sy = random.randint(margin_y, HEIGHT - margin_y)
         spot_radius = random.randint(2, 4)
 
         for dy in range(-spot_radius, spot_radius + 1):
@@ -157,7 +159,7 @@ def generate_mould_mask(size, num_colonies=3):
                     y = sy + dy
                     x = sx + dx
 
-                    if 0 <= y < size and 0 <= x < size:
+                    if 0 <= y < HEIGHT and 0 <= x < WIDTH:
                         mask[y, x] = max(mask[y, x], intensity * 0.6)
 
     # Slight blur for organic feel (but keep veins sharp)
@@ -192,7 +194,7 @@ def apply_mould(base_img, mould_mask):
     result = result * (1.0 - mould_mask_rgb * 0.75) + mould_overlay * mould_mask_rgb * 0.75
 
     # Add texture variation to mould (organic surface texture)
-    noise = np.random.uniform(0.85, 1.05, (SIZE, SIZE, 3))
+    noise = np.random.uniform(0.85, 1.05, (HEIGHT, WIDTH, 3))
     mould_texture = result * noise
     result = result * (1.0 - mould_mask_rgb * 0.4) + mould_texture * mould_mask_rgb * 0.4
 
@@ -212,12 +214,12 @@ def main():
     print(f"Loading base texture from {BASE_TEXTURE_PATH}...")
     base_img = Image.open(BASE_TEXTURE_PATH).convert("RGB")
 
-    if base_img.size != (SIZE, SIZE):
-        print(f"Warning: Base texture is {base_img.size}, resizing to {SIZE}×{SIZE}")
-        base_img = base_img.resize((SIZE, SIZE), Image.LANCZOS)
+    if base_img.size != (WIDTH, HEIGHT):
+        print(f"Warning: Base texture is {base_img.size}, resizing to {WIDTH}×{HEIGHT}")
+        base_img = base_img.resize((WIDTH, HEIGHT), Image.LANCZOS)
 
     print("Generating mould colonies with veiny tendrils...")
-    mould_mask = generate_mould_mask(SIZE, num_colonies=3)
+    mould_mask = generate_mould_mask(num_colonies=5)
 
     print("Applying dark mould overlay...")
     result = apply_mould(base_img, mould_mask)
@@ -226,7 +228,7 @@ def main():
     result.save(OUTPUT_PATH)
 
     print("Done! Mouldy wall texture with veiny tendrils generated.")
-    print(f"Output: {OUTPUT_PATH} ({SIZE}×{SIZE}, tileable)")
+    print(f"Output: {OUTPUT_PATH} ({WIDTH}×{HEIGHT}, tileable)")
     print("Features: Dark greenish-black mould colonies with spreading veins")
 
 

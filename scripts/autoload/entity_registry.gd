@@ -88,6 +88,30 @@ func _load_entities() -> void:
 	ceiling.threat_level = 0
 	_entities["level_0_ceiling"] = ceiling
 
+	# Create Level 0: Door (closed)
+	var door = EntityInfo.new()
+	door.entity_id = "level_0_door"
+	door.entity_name = "Office Door"
+	door.visual_description = "A plain brown office door set in the yellow wallpaper. The handle is a simple lever-style latch. It appears to be closed."
+	door.clearance_info[0] = ""
+	door.clearance_info[1] = "Standard hollow-core interior door. Faux wood veneer over particleboard. The wallpaper frame shows no seams."
+	door.clearance_info[2] = "Doors in Level 0 appear and vanish between visits. Their placement follows no discernible floor plan. Walking into a closed door will open it automatically."
+	door.object_class = "Safe"
+	door.threat_level = 0
+	_entities["level_0_door"] = door
+
+	# Create Level 0: Door (open)
+	var door_open = EntityInfo.new()
+	door_open.entity_id = "level_0_door_open"
+	door_open.entity_name = "Open Doorway"
+	door_open.visual_description = "A doorway stands open, the brown door retracted. A thin metallic track is visible in the carpet where the door slides. The passage beyond looks identical to this side."
+	door_open.clearance_info[0] = ""
+	door_open.clearance_info[1] = "The door track is slightly recessed into the floor. Carpet fibers grow over its edges suggesting long disuse."
+	door_open.clearance_info[2] = "Doors close automatically after you pass through. The mechanism is silent."
+	door_open.object_class = "Safe"
+	door_open.threat_level = 0
+	_entities["level_0_door_open"] = door_open
+
 	# Create Level -1: Floor (snowy dirt)
 	var neg1_floor = EntityInfo.new()
 	neg1_floor.entity_id = "level_neg1_floor"

@@ -1,7 +1,15 @@
 [gd_resource type="ShaderMaterial" load_steps=3 format=3]
 
+; ============================================================================
+; DOOR (CLOSED) - Wall variant with distinct door appearance
+; ============================================================================
+; Uses wall proximity shader (same as other walls) so doors fade with
+; sightline just like regular walls. Brown wooden door texture on yellow
+; wallpaper frame.
+; ============================================================================
+
 [ext_resource type="Shader" path="res://shaders/psx_wall_proximity.gdshader" id="1"]
-[ext_resource type="Texture2D" path="res://assets/levels/level_neg1/textures/pine_forest.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/levels/level_00/textures/door_closed.png" id="2"]
 
 [resource]
 shader = ExtResource("1")

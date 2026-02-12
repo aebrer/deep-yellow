@@ -140,6 +140,9 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 
 	var time_after_floor_pct := Time.get_ticks_usec()
 
+	# Place doors in single-width hallways (before variant placement)
+	_place_doors(grid, rng)
+
 	# Apply to chunk (with variant placement)
 	_apply_grid_to_chunk(grid, chunk, rng)
 
@@ -445,6 +448,81 @@ func _ensure_floor_percentage_range(grid: Array, rng: RandomNumberGenerator) -> 
 							if grid[ny][nx] == FLOOR:
 								grid[ny][nx] = WALL
 								break
+
+# ============================================================================
+# DOOR PLACEMENT
+# ============================================================================
+
+## Door spawn probability per eligible hallway tile
+const DOOR_SPAWN_CHANCE := 0.30  # 30% per eligible tile
+## Minimum distance between doors (in tiles)
+const DOOR_MIN_SPACING := 8
+## Margin from chunk edges (avoid doors right at borders where hallway cutting happens)
+const DOOR_EDGE_MARGIN := 3
+
+func _place_doors(grid: Array, rng: RandomNumberGenerator) -> void:
+	"""Place closed doors in single-width hallways.
+
+	A tile is eligible for a door if:
+	- It is a FLOOR tile
+	- It has walls on BOTH sides of one perpendicular axis (single-width corridor)
+	- It has floor on at least one side of the parallel axis (not a dead end)
+	- It is not too close to chunk edges (where border hallways get cut)
+	- It is not too close to another door
+	"""
+	var door_positions: Array[Vector2i] = []
+
+	for y in range(DOOR_EDGE_MARGIN, Chunk.SIZE - DOOR_EDGE_MARGIN):
+		for x in range(DOOR_EDGE_MARGIN, Chunk.SIZE - DOOR_EDGE_MARGIN):
+			if grid[y][x] != FLOOR:
+				continue
+
+			# Check for single-width horizontal hallway:
+			# walls above and below, floor left or right
+			var is_horizontal: bool = (
+				y > 0 and y < Chunk.SIZE - 1
+				and grid[y - 1][x] == WALL and grid[y + 1][x] == WALL
+				and (x > 0 and grid[y][x - 1] == FLOOR or x < Chunk.SIZE - 1 and grid[y][x + 1] == FLOOR)
+			)
+
+			# Check for single-width vertical hallway:
+			# walls left and right, floor above or below
+			var is_vertical: bool = (
+				x > 0 and x < Chunk.SIZE - 1
+				and grid[y][x - 1] == WALL and grid[y][x + 1] == WALL
+				and (y > 0 and grid[y - 1][x] == FLOOR or y < Chunk.SIZE - 1 and grid[y + 1][x] == FLOOR)
+			)
+
+			if not is_horizontal and not is_vertical:
+				continue
+
+			# Check no adjacent door in cardinal directions (prevents door clusters)
+			var has_adjacent_door := false
+			for offset in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nx: int = x + offset.x
+				var ny: int = y + offset.y
+				if nx >= 0 and nx < Chunk.SIZE and ny >= 0 and ny < Chunk.SIZE:
+					if SubChunk.is_door_type(grid[ny][nx]):
+						has_adjacent_door = true
+						break
+			if has_adjacent_door:
+				continue
+
+			# Check minimum spacing from existing doors
+			var too_close := false
+			var pos := Vector2i(x, y)
+			for door_pos in door_positions:
+				if abs(pos.x - door_pos.x) + abs(pos.y - door_pos.y) < DOOR_MIN_SPACING:
+					too_close = true
+					break
+			if too_close:
+				continue
+
+			# Roll for door placement
+			if rng.randf() < DOOR_SPAWN_CHANCE:
+				grid[y][x] = SubChunk.TileType.WALL_DOOR_A_CLOSED
+				door_positions.append(pos)
+
 
 # ============================================================================
 # GRID APPLICATION

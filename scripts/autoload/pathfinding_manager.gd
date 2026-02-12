@@ -309,6 +309,27 @@ func add_walkable_tile(world_pos: Vector2i) -> void:
 	if pos_to_id.has(world_pos):
 		_connect_neighbors(world_pos, pos_to_id[world_pos])
 
+
+## Remove a single walkable tile from the graph (for door closing)
+func remove_walkable_tile(world_pos: Vector2i) -> void:
+	"""Remove a single walkable tile from the navigation graph.
+
+	Called when a door closes, making a previously walkable tile impassable.
+	AStar2D automatically removes connections when a point is removed.
+
+	Args:
+		world_pos: World grid position to remove
+	"""
+	if not pos_to_id.has(world_pos):
+		return
+
+	var point_id: int = pos_to_id[world_pos]
+	astar.remove_point(point_id)
+	pos_to_id.erase(world_pos)
+	id_to_pos.erase(point_id)
+	free_ids.append(point_id)  # Recycle ID
+
+
 # ============================================================================
 # INCREMENTAL GRAPH UPDATES (for chunk load/unload)
 # ============================================================================

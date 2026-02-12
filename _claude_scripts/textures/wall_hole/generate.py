@@ -10,12 +10,13 @@ from PIL import Image
 import random
 
 # Constants
-SIZE = 128
+WIDTH = 128
+HEIGHT = 256
 BASE_WALLPAPER_PATH = "../../../assets/levels/level_00/textures/wallpaper_yellow.png"
 OUTPUT_PATH = "output.png"
 
 # Hole parameters - bottom opening (WIDE at bottom, NARROW at top)
-HOLE_HEIGHT = 50  # How far up from bottom the hole extends
+HOLE_HEIGHT = 95  # How far up from bottom the hole extends (~37% of 256, similar to 50/128=39%)
 HOLE_WIDTH_BOTTOM = 105  # Width at the very bottom (wide - broken from floor up)
 HOLE_WIDTH_TOP = 50  # Width at top of hole (narrows significantly as damage tapers)
 
@@ -38,23 +39,23 @@ DUST = (80, 75, 65)                  # Dust and grime
 def load_base_wallpaper():
     """Load the existing wallpaper texture."""
     img = Image.open(BASE_WALLPAPER_PATH).convert('RGB')
-    if img.size != (SIZE, SIZE):
-        img = img.resize((SIZE, SIZE), Image.LANCZOS)
+    if img.size != (WIDTH, HEIGHT):
+        img = img.resize((WIDTH, HEIGHT), Image.LANCZOS)
     return np.array(img, dtype=np.uint8)
 
-def create_crawl_hole_mask(size):
+def create_crawl_hole_mask():
     """
     Create a bottom-opening crawl hole mask.
     Returns a mask where 0.0 = inside hole (void), 1.0 = outside hole (wallpaper).
     """
-    mask = np.ones((size, size), dtype=np.float32)
+    mask = np.ones((HEIGHT, WIDTH), dtype=np.float32)
 
     # Set random seed for consistent raggedness
     np.random.seed(42)
 
     # Generate ragged top edge using noise
-    ragged_edge = np.zeros(size, dtype=np.float32)
-    for x in range(size):
+    ragged_edge = np.zeros(WIDTH, dtype=np.float32)
+    for x in range(WIDTH):
         # Base curve - arch shape that's wider at bottom
         # Width varies with height
         progress = 1.0  # Start at bottom
@@ -69,10 +70,10 @@ def create_crawl_hole_mask(size):
     ragged_edge = gaussian_filter1d(ragged_edge, sigma=2.0)
 
     # Create the hole mask
-    for y in range(size):
-        for x in range(size):
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
             # Distance from bottom
-            from_bottom = size - y
+            from_bottom = HEIGHT - y
 
             # Calculate hole width at this height
             if from_bottom <= HOLE_HEIGHT:
@@ -83,7 +84,7 @@ def create_crawl_hole_mask(size):
                 hole_width = HOLE_WIDTH_BOTTOM + (HOLE_WIDTH_TOP - HOLE_WIDTH_BOTTOM) * height_progress
 
                 # Center X position
-                center_x = size / 2.0
+                center_x = WIDTH / 2.0
                 left_edge = center_x - hole_width / 2.0
                 right_edge = center_x + hole_width / 2.0
 
@@ -127,19 +128,19 @@ def render_hole_interior(base_array, hole_mask):
     # Wooden stud positions (vertical supports, typically 16" apart = ~20-25px in our scale)
     stud_positions = [40, 64, 88]  # Three vertical studs visible
 
-    for y in range(SIZE):
-        for x in range(SIZE):
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
             if hole_mask[y, x] < 1.0:
                 # Inside or at edge of hole
-                from_bottom = SIZE - y
+                from_bottom = HEIGHT - y
 
                 # Base dark background
                 base_color = list(VOID_COLOR)
 
                 # Add depth gradient - darker toward bottom and center
                 depth_factor = from_bottom / HOLE_HEIGHT  # 0 at top, 1 at bottom
-                center_x = SIZE / 2.0
-                dist_from_center = abs(x - center_x) / (SIZE / 2.0)
+                center_x = WIDTH / 2.0
+                dist_from_center = abs(x - center_x) / (WIDTH / 2.0)
                 darkness = 1.0 - (depth_factor * 0.3 + (1.0 - dist_from_center) * 0.2)
 
                 # Wooden studs (vertical lines with width ~3-5px)
@@ -205,9 +206,9 @@ def add_plaster_debris(img_array, hole_mask, ragged_edge):
     """Add plaster/drywall chunks around the ragged top edge."""
     np.random.seed(43)
 
-    for y in range(SIZE):
-        for x in range(SIZE):
-            from_bottom = SIZE - y
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            from_bottom = HEIGHT - y
 
             # Only add plaster near the ragged top edge
             if from_bottom > 0 and from_bottom <= HOLE_HEIGHT + 15:
@@ -237,9 +238,9 @@ def add_plaster_debris(img_array, hole_mask, ragged_edge):
 
 def add_torn_wallpaper_edges(img_array, hole_mask, ragged_edge):
     """Darken and damage wallpaper at the torn edges."""
-    for y in range(SIZE):
-        for x in range(SIZE):
-            from_bottom = SIZE - y
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            from_bottom = HEIGHT - y
 
             if from_bottom > 0 and from_bottom <= HOLE_HEIGHT + 10:
                 ragged_top = ragged_edge[x]
@@ -260,25 +261,25 @@ def add_subtle_cracks(img_array, ragged_edge):
 
     # Pick a few random X positions for cracks
     num_cracks = 5
-    crack_positions = np.random.choice(range(20, SIZE - 20), num_cracks, replace=False)
+    crack_positions = np.random.choice(range(20, WIDTH - 20), num_cracks, replace=False)
 
     for crack_x in crack_positions:
         ragged_top = ragged_edge[crack_x]
-        start_y = SIZE - int(ragged_top)
+        start_y = HEIGHT - int(ragged_top)
 
         # Crack extends upward
         crack_length = random.randint(10, 25)
 
         for offset in range(crack_length):
             y = start_y - offset
-            if y < 0 or y >= SIZE:
+            if y < 0 or y >= HEIGHT:
                 continue
 
             # Slight horizontal wandering
             x_wander = int(np.random.randn() * 0.5)
             x = crack_x + x_wander
 
-            if x < 0 or x >= SIZE:
+            if x < 0 or x >= WIDTH:
                 continue
 
             # Darken slightly
@@ -291,7 +292,7 @@ def main():
     base_wallpaper = load_base_wallpaper()
 
     print("Creating bottom-opening crawl hole mask...")
-    hole_mask, ragged_edge = create_crawl_hole_mask(SIZE)
+    hole_mask, ragged_edge = create_crawl_hole_mask()
 
     print("Rendering hole interior with debris (studs, drywall, insulation)...")
     result = render_hole_interior(base_wallpaper, hole_mask)
@@ -306,18 +307,18 @@ def main():
     add_subtle_cracks(result, ragged_edge)
 
     print("Adding final grain/noise...")
-    noise = np.random.randint(-4, 5, (SIZE, SIZE, 3), dtype=np.int16)
+    noise = np.random.randint(-4, 5, (HEIGHT, WIDTH, 3), dtype=np.int16)
     result = np.clip(result.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
     print(f"Saving to {OUTPUT_PATH}...")
     output_img = Image.fromarray(result, mode='RGB')
     output_img.save(OUTPUT_PATH)
 
-    print(f"✓ Wall hole texture generated successfully!")
-    print(f"  Size: {SIZE}×{SIZE}")
+    print(f"Wall hole texture generated successfully!")
+    print(f"  Size: {WIDTH}x{HEIGHT}")
     print(f"  Hole type: Bottom-opening crawl space (human-sized)")
     print(f"  Hole height: ~{HOLE_HEIGHT}px from bottom")
-    print(f"  Hole shape: WIDE at bottom ({HOLE_WIDTH_BOTTOM}px) → NARROW at top ({HOLE_WIDTH_TOP}px)")
+    print(f"  Hole shape: WIDE at bottom ({HOLE_WIDTH_BOTTOM}px) -> NARROW at top ({HOLE_WIDTH_TOP}px)")
     print(f"  Interior: Wooden studs, drywall chunks, insulation, dust, debris")
     print(f"  Features: Ragged edges, plaster debris, torn wallpaper, depth shading")
     print(f"  Output: {OUTPUT_PATH}")
