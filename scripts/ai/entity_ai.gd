@@ -38,6 +38,10 @@ static func process_entity_turn(entity: WorldEntity, player_pos: Vector2i, grid)
 	# Get behavior for this entity type
 	var behavior = _BehaviorRegistry.get_behavior(entity.entity_type)
 
+	# Skip static entities (lights, vending machines, exit holes, etc.)
+	if behavior.skip_turn_processing:
+		return
+
 	# Reset turn state via behavior
 	behavior.reset_turn_state(entity)
 

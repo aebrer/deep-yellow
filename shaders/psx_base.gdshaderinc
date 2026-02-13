@@ -170,9 +170,11 @@ void fragment()
 #endif
 
 #ifdef POINT_LIGHTING
-	// Apply custom point lighting (replaces Godot's vertex_lighting)
+	// Add lightmap point lighting on top of Godot's vertex_lighting.
+	// Godot handles ambient+directional via COLOR (per-vertex, no seams for uniform lights).
+	// Lightmap adds fixture point lights per-fragment via texture sample (smooth across cells).
 	vec3 point_light = calculate_point_lighting(world_pos_for_lighting);
-	ALBEDO *= point_light;
+	ALBEDO += texture_color.rgb * modulate_color.rgb * point_light;
 #endif
 
 #ifdef LIGHT_VOLUME

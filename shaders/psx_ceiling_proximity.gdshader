@@ -10,7 +10,7 @@ shader_type spatial;
 // Without it: depth buffer + discard/alpha interaction causes missing faces
 // Uses unshaded + custom point lighting (replaces vertex_lighting).
 // vertex_lighting caused hard rectangular borders at GridMap cell boundaries.
-render_mode unshaded, cull_disabled, depth_prepass_alpha, blend_mix, specular_disabled, shadows_disabled;
+render_mode vertex_lighting, cull_disabled, depth_prepass_alpha, blend_mix, specular_disabled, shadows_disabled;
 
 // Global uniforms
 global uniform float precision_multiplier : hint_range(0.0, 1.0) = 1.0;
@@ -81,9 +81,9 @@ void fragment() {
 	vec4 texture_color = texture(albedoTex, UV);
 	ALBEDO = (color_base * texture_color).rgb;
 
-	// Apply custom point lighting
+	// Add lightmap point lighting on top of Godot's vertex_lighting
 	vec3 point_light = calculate_point_lighting(world_position);
-	ALBEDO *= point_light;
+	ALBEDO += texture_color.rgb * modulate_color.rgb * point_light;
 
 	// ALWAYS set ALPHA first (critical for correct rendering)
 	ALPHA = texture_color.a * color_base.a;

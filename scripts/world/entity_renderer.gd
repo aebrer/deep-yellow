@@ -37,16 +37,22 @@ const _EMOJI_FONT = preload("res://assets/fonts/default_font.tres")
 ## Maps world tile position to Sprite3D node
 var entity_billboards: Dictionary = {}  # Vector2i -> Sprite3D
 
-## Maps world tile position to WorldEntity reference
+## Maps world tile position to WorldEntity reference (gameplay entities only).
+## Used by combat queries, minimap, AI iteration — kept small for fast iteration.
 var entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
+
+## All light-emitting entities (any type in ENTITY_LIGHT_CONFIG).
+## Grid3D lightmap rebuild iterates this to bake light contributions.
+## Light-only entities (LIGHT_ONLY_ENTITIES) live here exclusively.
+## Light-emitting gameplay entities (e.g. barrel_fire) live in BOTH caches.
+## To add a new light source: add to ENTITY_LIGHT_CONFIG — that's it.
+var light_entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
 
 ## Maps world tile position to health bar Node3D
 var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
 
 ## Reverse lookup: WorldEntity -> Vector2i (for O(1) entity position lookup)
 var entity_to_pos: Dictionary = {}  # WorldEntity -> Vector2i
-
-## (OmniLight3D removed — shader-based lighting reads positions from entity_cache)
 
 ## Project-wide invalid position sentinel
 const INVALID_POSITION := Vector2i(-999999, -999999)
@@ -129,15 +135,21 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"barrel_fire": 1.0,        # Ground level (default billboard height)
 }
 
-## (Light culling removed — shader-based lighting evaluates nearest lights in shader)
-
 ## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).
 ## These are environmental fixtures: too numerous for full entity overhead.
-## Lighting is handled by shader uniforms (Grid3D reads entity_cache positions).
+## Goes into light_entity_cache only (not entity_cache), keeping gameplay queries fast.
+## Their behavior must set skip_turn_processing = true (see EntityBehavior).
 const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_light_broken"]
 
-## Light emission configuration for light-emitting entities
-## Entity types not listed here do not emit light.
+## Light emission configuration — the single source of truth for "this entity emits light".
+## Any entity type listed here is added to light_entity_cache on spawn.
+## Grid3D's lightmap rebuild iterates light_entity_cache to bake these contributions.
+##
+## To add a new light source for any level:
+##   1. Add entry here with color, energy, range
+##   2. Add entity spawning in your level generator
+##   3. If it's purely environmental (no HP/combat), also add to LIGHT_ONLY_ENTITIES
+##      and create a behavior with skip_turn_processing = true
 const ENTITY_LIGHT_CONFIG = {
 	"fluorescent_light": {
 		"color": Color(0.95, 0.9, 0.7),
@@ -174,7 +186,7 @@ const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 ## Creating a new Shader per entity causes massive memory bloat on web/WASM.
 var _health_bar_shader: Shader = null
 
-## (Light culling _process removed — no OmniLight3D nodes to cull)
+
 
 # ============================================================================
 # CHUNK LOADING
@@ -183,11 +195,12 @@ var _health_bar_shader: Shader = null
 func render_chunk_entities(chunk: Chunk) -> void:
 	"""Create visuals for all entities in chunk.
 
-	Light-only entities (LIGHT_ONLY_ENTITIES) get a lightweight Sprite3D only
-	— no collision, health bar, or signals. Lighting is handled by shader
-	uniforms (Grid3D reads their positions from entity_cache).
+	Two rendering paths:
+	- LIGHT_ONLY_ENTITIES: lightweight Sprite3D, goes into light_entity_cache only
+	- Everything else: full billboard with collision/health bar/signals, goes into entity_cache
+	  (also light_entity_cache if in ENTITY_LIGHT_CONFIG)
 
-	All other entities get the full billboard pipeline with signals.
+	Grid3D's lightmap reads light_entity_cache to bake point light contributions.
 
 	Args:
 		chunk: Chunk that was just loaded
@@ -200,8 +213,7 @@ func render_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 			var entity_type = entity.entity_type
 
-			# Light-only entities: lightweight sprite only (no collision/health bar)
-			# Lighting is handled by shader uniforms — Grid3D reads entity_cache positions
+			# Light-only entities: lightweight sprite, light_entity_cache only
 			if entity_type in LIGHT_ONLY_ENTITIES:
 				if entity_billboards.has(world_pos):
 					continue
@@ -213,7 +225,7 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				var sprite = _create_light_fixture_sprite(entity_type, world_3d, entity)
 				add_child(sprite)
 				entity_billboards[world_pos] = sprite
-				entity_cache[world_pos] = entity  # Queryable for examination + shader lighting
+				light_entity_cache[world_pos] = entity  # Separate cache for lights
 				continue
 
 			# Skip if billboard already exists
@@ -226,6 +238,10 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				add_child(billboard)
 				entity_billboards[world_pos] = billboard
 				entity_cache[world_pos] = entity
+
+				# Light-emitting gameplay entities also go into light cache
+				if ENTITY_LIGHT_CONFIG.has(entity_type):
+					light_entity_cache[world_pos] = entity
 
 				# Create health bar (as sibling, not child - avoids billboard nesting issues)
 				var health_bar = _create_health_bar(billboard.position)
@@ -262,18 +278,19 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 		for entity in subchunk.world_entities:
 			var world_pos = entity.world_position
 
-			# Clean up billboard entities (full pipeline)
+			# Clean up billboard entities (full pipeline + light-only)
 			if entity_billboards.has(world_pos):
 				entity_billboards[world_pos].queue_free()
 				entity_billboards.erase(world_pos)
 				entity_cache.erase(world_pos)
+				light_entity_cache.erase(world_pos)
 				entity_to_pos.erase(entity)
 
 				if entity_health_bars.has(world_pos):
 					entity_health_bars[world_pos].queue_free()
 					entity_health_bars.erase(world_pos)
 
-			# (OmniLight3D cleanup removed — shader-based lighting, no light nodes)
+
 
 # ============================================================================
 # DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
@@ -441,7 +458,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 
 	_add_examination_support(sprite, entity, final_size)
 
-	# (OmniLight3D removed — lighting handled by shader uniforms via Grid3D)
+
 
 	return sprite
 
@@ -507,7 +524,7 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 
 	return mesh_inst
 
-## (_create_entity_light removed — shader-based lighting, no OmniLight3D nodes)
+
 
 
 func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity: WorldEntity = null) -> Sprite3D:
@@ -708,7 +725,7 @@ func _update_health_bar(world_pos: Vector2i, hp_percent: float) -> void:
 # ============================================================================
 
 func get_entity_at(world_pos: Vector2i) -> WorldEntity:
-	"""Get WorldEntity at world position
+	"""Get WorldEntity at world position (checks both gameplay and light caches)
 
 	Args:
 		world_pos: World tile coordinates
@@ -716,7 +733,10 @@ func get_entity_at(world_pos: Vector2i) -> WorldEntity:
 	Returns:
 		WorldEntity or null if no entity at position
 	"""
-	return entity_cache.get(world_pos, null)
+	var entity = entity_cache.get(world_pos, null)
+	if entity:
+		return entity
+	return light_entity_cache.get(world_pos, null)
 
 func has_entity_at(world_pos: Vector2i) -> bool:
 	"""Check if there's a living entity at world position
@@ -728,6 +748,8 @@ func has_entity_at(world_pos: Vector2i) -> bool:
 		true if entity exists and is alive (not dead)
 	"""
 	var entity = entity_cache.get(world_pos, null)
+	if not entity:
+		entity = light_entity_cache.get(world_pos, null)
 	return entity != null and not entity.is_dead
 
 func get_all_entity_positions() -> Array[Vector2i]:
@@ -826,6 +848,8 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	# Get entity if not provided
 	if entity == null:
 		entity = entity_cache.get(world_pos, null)
+		if not entity:
+			entity = light_entity_cache.get(world_pos, null)
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
@@ -833,6 +857,7 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 		billboard.queue_free()
 	entity_billboards.erase(world_pos)
 	entity_cache.erase(world_pos)
+	light_entity_cache.erase(world_pos)
 
 	# Remove from reverse lookup
 	if entity:
@@ -1169,6 +1194,7 @@ func clear_all_entities() -> void:
 
 	entity_billboards.clear()
 	entity_cache.clear()
+	light_entity_cache.clear()
 	entity_health_bars.clear()
 	entity_to_pos.clear()
 
