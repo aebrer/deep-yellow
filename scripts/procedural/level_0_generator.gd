@@ -533,9 +533,9 @@ func _place_doors(grid: Array, rng: RandomNumberGenerator) -> void:
 
 ## Spacing between ceiling lights (in tiles). Lights are placed on a grid
 ## with this interval, then randomly offset and filtered to walkable tiles.
-## 8 tiles = 16 world units between lights. With range 10, adjacent lights
-## overlap by 4 world units for smooth coverage.
-const LIGHT_SPACING := 8
+## 5 tiles = 10 world units between lights. With range 12, adjacent lights
+## overlap significantly for dense fluorescent coverage.
+const LIGHT_SPACING := 5
 ## Probability that a light fixture is broken (dark, no light emission)
 const LIGHT_BROKEN_CHANCE := 0.15
 ## Random offset range for light positions (prevents perfectly regular grid)

@@ -289,7 +289,7 @@ func _load_entities() -> void:
 	barrel_fire.object_class = "Safe"
 	barrel_fire.threat_level = 0
 	barrel_fire.hostile = false
-	barrel_fire.blocks_movement = false
+	barrel_fire.blocks_movement = true  # Ground-level obstacle, blocks player and AI pathing
 	_entities["barrel_fire"] = barrel_fire
 
 	# Exit Hole (visual marker for EXIT_STAIRS tiles)

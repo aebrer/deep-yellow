@@ -52,9 +52,9 @@ entity density: very low"""
 		31: 9,  # CEILING_HOLE → CeilingHole
 	}
 
-	# Ambient low — point lights provide illumination, ambient is just baseline
-	ambient_light_color = Color(0.3, 0.3, 0.4, 1.0)  # Cool dark tone
-	ambient_light_intensity = 0.08
+	# Warm ambient — fluorescent bounce light off yellow walls
+	ambient_light_color = Color(0.5, 0.45, 0.3, 1.0)  # Warm yellow-brown bounce
+	ambient_light_intensity = 0.10
 
 	# Yellowish fog for distance culling
 	fog_color = Color(0.8, 0.75, 0.5, 1.0)

@@ -153,8 +153,8 @@ const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_li
 const ENTITY_LIGHT_CONFIG = {
 	"fluorescent_light": {
 		"color": Color(0.95, 0.9, 0.7),
-		"energy": 1.5,
-		"range": 10.0,
+		"energy": 2.0,
+		"range": 12.0,
 		"attenuation": 1.0,
 	},
 	"barrel_fire": {
@@ -213,7 +213,7 @@ func render_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 			var entity_type = entity.entity_type
 
-			# Light-only entities: lightweight sprite, light_entity_cache only
+			# Light-only entities: lightweight sprite, light_entity_cache only if they emit light
 			if entity_type in LIGHT_ONLY_ENTITIES:
 				if entity_billboards.has(world_pos):
 					continue
@@ -225,7 +225,9 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				var sprite = _create_light_fixture_sprite(entity_type, world_3d, entity)
 				add_child(sprite)
 				entity_billboards[world_pos] = sprite
-				light_entity_cache[world_pos] = entity  # Separate cache for lights
+				# Only add to light cache if entity actually emits light (has a config entry)
+				if ENTITY_LIGHT_CONFIG.has(entity_type):
+					light_entity_cache[world_pos] = entity
 				continue
 
 			# Skip if billboard already exists
@@ -423,7 +425,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	var sprite = Sprite3D.new()
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = true
+	sprite.shaded = false
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
 
 	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
@@ -545,7 +547,7 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 	var sprite := Sprite3D.new()
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = true
+	sprite.shaded = false
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
 	sprite.position = world_3d
 

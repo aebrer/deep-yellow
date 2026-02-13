@@ -781,6 +781,8 @@ func _rebuild_lightmap() -> void:
 		if not entity or entity.is_dead:
 			continue
 
+		if not EntityRenderer.ENTITY_LIGHT_CONFIG.has(entity.entity_type):
+			continue
 		var config: Dictionary = EntityRenderer.ENTITY_LIGHT_CONFIG[entity.entity_type]
 		var world_3d: Vector3 = grid_to_world_centered(pos, 0.0)  # XZ only, Y irrelevant for 2D lightmap
 
