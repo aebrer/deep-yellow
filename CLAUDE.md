@@ -289,6 +289,28 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - **Performance**: Scalability built in from start, not bolted on later
 
 
+### 3D World Y Coordinates (Empirically Confirmed)
+
+These values were confirmed via spike testing with debug spheres (Feb 2026).
+The GridMap cell_size is `Vector3(2.0, 1.0, 2.0)` but visual Y coordinates
+don't map 1:1 to cell units — always use these empirical values:
+
+| Y Value | What's There |
+|---------|-------------|
+| 4.4     | Ceiling surface (just below ceiling tiles) |
+| 2.5     | Midpoint / eye level |
+| 1.0     | Player / Entity billboards (`player_3d.gd`) |
+| 0.51    | Spraypaint floor text (`spraypaint_renderer.gd`) |
+| 0.48    | Void-fill floor plane (black, hides under-wall void) |
+| 0.0     | Bottom of floor cell (the void) |
+
+**Light fixture heights are per-level** — defined in level config, not hardcoded:
+- Ceiling fixtures (Level 0 fluorescent): Y=4.4
+- Barrel fires (Level -1): TBD (ground level, much lower)
+- Other fixture types will vary by level
+
+**Default lighting mode**: Ambient low + directional off (point lights provide all illumination).
+
 ### Key Files and Their Purposes
 
 **Autoloads (Singletons)** - `scripts/autoload/`
