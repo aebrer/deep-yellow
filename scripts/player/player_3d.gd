@@ -91,6 +91,17 @@ func _ready() -> void:
 	# Initialize combat system
 	attack_executor = AttackExecutorClass.new()
 
+	# Player light — ensures you can always see your immediate surroundings
+	var player_light := OmniLight3D.new()
+	player_light.light_color = Color(0.9, 0.85, 0.7)
+	player_light.light_energy = 0.8
+	player_light.omni_range = 8.0
+	player_light.omni_attenuation = 1.2
+	player_light.shadow_enabled = false
+	player_light.light_specular = 0.0
+	player_light.name = "PlayerLight"
+	add_child(player_light)
+
 	# Grid reference will be set by Game node
 	await get_tree().process_frame
 

@@ -344,7 +344,16 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 				entity_id = level_prefix + "_wall"
 			world_pos.y = 2.0
 		"ceiling":
-			entity_id = level_prefix + "_ceiling"
+			# Check for light fixture entity at this ceiling position
+			var entity_renderer = grid_3d.get_node_or_null("EntityRenderer")
+			if entity_renderer:
+				var light_entity = entity_renderer.get_entity_at(grid_pos)
+				if light_entity and light_entity.entity_type in EntityRenderer.LIGHT_ONLY_ENTITIES:
+					entity_id = light_entity.entity_type
+				else:
+					entity_id = level_prefix + "_ceiling"
+			else:
+				entity_id = level_prefix + "_ceiling"
 			world_pos.y = 2.98
 
 	# Fall back to level_0 if level-specific entity not registered

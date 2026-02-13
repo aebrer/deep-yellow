@@ -35,6 +35,10 @@ extends Node3D
 @onready var loading_screen: CanvasLayer = $LoadingScreen
 
 var snowfall: Snowfall = null
+var void_plane: MeshInstance3D = null
+
+## Y position for the void-fill plane (empirically confirmed, see CLAUDE.md)
+const VOID_PLANE_Y := 0.48
 
 func _ready() -> void:
 
@@ -77,6 +81,34 @@ func _ready() -> void:
 	# Listen for mid-run level changes (exit stairs)
 	if ChunkManager and not ChunkManager.level_changed.is_connected(_on_level_changed):
 		ChunkManager.level_changed.connect(_on_level_changed)
+
+	# Create void-fill plane after initial chunks load
+	if ChunkManager and not ChunkManager.initial_load_completed.is_connected(_create_void_plane):
+		ChunkManager.initial_load_completed.connect(_create_void_plane)
+
+
+func _create_void_plane() -> void:
+	"""Create a large black plane below the floor to hide the void under walls.
+
+	Without this, dynamic lighting makes the bright void visible through
+	proximity-faded walls, which is extremely distracting.
+	"""
+	if void_plane and is_instance_valid(void_plane):
+		return
+
+	var plane_mesh := PlaneMesh.new()
+	plane_mesh.size = Vector2(4000.0, 4000.0)
+
+	var plane_mat := StandardMaterial3D.new()
+	plane_mat.albedo_color = Color.BLACK
+	plane_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	void_plane = MeshInstance3D.new()
+	void_plane.mesh = plane_mesh
+	void_plane.material_override = plane_mat
+	void_plane.name = "VoidFillPlane"
+	add_child(void_plane)
+	void_plane.global_position = Vector3(0, VOID_PLANE_Y, 0)
 
 
 func _on_level_changed(_new_level_id: int) -> void:

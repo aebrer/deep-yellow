@@ -36,10 +36,10 @@ entity density: none (hand-placed)"""
 		3: 0,   # EXIT_STAIRS → Floor (renders as floor)
 	}
 
-	# Cool blue-white winter night atmosphere
-	# Ambient must be high enough to illuminate wall sides (vertical faces)
-	ambient_light_color = Color(0.6, 0.65, 0.8, 1.0)
-	ambient_light_intensity = 0.6
+	# Minimal ambient — barrel fires provide localized warmth.
+	# Textures have boosted modulate_color so surfaces reflect more point light.
+	ambient_light_color = Color(0.6, 0.65, 0.8, 1.0)  # Cool blue moonlight
+	ambient_light_intensity = 0.08
 
 	# Gray fog — dark forest
 	fog_color = Color(0.15, 0.15, 0.2, 1.0)
@@ -52,9 +52,9 @@ entity density: none (hand-placed)"""
 	# Dark void beyond geometry
 	background_color = Color(0.05, 0.05, 0.08, 1.0)
 
-	# Moonlight — cold blue tint, angled to hit wall sides
+	# Directional off — point lights (barrel fires) do all the heavy lifting
 	directional_light_color = Color(0.7, 0.75, 0.9, 1.0)
-	directional_light_energy = 0.7
+	directional_light_energy = 0.0
 	directional_light_rotation = Vector3(-45, 30, 0)
 
 	# ========================================================================
@@ -118,6 +118,9 @@ entity density: none (hand-placed)"""
 
 	# Snowfall effect
 	enable_snowfall = true
+
+	# Sprite brightness — boost so entities/items reflect barrel fire light
+	sprite_brightness = 2.5
 
 	# Fixed spawn at back wall of Room 1, facing forward (toward hallway)
 	player_spawn_position = Vector2i(64, 17)

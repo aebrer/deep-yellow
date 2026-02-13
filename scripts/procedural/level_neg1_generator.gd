@@ -156,6 +156,22 @@ func _place_tutorial_content(chunk: Chunk) -> void:
 	if mannequin_sc:
 		mannequin_sc.add_world_entity(mannequin)
 
+	# --- Barrel fires (warmth and light in the frozen forest) ---
+	var barrel_positions: Array[Vector2i] = [
+		Vector2i(61, 17),  # Room 1: near spawn
+		Vector2i(65, 30),  # Hallway 1: midpoint
+		Vector2i(61, 42),  # Room 2: corner
+		Vector2i(67, 58),  # Room 3: corner (opposite side from mannequin)
+		Vector2i(63, 76),  # Exit area
+	]
+	for local_pos in barrel_positions:
+		var world_pos: Vector2i = local_pos + chunk_world
+		var fire := WorldEntity.new("barrel_fire", world_pos, 99999.0, 0)
+		EntityRegistry.apply_defaults(fire)
+		var sc := chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
+		if sc:
+			sc.add_world_entity(fire)
+
 
 func _pick_tutorial_item() -> Item:
 	"""Pick one tutorial item using weighted rarity selection.

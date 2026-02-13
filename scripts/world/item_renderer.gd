@@ -111,6 +111,13 @@ func unload_chunk_items(chunk: Chunk) -> void:
 # BILLBOARD CREATION
 # ============================================================================
 
+func _get_sprite_brightness() -> float:
+	"""Get current level's sprite brightness multiplier."""
+	var level = LevelManager.get_current_level()
+	if level:
+		return level.sprite_brightness
+	return 1.0
+
 func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 	"""Create a Sprite3D billboard for an item
 
@@ -157,9 +164,13 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 		sprite.texture = ImageTexture.create_from_image(image)
 		sprite.pixel_size = BILLBOARD_SIZE / 16.0
 
+	# Apply level sprite brightness (amplifies light reflection from point sources)
+	var b = _get_sprite_brightness()
+	sprite.modulate = Color(b, b, b, 1.0)
+
 	# Corrupted item visual treatment: yellow tint + glitch animation
 	if item_data.get("corrupted", false):
-		sprite.modulate = Color(1.0, 0.9, 0.3, 1.0)  # Sickly yellow tint
+		sprite.modulate = Color(1.0 * b, 0.9 * b, 0.3 * b, 1.0)  # Sickly yellow × brightness
 		_start_glitch_animation(sprite)
 
 	# Add examination support (same pattern as floor tiles)

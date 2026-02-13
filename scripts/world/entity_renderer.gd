@@ -46,6 +46,9 @@ var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
 ## Reverse lookup: WorldEntity -> Vector2i (for O(1) entity position lookup)
 var entity_to_pos: Dictionary = {}  # WorldEntity -> Vector2i
 
+## Maps world tile position to OmniLight3D (for light-emitting entities)
+var entity_lights: Dictionary = {}  # Vector2i -> OmniLight3D
+
 ## Project-wide invalid position sentinel
 const INVALID_POSITION := Vector2i(-999999, -999999)
 
@@ -82,6 +85,9 @@ const ENTITY_COLORS = {
 	"tutorial_mannequin": Color(0.85, 0.75, 0.65),  # Pale beige plastic
 	"vending_machine": Color(0.6, 0.6, 0.7),        # Metallic gray-blue
 	"exit_hole": Color(0.15, 0.1, 0.1),             # Dark pit
+	"fluorescent_light": Color(1.0, 0.95, 0.8),    # Warm white
+	"fluorescent_light_broken": Color(0.3, 0.3, 0.3),  # Dark grey (dead tube)
+	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
 
 ## Entity render modes: BILLBOARD (default, faces camera) or FLOOR_DECAL (flat on ground)
@@ -107,15 +113,56 @@ const ENTITY_SCALE_OVERRIDES = {
 	"smiler": 2.0,  # Large, imposing presence
 	"tutorial_mannequin": 2.0,  # Life-sized mannequin
 	"vending_machine": 2.5,    # Tall vending machine
+	"fluorescent_light": 0.8,  # Ceiling fixture, smaller sprite
+	"fluorescent_light_broken": 0.8,
+	"barrel_fire": 1.5,        # Ground-level barrel
 }
 
 ## Per-entity height overrides (world units above floor)
-## Larger entities need higher placement so their bottom doesn't clip floor
+## See CLAUDE.md "3D World Y Coordinates" for empirically confirmed values
 const ENTITY_HEIGHT_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Raised to match 2x size scale
 	"smiler": 3.0,  # Floats ominously above the floor
 	"tutorial_mannequin": 2.0,  # Raised to match 2x size scale
 	"vending_machine": 2.5,    # Tall machine, raised to match scale
+	"fluorescent_light": 4.4,  # Ceiling surface (empirically confirmed)
+	"fluorescent_light_broken": 4.4,
+	"barrel_fire": 1.0,        # Ground level (default billboard height)
+}
+
+## Maximum distance (squared) from camera for entity lights to be active.
+## Light3D doesn't support visibility_range_end (that's GeometryInstance3D only),
+## so we manually toggle OmniLight3D.visible based on camera distance.
+## Set at fog_end (35.0) + margin — lights beyond fog contribute nothing visible.
+## CRITICAL: Without culling, ~15,000 light nodes across loaded chunks would all be
+## active, overwhelming GL Compatibility's per-object light limit (invisible lighting)
+## and killing framerate (renderer evaluates every light for every mesh).
+const LIGHT_CULL_RANGE_SQ := 40.0 * 40.0  # 40 world units, squared for fast comparison
+const LIGHT_CULL_INTERVAL := 0.25  # Seconds between culling updates
+var _light_cull_timer: float = 0.0
+
+## Entity types that ONLY create OmniLight3D — no billboard, collision, or health bar.
+## These are environmental fixtures: too numerous for full entity overhead.
+## With LIGHT_SPACING=6 on 128×128 chunks, each chunk has ~310 light entities.
+## At 49 loaded chunks, full billboard rendering would create 75,000+ scene tree nodes.
+## Light-only rendering: 1 node per entity (OmniLight3D), culled by distance.
+const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_light_broken"]
+
+## Light emission configuration for light-emitting entities
+## Entity types not listed here do not emit light.
+const ENTITY_LIGHT_CONFIG = {
+	"fluorescent_light": {
+		"color": Color(0.95, 0.9, 0.7),
+		"energy": 1.5,
+		"range": 10.0,
+		"attenuation": 1.0,
+	},
+	"barrel_fire": {
+		"color": Color(1.0, 0.5, 0.15),
+		"energy": 1.5,
+		"range": 10.0,
+		"attenuation": 1.0,
+	},
 }
 
 ## Default entity color
@@ -140,30 +187,95 @@ const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 var _health_bar_shader: Shader = null
 
 # ============================================================================
+# LIGHT CULLING
+# ============================================================================
+
+func _process(delta: float) -> void:
+	"""Throttled light culling — toggle OmniLight3D.visible by camera distance.
+
+	Light3D doesn't support visibility_range_end, so we manually cull.
+	Runs every LIGHT_CULL_INTERVAL seconds (not every frame).
+	"""
+	if entity_lights.is_empty():
+		return
+
+	_light_cull_timer += delta
+	if _light_cull_timer < LIGHT_CULL_INTERVAL:
+		return
+	_light_cull_timer = 0.0
+	_update_light_culling()
+
+func _update_light_culling() -> void:
+	"""Enable lights near camera, disable distant ones.
+
+	Uses squared distance to avoid sqrt. With ~15,000 light entities across
+	loaded chunks, this keeps only ~30-50 active at any time — matching the
+	spike test's performance profile (159 lights at 92 FPS).
+	"""
+	var camera := get_viewport().get_camera_3d()
+	if not camera:
+		return
+
+	var cam_pos := camera.global_position
+	for pos in entity_lights:
+		var light: OmniLight3D = entity_lights[pos]
+		if not is_instance_valid(light):
+			continue
+		var dist_sq := cam_pos.distance_squared_to(light.global_position)
+		light.visible = dist_sq <= LIGHT_CULL_RANGE_SQ
+
+# ============================================================================
 # CHUNK LOADING
 # ============================================================================
 
 func render_chunk_entities(chunk: Chunk) -> void:
-	"""Create billboards for all entities in chunk
+	"""Create visuals for all entities in chunk.
 
-	Connects to WorldEntity signals for HP/death updates.
+	Light-only entities (LIGHT_ONLY_ENTITIES) get a lightweight Sprite3D (visual)
+	+ OmniLight3D (illumination) — no collision, health bar, or signals.
+	This keeps per-fixture overhead to 2 nodes instead of 5, critical when
+	there are ~15,000 light entities across loaded chunks.
+
+	All other entities get the full billboard pipeline with signals.
 
 	Args:
 		chunk: Chunk that was just loaded
 	"""
 	for subchunk in chunk.sub_chunks:
 		for entity in subchunk.world_entities:
-			# Skip if dead
 			if entity.is_dead:
 				continue
 
 			var world_pos = entity.world_position
+			var entity_type = entity.entity_type
 
-			# Skip if billboard already exists (shouldn't happen, but safety check)
+			# Light-only entities: lightweight sprite + OmniLight3D (no collision/health bar)
+			if entity_type in LIGHT_ONLY_ENTITIES:
+				if entity_billboards.has(world_pos):
+					continue
+				var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+				var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
+					world_pos.x * 2.0 + 1.0, entity_height, world_pos.y * 2.0 + 1.0)
+
+				# Visual sprite (auto-culled by visibility_range_end)
+				var sprite = _create_light_fixture_sprite(entity_type, world_3d)
+				add_child(sprite)
+				entity_billboards[world_pos] = sprite
+				entity_cache[world_pos] = entity  # Queryable for examination
+
+				# OmniLight3D (manually culled by _update_light_culling)
+				var light = _create_entity_light(entity_type)
+				if light:
+					add_child(light)
+					light.global_position = world_3d
+					entity_lights[world_pos] = light
+				continue
+
+			# Skip if billboard already exists
 			if entity_billboards.has(world_pos):
 				continue
 
-			# Create billboard
+			# Full billboard pipeline for gameplay entities
 			var billboard = _create_billboard_for_entity(entity)
 			if billboard:
 				add_child(billboard)
@@ -179,7 +291,6 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				entity_to_pos[entity] = world_pos
 
 				# Connect to WorldEntity signals
-				# Bind to entity (not position) so callbacks remain valid after entity moves
 				if not entity.hp_changed.is_connected(_on_entity_hp_changed):
 					entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
 				if not entity.died.is_connected(_on_entity_died_signal):
@@ -195,35 +306,32 @@ func render_chunk_entities(chunk: Chunk) -> void:
 					health_bar.visible = false
 
 func unload_chunk_entities(chunk: Chunk) -> void:
-	"""Remove billboards for all entities in chunk
+	"""Remove visuals for all entities in chunk.
 
-	Note: We don't disconnect signals here - the EntityRenderer persists across
-	chunk loads/unloads, so the signal handlers remain valid. Signals will be
-	cleaned up when the scene reloads (start_new_run).
+	Handles both full billboard entities and light-only entities.
 
 	Args:
 		chunk: Chunk being unloaded
 	"""
-	var removed_count = 0
-
 	for subchunk in chunk.sub_chunks:
 		for entity in subchunk.world_entities:
 			var world_pos = entity.world_position
 
+			# Clean up billboard entities (full pipeline)
 			if entity_billboards.has(world_pos):
-				var billboard = entity_billboards[world_pos]
-				billboard.queue_free()
+				entity_billboards[world_pos].queue_free()
 				entity_billboards.erase(world_pos)
 				entity_cache.erase(world_pos)
 				entity_to_pos.erase(entity)
 
-				# Also remove health bar
 				if entity_health_bars.has(world_pos):
-					var health_bar = entity_health_bars[world_pos]
-					health_bar.queue_free()
+					entity_health_bars[world_pos].queue_free()
 					entity_health_bars.erase(world_pos)
 
-				removed_count += 1
+			# Clean up entity lights (both billboard entities and light-only entities)
+			if entity_lights.has(world_pos):
+				entity_lights[world_pos].queue_free()
+				entity_lights.erase(world_pos)
 
 # ============================================================================
 # DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
@@ -329,6 +437,13 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 # BILLBOARD CREATION
 # ============================================================================
 
+func _get_sprite_brightness() -> float:
+	"""Get current level's sprite brightness multiplier."""
+	var level = LevelManager.get_current_level()
+	if level:
+		return level.sprite_brightness
+	return 1.0
+
 func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	"""Create a visual node for an entity (billboard sprite or floor decal)
 
@@ -369,8 +484,9 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 		if texture:
 			sprite.texture = texture
 			sprite.pixel_size = final_size / texture.get_width()
-			sprite.modulate = Color.WHITE
-			sprite.set_meta("base_color", Color.WHITE)
+			var b = _get_sprite_brightness()
+			sprite.modulate = Color(b, b, b, 1.0)
+			sprite.set_meta("base_color", Color(b, b, b, 1.0))
 		else:
 			_apply_fallback_texture(sprite, entity_type, scale_mult)
 	else:
@@ -382,6 +498,14 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	sprite.set_meta("entity_type", entity_type)
 
 	_add_examination_support(sprite, entity, final_size)
+
+	# Create OmniLight3D as sibling (NOT child of billboard — billboard rotation
+	# would move the light source as camera rotates, causing angle-dependent lighting)
+	var light = _create_entity_light(entity_type)
+	if light:
+		add_child(light)
+		light.global_position = world_3d
+		entity_lights[world_pos] = light
 
 	return sprite
 
@@ -447,6 +571,67 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 
 	return mesh_inst
 
+func _create_entity_light(entity_type: String) -> OmniLight3D:
+	"""Create an OmniLight3D for a light-emitting entity, or return null.
+
+	The light is added as a child of the billboard, so it inherits position
+	and gets freed automatically on chunk unload.
+	"""
+	if not ENTITY_LIGHT_CONFIG.has(entity_type):
+		return null
+
+	var config: Dictionary = ENTITY_LIGHT_CONFIG[entity_type]
+	var light := OmniLight3D.new()
+	light.light_color = config.get("color", Color.WHITE)
+	light.light_energy = config.get("energy", 1.0)
+	light.omni_range = config.get("range", 8.0)
+	light.omni_attenuation = config.get("attenuation", 1.0)
+	light.shadow_enabled = false
+	light.light_specular = 0.0
+	light.visible = false  # Start hidden; _update_light_culling() enables nearby lights
+	return light
+
+
+func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3) -> Sprite3D:
+	"""Create a lightweight Sprite3D for a light fixture (no collision or health bar).
+
+	Used by LIGHT_ONLY_ENTITIES. Much cheaper than _create_billboard_for_entity():
+	just a visual sprite with auto-culling. No StaticBody3D, no CollisionShape3D,
+	no health bar, no signal connections.
+
+	Args:
+		entity_type: Entity type for color/texture/scale lookup
+		world_3d: World position for the sprite
+
+	Returns:
+		Sprite3D positioned at the fixture location
+	"""
+	var sprite := Sprite3D.new()
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = true
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
+
+	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		var texture = load(texture_path) as Texture2D
+		if texture:
+			sprite.texture = texture
+			sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / texture.get_width()
+			var b = _get_sprite_brightness()
+			sprite.modulate = Color(b, b, b, 1.0)
+	else:
+		_apply_fallback_texture(sprite, entity_type, scale_mult)
+
+	# Shorter visibility range than gameplay entities — ceiling fixtures are small
+	sprite.visibility_range_end = 30.0
+
+	return sprite
+
+
 func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null) -> void:
 	"""Add Examinable + StaticBody3D for raycast examination
 
@@ -489,8 +674,10 @@ func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: 
 	image.fill(Color.WHITE)
 	sprite.texture = ImageTexture.create_from_image(image)
 	sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / 16.0
-	sprite.modulate = color  # Base color via modulate
-	sprite.set_meta("base_color", color)
+	var b = _get_sprite_brightness()
+	var bright_color = Color(color.r * b, color.g * b, color.b * b, color.a)
+	sprite.modulate = bright_color  # Base color × level brightness
+	sprite.set_meta("base_color", bright_color)
 
 func _get_health_bar_shader() -> Shader:
 	"""Get or create the shared health bar shader.
@@ -724,6 +911,12 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	# Remove from reverse lookup
 	if entity:
 		entity_to_pos.erase(entity)
+
+	# Remove entity light
+	if entity_lights.has(world_pos):
+		if is_instance_valid(entity_lights[world_pos]):
+			entity_lights[world_pos].queue_free()
+		entity_lights.erase(world_pos)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
@@ -1052,10 +1245,14 @@ func clear_all_entities() -> void:
 	for health_bar in entity_health_bars.values():
 		health_bar.queue_free()
 
+	for light in entity_lights.values():
+		light.queue_free()
+
 	entity_billboards.clear()
 	entity_cache.clear()
 	entity_health_bars.clear()
 	entity_to_pos.clear()
+	entity_lights.clear()
 
 	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "EntityRenderer: Cleared all entity billboards")
 

@@ -52,9 +52,9 @@ entity density: very low"""
 		31: 9,  # CEILING_HOLE → CeilingHole
 	}
 
-	# Yellow office aesthetic
-	ambient_light_color = Color(1.0, 0.95, 0.7, 1.0)  # Warm yellow
-	ambient_light_intensity = 0.5
+	# Ambient low — point lights provide illumination, ambient is just baseline
+	ambient_light_color = Color(0.3, 0.3, 0.4, 1.0)  # Cool dark tone
+	ambient_light_intensity = 0.08
 
 	# Yellowish fog for distance culling
 	fog_color = Color(0.8, 0.75, 0.5, 1.0)
@@ -69,13 +69,9 @@ entity density: very low"""
 	# Greyish-beige represents stained office ceiling tiles stretching to infinity.
 	background_color = Color(0.82, 0.8, 0.75, 1.0)
 
-	# Overhead fluorescent lighting - The iconic buzzing lights of Level 0
-	# Slight blue tint gives that harsh, artificial fluorescent office feel
-	# Bright energy (0.9) ensures good visibility while maintaining atmosphere
-	# Rotation (-90, 0, 0) = straight down from above, like ceiling-mounted fluorescent panels
-	# This creates even illumination on all walls without harsh shadows
+	# Directional light off — point lights from fluorescent entities handle illumination
 	directional_light_color = Color(0.95, 0.97, 1.0, 1.0)
-	directional_light_energy = 0.9
+	directional_light_energy = 0.0
 	directional_light_rotation = Vector3(-90, 0, 0)
 
 	# ========================================================================
@@ -222,6 +218,9 @@ entity density: very low"""
 	time_scale = 1.0  # Normal speed
 	sanity_drain_rate = 0.05  # Slow sanity drain (isolation horror)
 	visibility_range = 20  # Good visibility
+
+	# Sprite brightness — boost so entities/items reflect fluorescent light
+	sprite_brightness = 1.5
 
 	# Ceiling vignette enabled for top-down view
 	enable_ceiling_vignette = true

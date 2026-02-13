@@ -14,6 +14,8 @@ const _BacteriaSpreaderBehavior = preload("res://scripts/ai/behaviors/bacteria_s
 const _TutorialMannequinBehavior = preload("res://scripts/ai/behaviors/tutorial_mannequin_behavior.gd")
 const _VendingMachineBehavior = preload("res://scripts/ai/behaviors/vending_machine_behavior.gd")
 const _ExitHoleBehavior = preload("res://scripts/ai/behaviors/exit_hole_behavior.gd")
+const _LightFixtureBehavior = preload("res://scripts/ai/behaviors/light_fixture_behavior.gd")
+const _BarrelFireBehavior = preload("res://scripts/ai/behaviors/barrel_fire_behavior.gd")
 
 # Singleton instance
 static var _instance: BehaviorRegistry = null
@@ -39,6 +41,9 @@ func _init_behaviors() -> void:
 		"tutorial_mannequin": _TutorialMannequinBehavior.new(),
 		"vending_machine": _VendingMachineBehavior.new(),
 		"exit_hole": _ExitHoleBehavior.new(),
+		"fluorescent_light": _LightFixtureBehavior.new(),
+		"fluorescent_light_broken": _LightFixtureBehavior.new(),
+		"barrel_fire": _BarrelFireBehavior.new(),
 	}
 
 static func get_behavior(entity_type: String) -> EntityBehavior:
