@@ -43,10 +43,8 @@ const DEFAULT_COLOR := Color(0.9, 0.9, 0.85)
 ## Default font size
 const DEFAULT_FONT_SIZE := 48
 
-## Height above floor for floor spraypaint
-## GridMap floor meshes sit at Y=0, so we need to be clearly above the surface.
-## Y=0.51 places text at the top of the cell_size.y (1.0) / 2 = 0.5 midpoint,
-## just above where the floor surface actually renders.
+## Height above floor for floor spraypaint.
+## See CLAUDE.md "3D World Y Coordinates" for the full reference.
 const FLOOR_HEIGHT := 0.51
 
 ## Outline size for readability against any surface

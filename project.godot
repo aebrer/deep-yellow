@@ -34,6 +34,7 @@ UIScaleManager="*res://scripts/autoload/ui_scale_manager.gd"
 Utilities="*res://scripts/autoload/utilities.gd"
 ExplorationTracker="*res://scripts/autoload/exploration_tracker.gd"
 MapMarkerManager="*res://scripts/autoload/map_marker_manager.gd"
+LightingSpikeTest="*res://scripts/debug/lighting_spike_test.gd"
 
 [display]
 
