@@ -3,6 +3,10 @@ render_mode LIT, CULL, shadows_disabled, DEPTH, BLEND, specular_disabled;
 global uniform float precision_multiplier : hint_range(0.0, 1.0) = 1.0;
 uniform vec4 modulate_color : source_color = vec4(1.0);
 
+#ifdef POINT_LIGHTING
+#include "psx_lighting.gdshaderinc"
+#endif
+
 #ifndef NO_TEXTURE
 uniform sampler2D albedoTex : source_color, filter_nearest, repeat_enable;
 #endif
@@ -128,6 +132,12 @@ void vertex()
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 #endif
 
+#ifdef POINT_LIGHTING
+	// World position and normal for custom point light calculation
+	world_pos_for_lighting = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	world_normal_for_lighting = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+#endif
+
 	POSITION = get_snapped_pos(PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0));  // snap position to grid
 	//POSITION /= abs(POSITION.w);  // discard depth for affine mapping (disabled: causes severe texture distortion near camera)
 
@@ -157,6 +167,12 @@ void fragment()
 #else
 	vec4 texture_color = texture(albedoTex, texture_uv);
 	ALBEDO = (color_base * texture_color).rgb;
+#endif
+
+#ifdef POINT_LIGHTING
+	// Apply custom point lighting (replaces Godot's vertex_lighting)
+	vec3 point_light = calculate_point_lighting(world_pos_for_lighting);
+	ALBEDO *= point_light;
 #endif
 
 #ifdef LIGHT_VOLUME

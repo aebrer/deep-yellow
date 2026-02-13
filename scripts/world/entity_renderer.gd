@@ -46,8 +46,7 @@ var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
 ## Reverse lookup: WorldEntity -> Vector2i (for O(1) entity position lookup)
 var entity_to_pos: Dictionary = {}  # WorldEntity -> Vector2i
 
-## Maps world tile position to OmniLight3D (for light-emitting entities)
-var entity_lights: Dictionary = {}  # Vector2i -> OmniLight3D
+## (OmniLight3D removed — shader-based lighting reads positions from entity_cache)
 
 ## Project-wide invalid position sentinel
 const INVALID_POSITION := Vector2i(-999999, -999999)
@@ -130,22 +129,11 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"barrel_fire": 1.0,        # Ground level (default billboard height)
 }
 
-## Maximum distance (squared) from camera for entity lights to be active.
-## Light3D doesn't support visibility_range_end (that's GeometryInstance3D only),
-## so we manually toggle OmniLight3D.visible based on camera distance.
-## Set at fog_end (35.0) + margin — lights beyond fog contribute nothing visible.
-## CRITICAL: Without culling, ~15,000 light nodes across loaded chunks would all be
-## active, overwhelming GL Compatibility's per-object light limit (invisible lighting)
-## and killing framerate (renderer evaluates every light for every mesh).
-const LIGHT_CULL_RANGE_SQ := 40.0 * 40.0  # 40 world units, squared for fast comparison
-const LIGHT_CULL_INTERVAL := 0.25  # Seconds between culling updates
-var _light_cull_timer: float = 0.0
+## (Light culling removed — shader-based lighting evaluates nearest lights in shader)
 
-## Entity types that ONLY create OmniLight3D — no billboard, collision, or health bar.
+## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).
 ## These are environmental fixtures: too numerous for full entity overhead.
-## With LIGHT_SPACING=6 on 128×128 chunks, each chunk has ~310 light entities.
-## At 49 loaded chunks, full billboard rendering would create 75,000+ scene tree nodes.
-## Light-only rendering: 1 node per entity (OmniLight3D), culled by distance.
+## Lighting is handled by shader uniforms (Grid3D reads entity_cache positions).
 const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_light_broken"]
 
 ## Light emission configuration for light-emitting entities
@@ -186,43 +174,7 @@ const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 ## Creating a new Shader per entity causes massive memory bloat on web/WASM.
 var _health_bar_shader: Shader = null
 
-# ============================================================================
-# LIGHT CULLING
-# ============================================================================
-
-func _process(delta: float) -> void:
-	"""Throttled light culling — toggle OmniLight3D.visible by camera distance.
-
-	Light3D doesn't support visibility_range_end, so we manually cull.
-	Runs every LIGHT_CULL_INTERVAL seconds (not every frame).
-	"""
-	if entity_lights.is_empty():
-		return
-
-	_light_cull_timer += delta
-	if _light_cull_timer < LIGHT_CULL_INTERVAL:
-		return
-	_light_cull_timer = 0.0
-	_update_light_culling()
-
-func _update_light_culling() -> void:
-	"""Enable lights near camera, disable distant ones.
-
-	Uses squared distance to avoid sqrt. With ~15,000 light entities across
-	loaded chunks, this keeps only ~30-50 active at any time — matching the
-	spike test's performance profile (159 lights at 92 FPS).
-	"""
-	var camera := get_viewport().get_camera_3d()
-	if not camera:
-		return
-
-	var cam_pos := camera.global_position
-	for pos in entity_lights:
-		var light: OmniLight3D = entity_lights[pos]
-		if not is_instance_valid(light):
-			continue
-		var dist_sq := cam_pos.distance_squared_to(light.global_position)
-		light.visible = dist_sq <= LIGHT_CULL_RANGE_SQ
+## (Light culling _process removed — no OmniLight3D nodes to cull)
 
 # ============================================================================
 # CHUNK LOADING
@@ -231,10 +183,9 @@ func _update_light_culling() -> void:
 func render_chunk_entities(chunk: Chunk) -> void:
 	"""Create visuals for all entities in chunk.
 
-	Light-only entities (LIGHT_ONLY_ENTITIES) get a lightweight Sprite3D (visual)
-	+ OmniLight3D (illumination) — no collision, health bar, or signals.
-	This keeps per-fixture overhead to 2 nodes instead of 5, critical when
-	there are ~15,000 light entities across loaded chunks.
+	Light-only entities (LIGHT_ONLY_ENTITIES) get a lightweight Sprite3D only
+	— no collision, health bar, or signals. Lighting is handled by shader
+	uniforms (Grid3D reads their positions from entity_cache).
 
 	All other entities get the full billboard pipeline with signals.
 
@@ -249,7 +200,8 @@ func render_chunk_entities(chunk: Chunk) -> void:
 			var world_pos = entity.world_position
 			var entity_type = entity.entity_type
 
-			# Light-only entities: lightweight sprite + OmniLight3D (no collision/health bar)
+			# Light-only entities: lightweight sprite only (no collision/health bar)
+			# Lighting is handled by shader uniforms — Grid3D reads entity_cache positions
 			if entity_type in LIGHT_ONLY_ENTITIES:
 				if entity_billboards.has(world_pos):
 					continue
@@ -257,18 +209,11 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 					world_pos.x * 2.0 + 1.0, entity_height, world_pos.y * 2.0 + 1.0)
 
-				# Visual sprite (auto-culled by visibility_range_end)
-				var sprite = _create_light_fixture_sprite(entity_type, world_3d)
+				# Visual sprite with examination support (auto-culled by visibility_range_end)
+				var sprite = _create_light_fixture_sprite(entity_type, world_3d, entity)
 				add_child(sprite)
 				entity_billboards[world_pos] = sprite
-				entity_cache[world_pos] = entity  # Queryable for examination
-
-				# OmniLight3D (manually culled by _update_light_culling)
-				var light = _create_entity_light(entity_type)
-				if light:
-					add_child(light)
-					light.global_position = world_3d
-					entity_lights[world_pos] = light
+				entity_cache[world_pos] = entity  # Queryable for examination + shader lighting
 				continue
 
 			# Skip if billboard already exists
@@ -328,10 +273,7 @@ func unload_chunk_entities(chunk: Chunk) -> void:
 					entity_health_bars[world_pos].queue_free()
 					entity_health_bars.erase(world_pos)
 
-			# Clean up entity lights (both billboard entities and light-only entities)
-			if entity_lights.has(world_pos):
-				entity_lights[world_pos].queue_free()
-				entity_lights.erase(world_pos)
+			# (OmniLight3D cleanup removed — shader-based lighting, no light nodes)
 
 # ============================================================================
 # DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
@@ -499,13 +441,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 
 	_add_examination_support(sprite, entity, final_size)
 
-	# Create OmniLight3D as sibling (NOT child of billboard — billboard rotation
-	# would move the light source as camera rotates, causing angle-dependent lighting)
-	var light = _create_entity_light(entity_type)
-	if light:
-		add_child(light)
-		light.global_position = world_3d
-		entity_lights[world_pos] = light
+	# (OmniLight3D removed — lighting handled by shader uniforms via Grid3D)
 
 	return sprite
 
@@ -571,37 +507,20 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 
 	return mesh_inst
 
-func _create_entity_light(entity_type: String) -> OmniLight3D:
-	"""Create an OmniLight3D for a light-emitting entity, or return null.
-
-	The light is added as a child of the billboard, so it inherits position
-	and gets freed automatically on chunk unload.
-	"""
-	if not ENTITY_LIGHT_CONFIG.has(entity_type):
-		return null
-
-	var config: Dictionary = ENTITY_LIGHT_CONFIG[entity_type]
-	var light := OmniLight3D.new()
-	light.light_color = config.get("color", Color.WHITE)
-	light.light_energy = config.get("energy", 1.0)
-	light.omni_range = config.get("range", 8.0)
-	light.omni_attenuation = config.get("attenuation", 1.0)
-	light.shadow_enabled = false
-	light.light_specular = 0.0
-	light.visible = false  # Start hidden; _update_light_culling() enables nearby lights
-	return light
+## (_create_entity_light removed — shader-based lighting, no OmniLight3D nodes)
 
 
-func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3) -> Sprite3D:
-	"""Create a lightweight Sprite3D for a light fixture (no collision or health bar).
+func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity: WorldEntity = null) -> Sprite3D:
+	"""Create a lightweight Sprite3D for a light fixture (no health bar or signals).
 
-	Used by LIGHT_ONLY_ENTITIES. Much cheaper than _create_billboard_for_entity():
-	just a visual sprite with auto-culling. No StaticBody3D, no CollisionShape3D,
-	no health bar, no signal connections.
+	Used by LIGHT_ONLY_ENTITIES. Cheaper than _create_billboard_for_entity():
+	no health bar, no signal connections. But DOES include examination support
+	so fixtures are examinable in FPV mode.
 
 	Args:
 		entity_type: Entity type for color/texture/scale lookup
 		world_3d: World position for the sprite
+		entity: WorldEntity for examination support (optional for backwards compat)
 
 	Returns:
 		Sprite3D positioned at the fixture location
@@ -614,13 +533,14 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3) -> Spr
 	sprite.position = world_3d
 
 	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+	var final_size = BILLBOARD_SIZE * scale_mult
 
 	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
 	if texture_path != "" and ResourceLoader.exists(texture_path):
 		var texture = load(texture_path) as Texture2D
 		if texture:
 			sprite.texture = texture
-			sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / texture.get_width()
+			sprite.pixel_size = final_size / texture.get_width()
 			var b = _get_sprite_brightness()
 			sprite.modulate = Color(b, b, b, 1.0)
 	else:
@@ -628,6 +548,12 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3) -> Spr
 
 	# Shorter visibility range than gameplay entities — ceiling fixtures are small
 	sprite.visibility_range_end = 30.0
+
+	# Add examination support so fixtures are examinable in FPV
+	# Use a wide flat slab (not thin card) since billboard is rendering-only —
+	# the collision shape stays fixed in world space, needs to be hittable from below
+	if entity:
+		_add_examination_support(sprite, entity, final_size, Vector3(1.5, 0.2, 1.5))
 
 	return sprite
 
@@ -912,11 +838,7 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	if entity:
 		entity_to_pos.erase(entity)
 
-	# Remove entity light
-	if entity_lights.has(world_pos):
-		if is_instance_valid(entity_lights[world_pos]):
-			entity_lights[world_pos].queue_free()
-		entity_lights.erase(world_pos)
+	# (entity_lights cleanup removed — shader-based lighting)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
@@ -1245,14 +1167,10 @@ func clear_all_entities() -> void:
 	for health_bar in entity_health_bars.values():
 		health_bar.queue_free()
 
-	for light in entity_lights.values():
-		light.queue_free()
-
 	entity_billboards.clear()
 	entity_cache.clear()
 	entity_health_bars.clear()
 	entity_to_pos.clear()
-	entity_lights.clear()
 
 	Log.msg(Log.Category.ENTITY, Log.Level.INFO, "EntityRenderer: Cleared all entity billboards")
 

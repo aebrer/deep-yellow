@@ -36,9 +36,35 @@ var player_node: Node3D = null
 # Procedural generation mode (set by ChunkManager)
 var use_procedural_generation: bool = false
 
-# Cached materials for proximity fade (for updating player_position uniform)
+# Cached materials for proximity fade and lighting uniforms
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
+var floor_materials: Array[ShaderMaterial] = []
+
+# All lit materials (union of floor + wall + ceiling) for lighting uniform updates
+var all_lit_materials: Array[ShaderMaterial] = []
+
+# ============================================================================
+# SHADER-BASED LIGHTING
+# ============================================================================
+# Light positions, colors, and ranges are passed as uniform arrays to all lit
+# shaders every frame. This replaces OmniLight3D nodes entirely.
+# See shaders/psx_lighting.gdshaderinc for the shader-side implementation.
+
+const MAX_SHADER_LIGHTS := 16
+
+# Pre-allocated arrays for shader uniforms (avoid per-frame allocation)
+var _light_positions: Array = []  # Array of Vector3
+var _light_colors: Array = []     # Array of Vector3 (RGB * energy)
+var _light_ranges: Array = []     # Array of float
+
+# Player light config (subtle always-on light attached to player)
+var _player_light_color := Vector3(1.0, 0.98, 0.9)  # Warm white
+var _player_light_range := 7.0
+var _player_light_energy := 0.6
+
+# Movement threshold: only re-sort lights when player moves >1 cell
+var _last_light_update_pos := Vector3.INF
 
 # Exit tile positions: tracked for minimap rendering
 var exit_tile_positions: Dictionary = {}  # Vector2i -> true (world positions of EXIT_STAIRS)
@@ -162,9 +188,11 @@ func configure_from_level(level_config: LevelConfig) -> void:
 
 	# Procedural mode: ChunkManager will populate via load_chunk()
 
-	# Cache materials and generate examination overlay
+	# Cache materials for proximity fade and lighting uniforms
 	_cache_wall_materials()
 	_cache_ceiling_materials()
+	_cache_floor_materials()
+	_build_all_lit_materials()
 	# Note: Examination overlay will be generated per-chunk as they load
 
 	# Lifecycle hook
@@ -620,33 +648,170 @@ func _cache_ceiling_materials() -> void:
 					if test_value == null:
 						push_warning("[Grid3D] Ceiling material (item %d) missing player_position uniform!" % item_id)
 
+func _cache_floor_materials() -> void:
+	"""Cache floor materials from MeshLibrary for lighting uniform updates"""
+	floor_materials.clear()
+
+	var mesh_library = grid_map.mesh_library
+	if not mesh_library:
+		return
+
+	for item_id in _floor_items:
+		var floor_mesh = mesh_library.get_item_mesh(item_id)
+		if not floor_mesh:
+			continue
+
+		for i in range(floor_mesh.get_surface_count()):
+			var material = floor_mesh.surface_get_material(i)
+			if material and material is ShaderMaterial:
+				if material not in floor_materials:
+					floor_materials.append(material)
+
+
+func _build_all_lit_materials() -> void:
+	"""Build combined list of all materials that receive lighting uniforms"""
+	all_lit_materials.clear()
+	for mat in floor_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	for mat in wall_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	for mat in ceiling_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	print("[Grid3D] Cached %d lit materials for shader lighting" % all_lit_materials.size())
+
+	# Push ambient light uniform from level config (replaces Godot's ambient
+	# which is bypassed by render_mode unshaded).
+	# Multiplier is needed because Godot's ambient system adds to vertex_lighting,
+	# but in unshaded mode ambient is the ONLY baseline light in unlit areas.
+	if current_level:
+		var ac: Color = current_level.ambient_light_color
+		var ai: float = current_level.ambient_light_intensity
+		var ambient := Vector3(ac.r * ai, ac.g * ai, ac.b * ai)
+		ambient *= 5.0  # Compensate for unshaded mode (no Godot ambient pipeline)
+		for mat in all_lit_materials:
+			mat.set_shader_parameter("ambient_light", ambient)
+
+
 # Debug: Track frame count for periodic logging
 var _frame_count: int = 0
 
 func _process(_delta: float) -> void:
-	"""Update wall and ceiling shader uniforms with player position for line-of-sight fade"""
+	"""Update shader uniforms: player position (proximity fade) + light data (point lights)"""
 	_frame_count += 1
 
-	if not player_node or (wall_materials.is_empty() and ceiling_materials.is_empty()):
-		if _frame_count % 60 == 0:  # Log once per second
+	if not player_node or all_lit_materials.is_empty():
+		if _frame_count % 60 == 0:
 			if not player_node:
 				print("[Grid3D] No player_node set for proximity fade")
-			if wall_materials.is_empty():
-				print("[Grid3D] No wall materials cached")
-			if ceiling_materials.is_empty():
-				print("[Grid3D] No ceiling materials cached")
 		return
 
-	# Update all materials with current player position
 	var player_pos = player_node.global_position
 
-	# Update wall materials
+	# Update proximity fade player position (wall + ceiling materials only)
 	for material in wall_materials:
 		material.set_shader_parameter("player_position", player_pos)
-
-	# Update ceiling materials
 	for material in ceiling_materials:
 		material.set_shader_parameter("player_position", player_pos)
+
+	# Collect nearest light positions from EntityRenderer
+	_update_light_uniforms(player_pos)
+
+func _update_light_uniforms(player_pos: Vector3) -> void:
+	"""Collect nearest light positions from EntityRenderer and pass to all lit shaders.
+
+	Replaces OmniLight3D nodes entirely. Light data comes from EntityRenderer's
+	entity_cache — light-emitting entities store their world positions there.
+	We sort by distance to player and take the nearest MAX_SHADER_LIGHTS.
+
+	Optimization: only re-sorts when player moves >2 world units (1 grid cell).
+	Light fixtures are static, so the sort order only changes with player movement.
+	"""
+	if not entity_renderer:
+		return
+
+	# Skip re-sort if player hasn't moved significantly (fixtures are static)
+	if _last_light_update_pos.distance_squared_to(player_pos) < 4.0:  # 2.0^2
+		# Still update player light position (it moves every frame)
+		var pl_color := Vector3(
+			_player_light_color.x * _player_light_energy,
+			_player_light_color.y * _player_light_energy,
+			_player_light_color.z * _player_light_energy
+		)
+		for material in all_lit_materials:
+			material.set_shader_parameter("player_light_pos", player_pos)
+			material.set_shader_parameter("player_light_color", pl_color)
+			material.set_shader_parameter("player_light_range", _player_light_range)
+		return
+	_last_light_update_pos = player_pos
+
+	# Collect all light-emitting entity positions and configs
+	# EntityRenderer.entity_cache: Vector2i -> WorldEntity
+	# EntityRenderer.ENTITY_LIGHT_CONFIG: entity_type -> {color, energy, range, ...}
+	_light_positions.clear()
+	_light_colors.clear()
+	_light_ranges.clear()
+
+	# Build unsorted list of (distance_sq, position, color, range)
+	var light_data: Array = []
+	for pos in entity_renderer.entity_cache:
+		var entity: WorldEntity = entity_renderer.entity_cache[pos]
+		if not entity or entity.is_dead:
+			continue
+		if not EntityRenderer.ENTITY_LIGHT_CONFIG.has(entity.entity_type):
+			continue
+
+		var config: Dictionary = EntityRenderer.ENTITY_LIGHT_CONFIG[entity.entity_type]
+		var height: float = EntityRenderer.ENTITY_HEIGHT_OVERRIDES.get(entity.entity_type, EntityRenderer.BILLBOARD_HEIGHT)
+		var world_3d: Vector3 = grid_to_world_centered(pos, height)
+		var dist_sq: float = player_pos.distance_squared_to(world_3d)
+
+		light_data.append({
+			"dist_sq": dist_sq,
+			"pos": world_3d,
+			"color": config.get("color", Color.WHITE),
+			"energy": config.get("energy", 1.0),
+			"range": config.get("range", 8.0),
+		})
+
+	# Sort by distance (nearest first) and take MAX_SHADER_LIGHTS
+	light_data.sort_custom(func(a, b): return a.dist_sq < b.dist_sq)
+	var count: int = mini(light_data.size(), MAX_SHADER_LIGHTS)
+
+	# Build uniform arrays
+	for i in range(count):
+		var ld = light_data[i]
+		_light_positions.append(ld.pos)
+		var c: Color = ld.color
+		var e: float = ld.energy
+		_light_colors.append(Vector3(c.r * e, c.g * e, c.b * e))
+		_light_ranges.append(ld.range)
+
+	# Pad arrays to MAX_SHADER_LIGHTS (shader expects fixed-size arrays)
+	while _light_positions.size() < MAX_SHADER_LIGHTS:
+		_light_positions.append(Vector3.ZERO)
+		_light_colors.append(Vector3.ZERO)
+		_light_ranges.append(0.0)
+
+	# Player light
+	var pl_color := Vector3(
+		_player_light_color.x * _player_light_energy,
+		_player_light_color.y * _player_light_energy,
+		_player_light_color.z * _player_light_energy
+	)
+
+	# Push to all lit materials
+	for material in all_lit_materials:
+		material.set_shader_parameter("light_count", count)
+		material.set_shader_parameter("light_positions", _light_positions)
+		material.set_shader_parameter("light_colors", _light_colors)
+		material.set_shader_parameter("light_ranges", _light_ranges)
+		material.set_shader_parameter("player_light_pos", player_pos)
+		material.set_shader_parameter("player_light_color", pl_color)
+		material.set_shader_parameter("player_light_range", _player_light_range)
+
 
 func set_player(player: Node3D) -> void:
 	"""Set player reference for line-of-sight proximity fade"""

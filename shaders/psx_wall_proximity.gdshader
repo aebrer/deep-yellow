@@ -8,7 +8,10 @@ shader_type spatial;
 // ============================================================================
 // CRITICAL: depth_prepass_alpha fixes culling issues when using transparency
 // Without it: depth buffer + discard/alpha interaction causes missing faces
-render_mode diffuse_lambert, vertex_lighting, cull_back, depth_prepass_alpha, blend_mix, specular_disabled, shadows_disabled;
+//
+// Uses unshaded + custom point lighting (replaces vertex_lighting).
+// vertex_lighting caused hard rectangular borders at GridMap cell boundaries.
+render_mode unshaded, cull_back, depth_prepass_alpha, blend_mix, specular_disabled, shadows_disabled;
 
 // Global uniforms
 global uniform float precision_multiplier : hint_range(0.0, 1.0) = 1.0;
@@ -29,6 +32,9 @@ uniform vec3 player_position;  // World space position of player (set by Grid)
 // CRITICAL: Pass world position from vertex shader to fragment shader
 // VERTEX is only valid in vertex shader, not fragment shader!
 varying vec3 world_position;
+
+// Custom point lighting
+#include "psx_lighting.gdshaderinc"
 
 // Bayer 4x4 dithering matrix
 const float bayer_matrix[16] = float[](
@@ -60,8 +66,10 @@ void vertex() {
 	UV = UV * uv_scale + uv_offset;
 	UV += uv_pan_velocity * TIME;
 
-	// Calculate world position for proximity fade (VERTEX is model space here)
+	// Calculate world position and normal for proximity fade AND point lighting
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	world_pos_for_lighting = world_position;
+	world_normal_for_lighting = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 
 	POSITION = get_snapped_pos(PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
 	//POSITION /= abs(POSITION.w);  // disabled: causes severe texture distortion near camera
@@ -73,6 +81,10 @@ void fragment() {
 	vec4 color_base = COLOR * modulate_color;
 	vec4 texture_color = texture(albedoTex, UV);
 	ALBEDO = (color_base * texture_color).rgb;
+
+	// Apply custom point lighting
+	vec3 point_light = calculate_point_lighting(world_position);
+	ALBEDO *= point_light;
 
 	// ALWAYS set ALPHA first (critical for correct rendering)
 	ALPHA = texture_color.a * color_base.a;

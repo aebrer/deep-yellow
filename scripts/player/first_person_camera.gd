@@ -239,9 +239,10 @@ func get_current_target() -> Examinable:
 			return null
 	elif pitch > 10:  # Looking up at ceiling (positive pitch = looking up)
 		tile_type = "ceiling"
-		# Intersect with ceiling plane at Y=2.98
+		# Intersect with ceiling plane at Y=4.4 (visual ceiling surface)
+		# Must match actual ceiling Y to get correct grid position for distant fixtures
 		if abs(ray_direction.y) > 0.01:
-			var t = (2.98 - ray_origin.y) / ray_direction.y
+			var t = (4.4 - ray_origin.y) / ray_direction.y
 			# Negative t means ray points away - need to negate direction
 			var actual_t = abs(t)
 			if actual_t < max_distance:
@@ -354,7 +355,7 @@ func _create_examination_tile(grid_3d, grid_pos: Vector2, tile_type: String, cac
 					entity_id = level_prefix + "_ceiling"
 			else:
 				entity_id = level_prefix + "_ceiling"
-			world_pos.y = 2.98
+			world_pos.y = 4.4  # Visual ceiling surface
 
 	# Fall back to level_0 if level-specific entity not registered
 	if not EntityRegistry.has_entity(entity_id):
