@@ -62,29 +62,3 @@ func execute(player) -> void:
 		to_index,
 		Item.PoolType.keys()[pool_type]
 	])
-
-func get_preview_info(player) -> Dictionary:
-	var pool = Action._get_pool_by_type(player, pool_type)
-	if not pool or from_index >= pool.items.size():
-		return {
-			"name": "Reorder Item",
-			"target": "",
-			"icon": "↔️",
-			"cost": ""
-		}
-
-	var item = pool.items[from_index]
-	if not item:
-		return {
-			"name": "Reorder Item",
-			"target": "",
-			"icon": "↔️",
-			"cost": ""
-		}
-
-	return {
-		"name": "Reorder",
-		"target": "%s: %d → %d" % [item.item_name, from_index, to_index],
-		"icon": "↔️",
-		"cost": ""
-	}

@@ -53,14 +53,5 @@ func _get_vending_panel(player: Player3D) -> VendingMachinePanel:
 	ui.name = "VendingMachinePanel"
 	game_node.add_child(ui)
 	return ui
-
-func get_preview_info(_player) -> Dictionary:
-	return {
-		"name": "Use",
-		"target": "Vending Machine",
-		"icon": "🏧",
-		"cost": ""
-	}
-
 func get_description() -> String:
 	return "Use Vending Machine"

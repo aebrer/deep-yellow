@@ -160,7 +160,7 @@ func _ready() -> void:
 	spraypaint_renderer = SpraypaintRenderer.new()
 	add_child(spraypaint_renderer)
 
-	print("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
+	Log.grid("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
 
 func configure_from_level(level_config: LevelConfig) -> void:
 	"""Configure grid from a LevelConfig resource"""
@@ -687,7 +687,7 @@ func _build_all_lit_materials() -> void:
 	for mat in ceiling_materials:
 		if mat not in all_lit_materials:
 			all_lit_materials.append(mat)
-	print("[Grid3D] Cached %d lit materials for lightmap lighting" % all_lit_materials.size())
+	Log.grid("[Grid3D] Cached %d lit materials for lightmap lighting" % all_lit_materials.size())
 
 	# Initialize lightmap system (ambient + fixture lights baked into texture)
 	_init_lightmap()
@@ -703,7 +703,7 @@ func _process(_delta: float) -> void:
 	if not player_node or all_lit_materials.is_empty():
 		if _frame_count % 60 == 0:
 			if not player_node:
-				print("[Grid3D] No player_node set for proximity fade")
+				Log.warn(Log.Category.GRID, "[Grid3D] No player_node set for proximity fade")
 		return
 
 	var player_pos = player_node.global_position
@@ -746,7 +746,7 @@ func _init_lightmap() -> void:
 		mat.set_shader_parameter("lightmap_origin", _lightmap_origin)
 
 	_lightmap_dirty = true
-	print("[Grid3D] Lightmap initialized: %dx%d (%.0f world units coverage)" % [
+	Log.grid("[Grid3D] Lightmap initialized: %dx%d (%.0f world units coverage)" % [
 		LIGHTMAP_SIZE, LIGHTMAP_SIZE, LIGHTMAP_SIZE * LIGHTMAP_CELL_SIZE])
 
 
@@ -802,7 +802,7 @@ func _rebuild_lightmap() -> void:
 		mat.set_shader_parameter("lightmap_origin", _lightmap_origin)
 
 	if _frame_count < 10:  # Only log during startup
-		print("[Grid3D] Lightmap rebuilt: %d lights baked, origin=(%.0f, %.0f)" % [
+		Log.grid("[Grid3D] Lightmap rebuilt: %d lights baked, origin=(%.0f, %.0f)" % [
 			light_count, _lightmap_origin.x, _lightmap_origin.y])
 
 

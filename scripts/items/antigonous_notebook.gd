@@ -173,36 +173,6 @@ func _try_intercept_damage(amount: float) -> bool:
 	return true  # Damage intercepted
 
 # ============================================================================
-# TURN EFFECT INFO (for UI preview)
-# ============================================================================
-
-func get_turn_effect_info() -> Dictionary:
-	"""Return info about this item's reactive effect for UI preview."""
-	# No per-turn mana cost - only spends mana when damage is blocked
-	return {}
-
-func get_status_display() -> Dictionary:
-	"""Return status for action preview UI - shows shield ready or on cooldown."""
-	var mana_cost = SHIELD_MANA_COST_PER_LEVEL * level
-	var ready = _current_cooldown <= 0
-
-	if ready:
-		return {
-			"show": true,
-			"type": "ready",
-			"mana_cost": mana_cost,
-			"description": "Blocks next hit"
-		}
-	else:
-		return {
-			"show": true,
-			"type": "cooldown",
-			"cooldown_current": _current_cooldown + 1,
-			"cooldown_after": _current_cooldown,
-			"description": "%d turns" % _current_cooldown
-		}
-
-# ============================================================================
 # CORRUPTION HELPER
 # ============================================================================
 

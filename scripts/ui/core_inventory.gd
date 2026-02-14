@@ -18,9 +18,6 @@ Tooltips show full clearance-based item descriptions.
 Updates in real-time as items change.
 """
 
-## Emitted when reorder state changes (for updating action preview UI)
-signal reorder_state_changed(is_reordering: bool)
-
 enum LayoutMode { VERTICAL, HORIZONTAL }
 var current_layout: LayoutMode = LayoutMode.VERTICAL
 
@@ -532,9 +529,6 @@ func _start_reorder(slot: Control, pool_type: Item.PoolType, slot_index: int) ->
 		label.add_theme_stylebox_override("focus", style)
 
 
-	# Emit signal to update action preview
-	reorder_state_changed.emit(true)
-
 func _toggle_item(pool_type: Item.PoolType, slot_index: int) -> void:
 	"""Toggle an item ON/OFF (consumes a turn)"""
 	if not player:
@@ -605,9 +599,6 @@ func _cancel_reorder() -> void:
 	reordering_slot = null
 	reordering_slot_index = -1
 
-	# Emit signal to update action preview
-	reorder_state_changed.emit(false)
-
 func _on_pause_toggled(is_paused: bool) -> void:
 	"""Enable/disable focus and clear highlights based on pause state"""
 	if is_paused:
@@ -617,8 +608,6 @@ func _on_pause_toggled(is_paused: bool) -> void:
 				slot.focus_mode = Control.FOCUS_ALL
 				slot.mouse_filter = Control.MOUSE_FILTER_STOP  # Allow mouse hover
 
-		# Emit signal to show pause controls in action preview
-		reorder_state_changed.emit(false)
 	else:
 		# Cancel any ongoing reorder when unpausing
 		if reordering_slot:

@@ -67,12 +67,10 @@ What we need to add:
 - All enemies within 45° of that direction are hit
 - Camera direction is irrelevant (auto-battler design)
 
-### 6. Attack Preview & Targeting ✅
+### 6. Attack Targeting ✅
 - Visual highlight on targetable enemies (red tint)
-- Action preview UI shows attack name, damage, target count
-- Preview updates based on movement indicator position
-- Shows "X targets for Y dmg" format
-- Mana cost displayed for NULL attacks
+- Auto-targeting finds nearest enemy in range
+- Mana cost enforced for NULL attacks
 
 ### 7. Combat Visual Feedback ✅
 - Floating emoji VFX when attacks hit (👊, 📢, ✨)
@@ -227,7 +225,7 @@ What we need to add:
 
 ### Resolved ✅
 - [x] **Auto-attack vs Manual attack**: AUTO-ATTACK (turn-based auto-battler)
-- [x] **Attack range indicators**: Dual system (visual highlight + action preview UI)
+- [x] **Attack range indicators**: Visual highlight on targetable enemies
 - [x] **Attack frequency**: Turn-based cooldowns per attack type
 - [x] **Cone targeting**: Auto-aim at nearest enemy (not camera direction)
 - [x] **LOS blocking**: Walls block attacks, entities don't

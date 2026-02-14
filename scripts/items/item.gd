@@ -294,23 +294,6 @@ func get_attack_modifiers() -> Dictionary:
 	"""
 	return {}
 
-func get_turn_effect_info() -> Dictionary:
-	"""Return info about this item's on_turn() effect for UI preview.
-
-	Override in subclasses that have mana-consuming turn effects.
-	Used by action preview to show 🚫 when item can't afford its effect.
-
-	Returns:
-		Dictionary with:
-		- effect_name: String (display name for the effect)
-		- mana_cost: float (mana required per turn, 0 if none)
-		- description: String (brief effect description, optional)
-
-		Empty dict = no turn effect to preview
-	"""
-	return {}
-
-
 func get_passive_modifiers() -> Dictionary:
 	"""Return passive modifiers that affect gameplay systems beyond attacks.
 
@@ -352,27 +335,6 @@ func reset_cooldown() -> void:
 	Called by effects like Lucky Rabbit's Foot.
 	"""
 	pass
-
-func get_status_display() -> Dictionary:
-	"""Return info for action preview UI status display.
-
-	Override in subclasses with reactive effects or important cooldowns.
-	Used to show items in the action preview (e.g., shield ready, cooldown ticking).
-
-	Returns:
-		Dictionary with:
-		- show: bool (true to display in action preview)
-		- type: String ("ready" or "cooldown")
-		- mana_cost: float (mana required when triggered, for ready type)
-		- description: String (brief status description)
-
-		Empty dict or show=false = don't display in action preview
-
-	Example (Antigonous Notebook):
-		Ready: {"show": true, "type": "ready", "mana_cost": 5, "description": "Blocks next hit"}
-		Cooldown: {"show": true, "type": "cooldown", "description": "3 turns"}
-	"""
-	return {}
 
 # ============================================================================
 # UTILITY
