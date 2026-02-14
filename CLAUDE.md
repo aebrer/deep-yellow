@@ -81,7 +81,7 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 │            STATE MACHINE LAYER                       │
 │  Player → InputStateMachine → Current State          │
 │  States: Idle (FPV/Tactical), PreTurn, Executing,    │
-│          PostTurn                                     │
+│          PostTurn, AutoExplore                        │
 └────────────────┬────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────┐
@@ -102,7 +102,7 @@ When ready for testing, say: "This is ready for you to test. When you run it, yo
 
 **Do NOT add controls without explicit user request.**
 
-Authoritative control list is in `scripts/ui/settings_panel.gd` (~line 510) — read that for current mappings. That's the single source of truth; don't duplicate it here.
+Authoritative control list is the `CONTROL_MAPPINGS` const in `scripts/ui/settings_panel.gd` — read that for current mappings. That's the single source of truth; don't duplicate it here.
 
 **Camera System:**
 - Game loads in FPV (first-person view) by default
@@ -141,15 +141,17 @@ Default lighting: ambient low + directional off (point lights provide all illumi
 - `pathfinding_manager.gd` - A* pathfinding
 - `pause_manager.gd` - Pause state and menu handling
 - `ui_scale_manager.gd` - UI scaling for different resolutions
+- `exploration_tracker.gd` - Exploration state tracking
+- `map_marker_manager.gd` - Map marker management
 - `utilities.gd` - Common utility functions
 
 **Player System** - `scripts/player/`
 - `player_3d.gd` - 3D player controller, turn-based movement, stats
 - `first_person_camera.gd` / `tactical_camera.gd` - Camera modes
-- `input_state_machine.gd` + `states/` - State machine with idle, pre/executing/post turn states
+- `input_state_machine.gd` + `states/` - State machine with idle, pre/executing/post turn, auto-explore states
 
 **Actions** - `scripts/actions/`
-- `action.gd` (base), `movement_action.gd`, `wait_action.gd`, `pickup_item_action.gd`, `toggle_item_action.gd`, `reorder_item_action.gd`, `sanity_damage_action.gd`
+- `action.gd` (base), `movement_action.gd`, `wait_action.gd`, `pickup_item_action.gd`, `pickup_to_slot_action.gd`, `toggle_item_action.gd`, `reorder_item_action.gd`, `sanity_damage_action.gd`, `vending_machine_action.gd`
 
 **Combat** - `scripts/combat/`
 - `attack_executor.gd`, `attack_types.gd`, `pool_attack.gd`
@@ -169,6 +171,7 @@ Default lighting: ambient low + directional off (point lights provide all illumi
 - `chunk.gd` / `sub_chunk.gd` / `chunk_generation_thread.gd` - Background generation
 - `level_0_generator.gd` - WFC maze generator
 - `level_config.gd` / `level_generator.gd` - Level configuration base classes
+- `entity_config.gd` - Entity spawn configuration
 - `corruption_tracker.gd` - Corruption/difficulty scaling
 
 **UI** - `scripts/ui/`
@@ -185,9 +188,12 @@ Default lighting: ambient low + directional off (point lights provide all illumi
 - `psx_base.gdshaderinc` - Base PSX shader include (vertex snapping, UV)
 - `psx_lit.gdshader` / `psx_lit_nocull.gdshader` - Standard lit PSX shaders
 - `psx_unlit.gdshader` - Unlit variant
-- `psx_wall_proximity.gdshader` / `psx_wall_proximity_nocull.gdshader` - Wall camera→player sightline cutout
+- `psx_lighting.gdshaderinc` - Shared lighting include
+- `psx_wall_proximity.gdshader` - Wall camera→player sightline cutout
 - `psx_ceiling_proximity.gdshader` / `psx_ceiling_tactical.gdshader` - Ceiling proximity/tactical shaders
 - `psx_sprite.gdshader` - Billboard sprite shader
+- `psx_sprite_glitch.gdshader` - Corrupted item visual effects
+- `snow_particles.gdshader` - Snowfall particle system
 - `pp_band-dither.gdshader` - Post-processing dither
 
 **Components** - `scripts/components/`
@@ -219,7 +225,8 @@ var msg = "null" if not x else x.entity_id
 
 Accessed as `Log` autoload. Categories can be toggled on/off.
 
-**Log levels:** TRACE → DEBUG → INFO → WARN → ERROR → NONE
+**Log levels:** TRACE → DEBUG → INFO → PLAYER → WARN → ERROR → NONE
+- PLAYER and WARN also display in the in-game log — don't spam these or the player loses useful context
 
 **Category convenience methods** (most common usage):
 ```gdscript
