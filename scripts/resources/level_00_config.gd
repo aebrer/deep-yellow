@@ -54,7 +54,7 @@ entity density: very low"""
 
 	# Warm ambient — fluorescent bounce light off yellow walls
 	ambient_light_color = Color(0.5, 0.45, 0.3, 1.0)  # Warm yellow-brown bounce
-	ambient_light_intensity = 0.10
+	ambient_light_intensity = 0.03
 
 	# Yellowish fog for distance culling
 	fog_color = Color(0.8, 0.75, 0.5, 1.0)

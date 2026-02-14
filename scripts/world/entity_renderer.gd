@@ -110,6 +110,9 @@ const ENTITY_TEXTURES = {
 	"tutorial_mannequin": "res://assets/textures/entities/tutorial_mannequin.png",
 	"exit_hole": "res://assets/textures/entities/exit_hole.png",
 	"vending_machine": "res://assets/textures/entities/vending_machine.png",
+	"fluorescent_light": "res://assets/textures/entities/fluorescent_light.png",
+	"fluorescent_light_broken": "res://assets/textures/entities/fluorescent_light_broken.png",
+	"barrel_fire": "res://assets/textures/entities/barrel_fire.png",
 }
 
 ## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
