@@ -138,6 +138,17 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"barrel_fire": 1.0,        # Ground level (default billboard height)
 }
 
+## Animated entity spritesheets — entities with frame-by-frame animation.
+## Uses AnimatedSprite3D instead of Sprite3D. Spritesheet is a horizontal strip
+## of equal-sized frames. FPS controls playback speed.
+const ENTITY_SPRITESHEETS = {
+	"barrel_fire": {
+		"path": "res://assets/textures/entities/barrel_fire_spritesheet.png",
+		"frames": 4,
+		"fps": 6.0,
+	},
+}
+
 ## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).
 ## These are environmental fixtures: too numerous for full entity overhead.
 ## Goes into light_entity_cache only (not entity_cache), keeping gameplay queries fast.
@@ -424,23 +435,26 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	if render_mode == RenderMode.FLOOR_DECAL:
 		return _create_floor_decal_for_entity(entity)
 
-	# --- Standard billboard sprite ---
-	var sprite = Sprite3D.new()
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = false
-	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
-
 	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,
 		entity_height,
 		world_pos.y * 2.0 + 1.0
 	)
-	sprite.position = world_3d
-
 	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
 	var final_size = BILLBOARD_SIZE * scale_mult
+
+	# --- Animated spritesheet entities (e.g. barrel_fire) ---
+	if ENTITY_SPRITESHEETS.has(entity_type):
+		return _create_animated_billboard(entity, world_3d, final_size, scale_mult)
+
+	# --- Standard billboard sprite ---
+	var sprite = Sprite3D.new()
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
 
 	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
 	if texture_path != "" and ResourceLoader.exists(texture_path):
@@ -464,6 +478,65 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	_add_examination_support(sprite, entity, final_size)
 
 
+
+	return sprite
+
+func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_size: float, scale_mult: float) -> AnimatedSprite3D:
+	"""Create an AnimatedSprite3D for entities with spritesheet animation.
+
+	Builds a SpriteFrames resource from a horizontal strip spritesheet using
+	AtlasTexture regions. Used for entities like barrel_fire with flickering flames.
+
+	Args:
+		entity: WorldEntity to create visual for
+		world_3d: World position for the sprite
+		final_size: Billboard size after scale override
+		scale_mult: Scale multiplier for fallback texture
+	"""
+	var entity_type = entity.entity_type
+	var config = ENTITY_SPRITESHEETS[entity_type]
+	var sheet_path: String = config["path"]
+	var frame_count: int = config["frames"]
+	var fps: float = config["fps"]
+
+	var sheet_texture = load(sheet_path) as Texture2D
+	if not sheet_texture:
+		push_warning("Failed to load spritesheet: %s" % sheet_path)
+		return null
+
+	var frame_width: int = sheet_texture.get_width() / frame_count
+	var frame_height: int = sheet_texture.get_height()
+
+	# Build SpriteFrames from atlas regions
+	var sprite_frames = SpriteFrames.new()
+	sprite_frames.set_animation_speed("default", fps)
+	sprite_frames.set_animation_loop("default", true)
+	for i in range(frame_count):
+		var atlas = AtlasTexture.new()
+		atlas.atlas = sheet_texture
+		atlas.region = Rect2(i * frame_width, 0, frame_width, frame_height)
+		atlas.filter_clip = true
+		sprite_frames.add_frame("default", atlas)
+
+	var sprite = AnimatedSprite3D.new()
+	sprite.sprite_frames = sprite_frames
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
+	sprite.pixel_size = final_size / frame_width
+	sprite.play("default")
+
+	var b = _get_sprite_brightness()
+	sprite.modulate = Color(b, b, b, 1.0)
+	sprite.set_meta("base_color", Color(b, b, b, 1.0))
+
+	sprite.visibility_range_end = VISIBILITY_RANGE_END
+	sprite.set_meta("grid_position", entity.world_position)
+	sprite.set_meta("entity_type", entity_type)
+
+	_add_examination_support(sprite, entity, final_size)
 
 	return sprite
 
