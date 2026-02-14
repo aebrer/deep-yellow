@@ -29,6 +29,8 @@ godot --headless --script test_script.gd  # Script validation
 godot --headless --import                 # Trigger import of new scripts and textures
 ```
 
+Headless mode auto-selects "Start Game" in the start menu, so it loads into level -1 with full chunk generation and in-game context — useful for debugging beyond just script validation.
+
 When ready for testing, say: "This is ready for you to test. When you run it, you should see [expected behavior]."
 
 ---
