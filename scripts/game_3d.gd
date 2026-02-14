@@ -35,6 +35,7 @@ extends Node3D
 @onready var loading_screen: CanvasLayer = $LoadingScreen
 
 var snowfall: Snowfall = null
+var chunk_indicator: ChunkLoadingIndicator = null
 var void_plane: MeshInstance3D = null
 
 ## Y position for the void-fill plane (empirically confirmed, see CLAUDE.md)
@@ -81,6 +82,10 @@ func _ready() -> void:
 	# Listen for mid-run level changes (exit stairs)
 	if ChunkManager and not ChunkManager.level_changed.is_connected(_on_level_changed):
 		ChunkManager.level_changed.connect(_on_level_changed)
+
+	# Chunk loading indicator (in-viewport overlay)
+	chunk_indicator = ChunkLoadingIndicator.new()
+	$ViewportUILayer.add_child(chunk_indicator)
 
 	# Create void-fill plane after initial chunks load
 	if ChunkManager and not ChunkManager.initial_load_completed.is_connected(_create_void_plane):
