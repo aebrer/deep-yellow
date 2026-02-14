@@ -71,6 +71,7 @@ var corruption_tracker: CorruptionTracker
 var level_generators: Dictionary = {}  # level_id → LevelGenerator
 var level_configs: Dictionary = {}  # level_id → LevelConfig (loaded from resources)
 var grid_3d: Grid3D = null  # Cached reference to Grid3D (found via search)
+var _cached_player: Node = null  # Cached Player3D reference (avoids recursive tree search)
 var generation_thread: ChunkGenerationThread = null  # Worker thread for async generation
 var item_spawner: ItemSpawner = null  # Item spawning system (initialized after corruption_tracker)
 
@@ -128,8 +129,9 @@ func _on_node_added(node: Node) -> void:
 		# Reset all state for new run (handles scene reload/restart)
 		# This clears loaded_chunks, generating_chunks, visited_chunks, and resets initial_load_complete
 		start_new_run()
-		# Clear grid_3d reference since we're reloading
+		# Clear cached references since we're reloading
 		grid_3d = null
+		_cached_player = null
 		# Search for Grid3D (deferred to ensure SubViewport content is ready)
 		call_deferred("_find_grid_3d")
 		call_deferred("_connect_to_player_signal")
@@ -155,9 +157,10 @@ func _process(_delta: float) -> void:
 	_process_generation_queue()
 
 func _connect_to_player_signal() -> void:
-	"""Connect to player's turn_completed signal"""
+	"""Connect to player's turn_completed signal and cache player reference"""
 	var player = _find_player()
 	if player:
+		_cached_player = player
 		if not player.turn_completed.is_connected(on_turn_completed):
 			player.turn_completed.connect(on_turn_completed)
 	else:
@@ -1143,12 +1146,15 @@ func _search_for_grid_3d(node: Node) -> Grid3D:
 	return null
 
 func _find_player() -> Node:
-	"""Find Player3D node dynamically (works in both portrait and landscape layouts)
+	"""Find Player3D node, using cached reference when available.
 
-	Searches the entire scene tree for a node named "Player3D".
+	Falls back to recursive tree search if cache is empty or stale.
 	"""
+	if is_instance_valid(_cached_player):
+		return _cached_player
 	var root = get_tree().root
-	return _search_for_player(root)
+	_cached_player = _search_for_player(root)
+	return _cached_player
 
 func _search_for_player(node: Node) -> Node:
 	"""Recursively search for Player3D node"""
@@ -1242,6 +1248,7 @@ func start_new_run(new_seed: int = -1) -> void:
 	generating_chunks.clear()
 	visited_chunks.clear()
 	tile_cache.clear()
+	_cached_player = null
 	chunks_without_items = 0  # Reset pity timer for new run
 
 	# Reset map markers for new run

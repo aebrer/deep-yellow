@@ -250,6 +250,48 @@ func _load_entities() -> void:
 	vending.blocks_movement = false
 	_entities["vending_machine"] = vending
 
+	# Fluorescent Light (Level 0 ceiling fixture — light-emitting entity)
+	var fluorescent_light = EntityInfo.new()
+	fluorescent_light.entity_id = "fluorescent_light"
+	fluorescent_light.entity_name = "Fluorescent Light"
+	fluorescent_light.visual_description = "A ceiling-mounted fluorescent tube behind a yellowed plastic diffuser panel. It hums faintly, casting a flat, sterile glow across the damp carpet below."
+	fluorescent_light.clearance_info[0] = ""
+	fluorescent_light.clearance_info[1] = "Standard 4-foot T8 fluorescent tube. Ballast hum measured at 120Hz. Color temperature approximately 3500K — warm white."
+	fluorescent_light.clearance_info[2] = "The fixtures appear to have no wiring or power source. They simply emit light. Some have been observed flickering in patterns that do not correspond to any known electrical fault."
+	fluorescent_light.object_class = "Safe"
+	fluorescent_light.threat_level = 0
+	fluorescent_light.hostile = false
+	fluorescent_light.blocks_movement = false
+	_entities["fluorescent_light"] = fluorescent_light
+
+	# Fluorescent Light — Broken (Level 0 dark variant, no light emission)
+	var fluorescent_light_broken = EntityInfo.new()
+	fluorescent_light_broken.entity_id = "fluorescent_light_broken"
+	fluorescent_light_broken.entity_name = "Broken Light"
+	fluorescent_light_broken.visual_description = "A dead fluorescent fixture. The tube is dark — either burnt out or shattered. Fragments of glass and phosphor dust litter the ceiling panel."
+	fluorescent_light_broken.clearance_info[0] = ""
+	fluorescent_light_broken.clearance_info[1] = "No electrical activity detected. The tube appears to have failed naturally, though 'naturally' is a generous term here."
+	fluorescent_light_broken.clearance_info[2] = "Areas with broken fixtures tend to cluster together. Whether this is coincidence or something deliberate is unclear."
+	fluorescent_light_broken.object_class = "Safe"
+	fluorescent_light_broken.threat_level = 0
+	fluorescent_light_broken.hostile = false
+	fluorescent_light_broken.blocks_movement = false
+	_entities["fluorescent_light_broken"] = fluorescent_light_broken
+
+	# Barrel Fire (Level -1 ground-level light source)
+	var barrel_fire = EntityInfo.new()
+	barrel_fire.entity_id = "barrel_fire"
+	barrel_fire.entity_name = "Burning Barrel"
+	barrel_fire.visual_description = "A rusted oil drum with flames licking from its rim. The fire crackles softly, casting dancing orange light across the frozen ground. Warmth radiates from it in waves."
+	barrel_fire.clearance_info[0] = ""
+	barrel_fire.clearance_info[1] = "Contents: scrap wood, cardboard, unknown accelerant. Burns steadily despite subzero temperatures and snowfall."
+	barrel_fire.clearance_info[2] = "No one has been observed tending these fires. They appear to burn indefinitely. The fuel inside never seems to diminish."
+	barrel_fire.object_class = "Safe"
+	barrel_fire.threat_level = 0
+	barrel_fire.hostile = false
+	barrel_fire.blocks_movement = true  # Ground-level obstacle, blocks player and AI pathing
+	_entities["barrel_fire"] = barrel_fire
+
 	# Exit Hole (visual marker for EXIT_STAIRS tiles)
 	var exit_hole = EntityInfo.new()
 	exit_hole.entity_id = "exit_hole"

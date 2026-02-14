@@ -174,14 +174,6 @@ func get_description(clearance_level: int) -> String:
 # UTILITY
 # ============================================================================
 
-func get_turn_effect_info() -> Dictionary:
-	"""Return mana cost info for UI preview."""
-	return {
-		"effect_name": ITEM_NAME,
-		"mana_cost": float(level),
-		"description": "Chaos effect"
-	}
-
 func _to_string() -> String:
 	"""Debug representation."""
 	return "DebugItem(Level %d, +%d Mana, %s)" % [

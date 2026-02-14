@@ -8,9 +8,6 @@ extends PlayerInputState
 ##
 ## FPV is the default camera mode. Examination is active in FPV mode.
 
-const _AttackTypes = preload("res://scripts/combat/attack_types.gd")
-const _ItemStatusAction = preload("res://scripts/actions/item_status_action.gd")
-const _SanityDamageAction = preload("res://scripts/actions/sanity_damage_action.gd")
 const _AutoExploreState = preload("res://scripts/player/states/auto_explore_state.gd")
 const _MapOverlayPanel = preload("res://scripts/ui/map_overlay_panel.gd")
 
@@ -76,9 +73,6 @@ func enter() -> void:
 		_apply_camera_mode()
 	# Otherwise cameras are already in correct state, don't reset them
 
-	# Update action preview
-	_update_action_preview()
-
 	# Check if RT/Click is already being held (from previous state)
 	var rt_currently_held = InputManager.is_action_pressed("move_confirm")
 	if rt_currently_held and rt_held:
@@ -142,7 +136,6 @@ func _toggle_camera() -> void:
 		Log.state("Camera toggled to FPV")
 
 	_apply_camera_mode()
-	_update_action_preview()
 
 func _apply_camera_mode() -> void:
 	"""Apply the current camera mode settings"""
@@ -222,14 +215,10 @@ func process_frame(delta: float) -> void:
 	if player and player.suppress_input_next_frame:
 		player.suppress_input_next_frame = false
 		_update_visuals()
-		_update_action_preview()
 		return
 
 	# Update visuals based on camera mode
 	_update_visuals()
-
-	# Update action preview
-	_update_action_preview()
 
 	# Check for "Go To" target from map overlay
 	if player and player.goto_target != Vector2i(-999999, -999999):
@@ -440,254 +429,8 @@ func _execute_wait_action() -> void:
 		transition_to("PreTurnState")
 
 # ============================================================================
-# ACTION PREVIEW
+# POSITION HELPERS
 # ============================================================================
-
-func _update_action_preview() -> void:
-	"""Update action preview with current movement/pickup action plus pending attacks"""
-	if not player:
-		return
-
-	# Get forward direction from camera
-	var forward_direction = Vector2i.ZERO
-	if player.has_method("get_camera_forward_grid_direction"):
-		forward_direction = player.get_camera_forward_grid_direction()
-
-	if forward_direction == Vector2i.ZERO:
-		# No valid direction - hide preview
-		var empty_actions: Array[Action] = []
-		player.action_preview_changed.emit(empty_actions)
-		return
-
-	# Check if there's a vending machine or item at the target position
-	var target_position = player.grid_position + forward_direction
-	var item_at_target = _get_item_at_position(target_position)
-	var entity_at_target = _get_vending_machine_at_position(target_position)
-
-	var preview_action: Action
-
-	if entity_at_target:
-		# Show vending machine action
-		preview_action = VendingMachineAction.new(target_position, entity_at_target)
-	elif item_at_target:
-		# Show pickup action
-		preview_action = PickupItemAction.new(target_position, item_at_target)
-	else:
-		# Show movement action
-		preview_action = MovementAction.new(forward_direction)
-
-	# Build action list: main action first
-	var actions: Array[Action] = [preview_action]
-
-	# Add attack previews from destination (shows what attacks will fire after moving)
-	_add_attack_previews(actions, target_position)
-
-	# Add camera toggle hint
-	var toggle_btn = "[C]"
-	if InputManager and InputManager.current_input_device == InputManager.InputDevice.GAMEPAD:
-		toggle_btn = "[SELECT]"
-	var mode_name = "FPV" if camera_mode == CameraMode.FPV else "Tactical"
-	var camera_hint = ControlHintAction.new("📷", "Camera: %s" % mode_name, toggle_btn)
-	actions.append(camera_hint)
-
-	# Add cooldown displays at the bottom (understated)
-	_add_cooldown_previews(actions)
-
-	# Add item status displays (ready shields, item cooldowns)
-	_add_item_status_previews(actions)
-
-	# Add mana-blocked item effects
-	_add_item_mana_blocked_previews(actions)
-
-	# Add sanity damage preview (shows when next sanity drain will occur)
-	_add_sanity_damage_preview(actions)
-
-	# Emit preview signal
-	player.action_preview_changed.emit(actions)
-
-func _add_attack_previews(actions: Array[Action], destination: Vector2i) -> void:
-	"""Add attack preview actions for attacks that will fire this turn from destination."""
-	if not player or not player.attack_executor:
-		return
-
-	var attack_types = [_AttackTypes.Type.BODY, _AttackTypes.Type.MIND, _AttackTypes.Type.NULL]
-
-	for attack_type in attack_types:
-		var preview = player.attack_executor.get_attack_preview(player, attack_type, destination)
-
-		if not preview.get("ready", false):
-			continue
-
-		# Skip NULL attack if player has no mana pool yet
-		if attack_type == _AttackTypes.Type.NULL:
-			if player.stats and player.stats.max_mana <= 0:
-				continue
-
-		var targets: Array = preview.get("targets", [])
-		var attack_name = preview.get("attack_name", _AttackTypes.BASE_ATTACK_NAMES.get(attack_type, "Attack"))
-
-		# Check if attack can afford after regen
-		var can_afford_after_regen = preview.get("can_afford_after_regen", true)
-
-		if not can_afford_after_regen:
-			var mana_blocked = ManaBlockedAction.new(
-				attack_name,
-				preview.get("mana_cost", 0.0),
-				preview.get("current_mana", 0.0),
-				preview.get("mana_after_regen", 0.0)
-			)
-			actions.append(mana_blocked)
-			continue
-
-		# Only show in UI if there are targets
-		if targets.is_empty():
-			continue
-
-		var attack_emoji = preview.get("attack_emoji", _AttackTypes.BASE_ATTACK_EMOJIS.get(attack_type, "⚔️"))
-		var extra_attacks = preview.get("extra_attacks", 0)
-		var attack_preview = AttackPreviewAction.new(
-			attack_type,
-			attack_name,
-			attack_emoji,
-			preview.get("damage", 0.0),
-			targets.size(),
-			preview.get("mana_cost", 0.0),
-			extra_attacks
-		)
-		actions.append(attack_preview)
-
-func _add_cooldown_previews(actions: Array[Action]) -> void:
-	"""Add cooldown displays for attacks not ready to fire."""
-	if not player or not player.attack_executor:
-		return
-
-	var attack_types = [_AttackTypes.Type.BODY, _AttackTypes.Type.MIND, _AttackTypes.Type.NULL]
-
-	for attack_type in attack_types:
-		var preview = player.attack_executor.get_attack_preview(player, attack_type)
-
-		if preview.get("ready", false):
-			continue
-
-		if attack_type == _AttackTypes.Type.NULL and player.stats and player.stats.max_mana <= 0:
-			continue
-
-		var attack_name = preview.get("attack_name", _AttackTypes.BASE_ATTACK_NAMES.get(attack_type, "Attack"))
-		var cd_remaining = preview.get("cooldown_remaining", 0)
-		var cd_current = cd_remaining + 1
-
-		var cooldown_preview = AttackCooldownAction.new(
-			attack_name,
-			cd_current,
-			cd_remaining
-		)
-		actions.append(cooldown_preview)
-
-func _add_item_status_previews(actions: Array[Action]) -> void:
-	"""Add status displays for items with reactive effects or cooldowns."""
-	if not player:
-		return
-
-	var pools = [player.body_pool, player.mind_pool, player.null_pool]
-
-	for pool in pools:
-		if not pool:
-			continue
-
-		for i in range(pool.max_slots):
-			var item = pool.items[i]
-			var is_enabled = pool.enabled[i]
-
-			if not item or not is_enabled:
-				continue
-
-			var status = item.get_status_display()
-			if status.is_empty() or not status.get("show", false):
-				continue
-
-			var status_type = status.get("type", "")
-
-			if status_type == "ready":
-				var status_action = _ItemStatusAction.new(
-					item.item_name,
-					_ItemStatusAction.StatusType.READY,
-					0, 0,
-					status.get("mana_cost", 0.0),
-					status.get("description", "")
-				)
-				actions.append(status_action)
-
-			elif status_type == "cooldown":
-				var cd_current = status.get("cooldown_current", 1)
-				var cd_after = status.get("cooldown_after", 0)
-				var status_action = _ItemStatusAction.new(
-					item.item_name,
-					_ItemStatusAction.StatusType.COOLDOWN,
-					cd_current, cd_after,
-					0.0,
-					status.get("description", "")
-				)
-				actions.append(status_action)
-
-func _add_item_mana_blocked_previews(actions: Array[Action]) -> void:
-	"""Add mana-blocked displays for equipped items that can't afford their turn effects."""
-	if not player or not player.stats:
-		return
-
-	var mana_after_regen = player.stats.get_mana_after_regen()
-	var current_mana = player.stats.current_mana
-
-	var pools = [player.body_pool, player.mind_pool, player.null_pool]
-
-	for pool in pools:
-		if not pool:
-			continue
-
-		for i in range(pool.max_slots):
-			var item = pool.items[i]
-			var is_enabled = pool.enabled[i]
-
-			if not item or not is_enabled:
-				continue
-
-			var effect_info = item.get_turn_effect_info()
-			if effect_info.is_empty():
-				continue
-
-			var mana_cost = effect_info.get("mana_cost", 0.0)
-			if mana_cost <= 0:
-				continue
-
-			if mana_after_regen >= mana_cost:
-				continue
-
-			var effect_name = effect_info.get("effect_name", item.item_name)
-			var mana_blocked = ManaBlockedAction.new(
-				effect_name,
-				mana_cost,
-				current_mana,
-				mana_after_regen
-			)
-			actions.append(mana_blocked)
-
-func _add_sanity_damage_preview(actions: Array[Action]) -> void:
-	"""Add sanity damage preview showing when next sanity drain will occur."""
-	if not player or not player.grid:
-		return
-
-	var damage_info = _SanityDamageAction.calculate_sanity_damage(player, player.grid)
-
-	if damage_info["turns_until"] > 4:
-		return
-
-	var sanity_action = _SanityDamageAction.new(
-		damage_info["damage"],
-		damage_info["turns_until"],
-		damage_info["enemy_count"],
-		damage_info["weighted_count"],
-		damage_info["corruption"]
-	)
-	actions.append(sanity_action)
 
 func _get_item_at_position(grid_pos: Vector2i) -> Dictionary:
 	"""Check if there's an item at the given grid position"""

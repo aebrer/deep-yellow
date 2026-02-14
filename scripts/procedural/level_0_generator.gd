@@ -143,6 +143,9 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	# Place doors in single-width hallways (before variant placement)
 	_place_doors(grid, rng)
 
+	# Place ceiling lights on walkable tiles
+	_place_lights(grid, chunk, rng)
+
 	# Apply to chunk (with variant placement)
 	_apply_grid_to_chunk(grid, chunk, rng)
 
@@ -522,6 +525,50 @@ func _place_doors(grid: Array, rng: RandomNumberGenerator) -> void:
 			if rng.randf() < DOOR_SPAWN_CHANCE:
 				grid[y][x] = SubChunk.TileType.WALL_DOOR_A_CLOSED
 				door_positions.append(pos)
+
+
+# ============================================================================
+# LIGHT PLACEMENT
+# ============================================================================
+
+## Spacing between ceiling lights (in tiles). Lights are placed on a grid
+## with this interval, then randomly offset and filtered to walkable tiles.
+## 5 tiles = 10 world units between lights. With range 12, adjacent lights
+## overlap significantly for dense fluorescent coverage.
+const LIGHT_SPACING := 5
+## Probability that a light fixture is broken (dark, no light emission)
+const LIGHT_BROKEN_CHANCE := 0.15
+## Random offset range for light positions (prevents perfectly regular grid)
+const LIGHT_JITTER := 1
+
+func _place_lights(grid: Array, chunk: Chunk, rng: RandomNumberGenerator) -> void:
+	"""Place fluorescent ceiling light entities on walkable floor tiles.
+
+	Uses a regular grid with jitter for natural-looking coverage.
+	Some fixtures are broken (no light emission) to create dark areas.
+	"""
+	var chunk_world := chunk.position * Chunk.SIZE
+	var light_count := 0
+
+	for gy in range(LIGHT_SPACING / 2, Chunk.SIZE, LIGHT_SPACING):
+		for gx in range(LIGHT_SPACING / 2, Chunk.SIZE, LIGHT_SPACING):
+			# Apply random jitter
+			var x: int = clampi(gx + rng.randi_range(-LIGHT_JITTER, LIGHT_JITTER), 0, Chunk.SIZE - 1)
+			var y: int = clampi(gy + rng.randi_range(-LIGHT_JITTER, LIGHT_JITTER), 0, Chunk.SIZE - 1)
+
+			if grid[y][x] != FLOOR:
+				continue
+
+			var world_pos := Vector2i(x, y) + chunk_world
+			var entity_type := "fluorescent_light_broken" if rng.randf() < LIGHT_BROKEN_CHANCE else "fluorescent_light"
+
+			var light_entity := WorldEntity.new(entity_type, world_pos, 99999.0, 0)
+			EntityRegistry.apply_defaults(light_entity)
+
+			var sc := chunk.get_sub_chunk(Vector2i(x / SubChunk.SIZE, y / SubChunk.SIZE))
+			if sc:
+				sc.add_world_entity(light_entity)
+				light_count += 1
 
 
 # ============================================================================

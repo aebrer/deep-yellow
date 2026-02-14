@@ -624,9 +624,22 @@ func _draw_entities(player_pos: Vector2i) -> void:
 	# Get all entity positions from renderer
 	var entity_positions = grid.entity_renderer.get_all_entity_positions()
 
+	# Entity types to skip on minimap (environmental fixtures, too numerous to render)
+	const MINIMAP_HIDDEN_ENTITIES := [
+		"fluorescent_light", "fluorescent_light_broken", "barrel_fire",
+	]
+
 	for entity_pos in entity_positions:
 		var distance: float = Vector2(entity_pos).distance_to(Vector2(player_pos))
 		if distance > perception_range:
+			continue
+
+		var entity = grid.entity_renderer.get_entity_at(entity_pos)
+		if not entity:
+			continue
+
+		# Skip light fixtures — too many, kills perf, not useful on minimap
+		if entity.entity_type in MINIMAP_HIDDEN_ENTITIES:
 			continue
 
 		var screen_pos := _world_to_screen(entity_pos, player_pos)
@@ -634,7 +647,6 @@ func _draw_entities(player_pos: Vector2i) -> void:
 			continue
 
 		# Try to blit sprite icon
-		var entity = grid.entity_renderer.get_entity_at(entity_pos)
 		var drew_sprite := false
 		if entity:
 			var etype: String = entity.entity_type

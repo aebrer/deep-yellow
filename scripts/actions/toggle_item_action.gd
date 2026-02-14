@@ -51,31 +51,3 @@ func execute(player) -> void:
 	player.turn_count += 1
 
 	Log.turn("Turn %d: Toggled %s to %s" % [player.turn_count, item_name, state])
-
-func get_preview_info(player) -> Dictionary:
-	var pool = Action._get_pool_by_type(player, pool_type)
-	if not pool or slot_index >= pool.items.size():
-		return {
-			"name": "Toggle Item",
-			"target": "",
-			"icon": "⚡",
-			"cost": ""
-		}
-
-	var item = pool.items[slot_index]
-	if not item:
-		return {
-			"name": "Toggle Item",
-			"target": "",
-			"icon": "⚡",
-			"cost": ""
-		}
-
-	var new_state = "OFF" if pool.enabled[slot_index] else "ON"
-
-	return {
-		"name": "Toggle",
-		"target": "%s → %s" % [item.item_name, new_state],
-		"icon": "⚡",
-		"cost": ""
-	}

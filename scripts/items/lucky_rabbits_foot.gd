@@ -185,19 +185,6 @@ func _reset_random_cooldown_from_targets(player: Player3D, targets: Array) -> vo
 		Log.player("LUCKY RABBIT'S FOOT: Reset %s cooldown!" % chosen["name"])
 
 # ============================================================================
-# TURN EFFECT INFO (for UI preview)
-# ============================================================================
-
-func get_turn_effect_info() -> Dictionary:
-	"""Return info about this item's on_turn() effect for UI preview."""
-	var reset_chance = BASE_RESET_CHANCE + (RESET_CHANCE_PER_LEVEL * level)
-	return {
-		"effect_name": "Lucky Reset",
-		"mana_cost": MANA_COST if _current_cooldown <= 0 else 0.0,
-		"description": "%.0f%% chance to reset a random cooldown" % (reset_chance * 100)
-	}
-
-# ============================================================================
 # DESCRIPTIONS
 # ============================================================================
 

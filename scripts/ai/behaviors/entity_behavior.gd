@@ -10,6 +10,11 @@ class_name EntityBehavior extends RefCounted
 ## Behaviors are resolved by entity_type string, so chunk serialization
 ## is unaffected.
 
+## If true, this entity is skipped entirely during turn processing.
+## Use for stationary environmental entities that never act (lights,
+## vending machines, exit holes). Set in subclass _init().
+var skip_turn_processing: bool = false
+
 # ============================================================================
 # TURN PROCESSING
 # ============================================================================

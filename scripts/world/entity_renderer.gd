@@ -37,8 +37,16 @@ const _EMOJI_FONT = preload("res://assets/fonts/default_font.tres")
 ## Maps world tile position to Sprite3D node
 var entity_billboards: Dictionary = {}  # Vector2i -> Sprite3D
 
-## Maps world tile position to WorldEntity reference
+## Maps world tile position to WorldEntity reference (gameplay entities only).
+## Used by combat queries, minimap, AI iteration — kept small for fast iteration.
 var entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
+
+## All light-emitting entities (any type in ENTITY_LIGHT_CONFIG).
+## Grid3D lightmap rebuild iterates this to bake light contributions.
+## Light-only entities (LIGHT_ONLY_ENTITIES) live here exclusively.
+## Light-emitting gameplay entities (e.g. barrel_fire) live in BOTH caches.
+## To add a new light source: add to ENTITY_LIGHT_CONFIG — that's it.
+var light_entity_cache: Dictionary = {}  # Vector2i -> WorldEntity
 
 ## Maps world tile position to health bar Node3D
 var entity_health_bars: Dictionary = {}  # Vector2i -> Node3D
@@ -82,6 +90,9 @@ const ENTITY_COLORS = {
 	"tutorial_mannequin": Color(0.85, 0.75, 0.65),  # Pale beige plastic
 	"vending_machine": Color(0.6, 0.6, 0.7),        # Metallic gray-blue
 	"exit_hole": Color(0.15, 0.1, 0.1),             # Dark pit
+	"fluorescent_light": Color(1.0, 0.95, 0.8),    # Warm white
+	"fluorescent_light_broken": Color(0.3, 0.3, 0.3),  # Dark grey (dead tube)
+	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
 
 ## Entity render modes: BILLBOARD (default, faces camera) or FLOOR_DECAL (flat on ground)
@@ -99,6 +110,9 @@ const ENTITY_TEXTURES = {
 	"tutorial_mannequin": "res://assets/textures/entities/tutorial_mannequin.png",
 	"exit_hole": "res://assets/textures/entities/exit_hole.png",
 	"vending_machine": "res://assets/textures/entities/vending_machine.png",
+	"fluorescent_light": "res://assets/textures/entities/fluorescent_light.png",
+	"fluorescent_light_broken": "res://assets/textures/entities/fluorescent_light_broken.png",
+	"barrel_fire": "res://assets/textures/entities/barrel_fire.png",
 }
 
 ## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
@@ -107,15 +121,62 @@ const ENTITY_SCALE_OVERRIDES = {
 	"smiler": 2.0,  # Large, imposing presence
 	"tutorial_mannequin": 2.0,  # Life-sized mannequin
 	"vending_machine": 2.5,    # Tall vending machine
+	"fluorescent_light": 0.8,  # Ceiling fixture, smaller sprite
+	"fluorescent_light_broken": 0.8,
+	"barrel_fire": 1.5,        # Ground-level barrel
 }
 
 ## Per-entity height overrides (world units above floor)
-## Larger entities need higher placement so their bottom doesn't clip floor
+## See CLAUDE.md "3D World Y Coordinates" for empirically confirmed values
 const ENTITY_HEIGHT_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Raised to match 2x size scale
 	"smiler": 3.0,  # Floats ominously above the floor
 	"tutorial_mannequin": 2.0,  # Raised to match 2x size scale
 	"vending_machine": 2.5,    # Tall machine, raised to match scale
+	"fluorescent_light": 4.4,  # Ceiling surface (empirically confirmed)
+	"fluorescent_light_broken": 4.4,
+	"barrel_fire": 1.0,        # Ground level (default billboard height)
+}
+
+## Animated entity spritesheets — entities with frame-by-frame animation.
+## Uses AnimatedSprite3D instead of Sprite3D. Spritesheet is a horizontal strip
+## of equal-sized frames. FPS controls playback speed.
+const ENTITY_SPRITESHEETS = {
+	"barrel_fire": {
+		"path": "res://assets/textures/entities/barrel_fire_spritesheet.png",
+		"frames": 4,
+		"fps": 6.0,
+	},
+}
+
+## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).
+## These are environmental fixtures: too numerous for full entity overhead.
+## Goes into light_entity_cache only (not entity_cache), keeping gameplay queries fast.
+## Their behavior must set skip_turn_processing = true (see EntityBehavior).
+const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_light_broken"]
+
+## Light emission configuration — the single source of truth for "this entity emits light".
+## Any entity type listed here is added to light_entity_cache on spawn.
+## Grid3D's lightmap rebuild iterates light_entity_cache to bake these contributions.
+##
+## To add a new light source for any level:
+##   1. Add entry here with color, energy, range
+##   2. Add entity spawning in your level generator
+##   3. If it's purely environmental (no HP/combat), also add to LIGHT_ONLY_ENTITIES
+##      and create a behavior with skip_turn_processing = true
+const ENTITY_LIGHT_CONFIG = {
+	"fluorescent_light": {
+		"color": Color(0.95, 0.9, 0.7),
+		"energy": 2.0,
+		"range": 12.0,
+		"attenuation": 1.0,
+	},
+	"barrel_fire": {
+		"color": Color(1.0, 0.5, 0.15),
+		"energy": 1.5,
+		"range": 10.0,
+		"attenuation": 1.0,
+	},
 }
 
 ## Default entity color
@@ -139,36 +200,64 @@ const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 ## Creating a new Shader per entity causes massive memory bloat on web/WASM.
 var _health_bar_shader: Shader = null
 
+
+
 # ============================================================================
 # CHUNK LOADING
 # ============================================================================
 
 func render_chunk_entities(chunk: Chunk) -> void:
-	"""Create billboards for all entities in chunk
+	"""Create visuals for all entities in chunk.
 
-	Connects to WorldEntity signals for HP/death updates.
+	Two rendering paths:
+	- LIGHT_ONLY_ENTITIES: lightweight Sprite3D, goes into light_entity_cache only
+	- Everything else: full billboard with collision/health bar/signals, goes into entity_cache
+	  (also light_entity_cache if in ENTITY_LIGHT_CONFIG)
+
+	Grid3D's lightmap reads light_entity_cache to bake point light contributions.
 
 	Args:
 		chunk: Chunk that was just loaded
 	"""
 	for subchunk in chunk.sub_chunks:
 		for entity in subchunk.world_entities:
-			# Skip if dead
 			if entity.is_dead:
 				continue
 
 			var world_pos = entity.world_position
+			var entity_type = entity.entity_type
 
-			# Skip if billboard already exists (shouldn't happen, but safety check)
+			# Light-only entities: lightweight sprite, light_entity_cache only if they emit light
+			if entity_type in LIGHT_ONLY_ENTITIES:
+				if entity_billboards.has(world_pos):
+					continue
+				var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+				var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
+					world_pos.x * 2.0 + 1.0, entity_height, world_pos.y * 2.0 + 1.0)
+
+				# Visual sprite with examination support (auto-culled by visibility_range_end)
+				var sprite = _create_light_fixture_sprite(entity_type, world_3d, entity)
+				add_child(sprite)
+				entity_billboards[world_pos] = sprite
+				# Only add to light cache if entity actually emits light (has a config entry)
+				if ENTITY_LIGHT_CONFIG.has(entity_type):
+					light_entity_cache[world_pos] = entity
+				continue
+
+			# Skip if billboard already exists
 			if entity_billboards.has(world_pos):
 				continue
 
-			# Create billboard
+			# Full billboard pipeline for gameplay entities
 			var billboard = _create_billboard_for_entity(entity)
 			if billboard:
 				add_child(billboard)
 				entity_billboards[world_pos] = billboard
 				entity_cache[world_pos] = entity
+
+				# Light-emitting gameplay entities also go into light cache
+				if ENTITY_LIGHT_CONFIG.has(entity_type):
+					light_entity_cache[world_pos] = entity
 
 				# Create health bar (as sibling, not child - avoids billboard nesting issues)
 				var health_bar = _create_health_bar(billboard.position)
@@ -179,7 +268,6 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				entity_to_pos[entity] = world_pos
 
 				# Connect to WorldEntity signals
-				# Bind to entity (not position) so callbacks remain valid after entity moves
 				if not entity.hp_changed.is_connected(_on_entity_hp_changed):
 					entity.hp_changed.connect(_on_entity_hp_changed.bind(entity))
 				if not entity.died.is_connected(_on_entity_died_signal):
@@ -195,35 +283,30 @@ func render_chunk_entities(chunk: Chunk) -> void:
 					health_bar.visible = false
 
 func unload_chunk_entities(chunk: Chunk) -> void:
-	"""Remove billboards for all entities in chunk
+	"""Remove visuals for all entities in chunk.
 
-	Note: We don't disconnect signals here - the EntityRenderer persists across
-	chunk loads/unloads, so the signal handlers remain valid. Signals will be
-	cleaned up when the scene reloads (start_new_run).
+	Handles both full billboard entities and light-only entities.
 
 	Args:
 		chunk: Chunk being unloaded
 	"""
-	var removed_count = 0
-
 	for subchunk in chunk.sub_chunks:
 		for entity in subchunk.world_entities:
 			var world_pos = entity.world_position
 
+			# Clean up billboard entities (full pipeline + light-only)
 			if entity_billboards.has(world_pos):
-				var billboard = entity_billboards[world_pos]
-				billboard.queue_free()
+				entity_billboards[world_pos].queue_free()
 				entity_billboards.erase(world_pos)
 				entity_cache.erase(world_pos)
+				light_entity_cache.erase(world_pos)
 				entity_to_pos.erase(entity)
 
-				# Also remove health bar
 				if entity_health_bars.has(world_pos):
-					var health_bar = entity_health_bars[world_pos]
-					health_bar.queue_free()
+					entity_health_bars[world_pos].queue_free()
 					entity_health_bars.erase(world_pos)
 
-				removed_count += 1
+
 
 # ============================================================================
 # DYNAMIC ENTITY MANAGEMENT (for mid-game spawns and movement)
@@ -329,6 +412,13 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 # BILLBOARD CREATION
 # ============================================================================
 
+func _get_sprite_brightness() -> float:
+	"""Get current level's sprite brightness multiplier."""
+	var level = LevelManager.get_current_level()
+	if level:
+		return level.sprite_brightness
+	return 1.0
+
 func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	"""Create a visual node for an entity (billboard sprite or floor decal)
 
@@ -345,23 +435,26 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	if render_mode == RenderMode.FLOOR_DECAL:
 		return _create_floor_decal_for_entity(entity)
 
-	# --- Standard billboard sprite ---
-	var sprite = Sprite3D.new()
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = true
-	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
-
 	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,
 		entity_height,
 		world_pos.y * 2.0 + 1.0
 	)
-	sprite.position = world_3d
-
 	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
 	var final_size = BILLBOARD_SIZE * scale_mult
+
+	# --- Animated spritesheet entities (e.g. barrel_fire) ---
+	if ENTITY_SPRITESHEETS.has(entity_type):
+		return _create_animated_billboard(entity, world_3d, final_size, scale_mult)
+
+	# --- Standard billboard sprite ---
+	var sprite = Sprite3D.new()
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
 
 	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
 	if texture_path != "" and ResourceLoader.exists(texture_path):
@@ -369,8 +462,9 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 		if texture:
 			sprite.texture = texture
 			sprite.pixel_size = final_size / texture.get_width()
-			sprite.modulate = Color.WHITE
-			sprite.set_meta("base_color", Color.WHITE)
+			var b = _get_sprite_brightness()
+			sprite.modulate = Color(b, b, b, 1.0)
+			sprite.set_meta("base_color", Color(b, b, b, 1.0))
 		else:
 			_apply_fallback_texture(sprite, entity_type, scale_mult)
 	else:
@@ -379,6 +473,67 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	sprite.visibility_range_end = VISIBILITY_RANGE_END
 
 	sprite.set_meta("grid_position", world_pos)
+	sprite.set_meta("entity_type", entity_type)
+
+	_add_examination_support(sprite, entity, final_size)
+
+
+
+	return sprite
+
+func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_size: float, scale_mult: float) -> AnimatedSprite3D:
+	"""Create an AnimatedSprite3D for entities with spritesheet animation.
+
+	Builds a SpriteFrames resource from a horizontal strip spritesheet using
+	AtlasTexture regions. Used for entities like barrel_fire with flickering flames.
+
+	Args:
+		entity: WorldEntity to create visual for
+		world_3d: World position for the sprite
+		final_size: Billboard size after scale override
+		scale_mult: Scale multiplier for fallback texture
+	"""
+	var entity_type = entity.entity_type
+	var config = ENTITY_SPRITESHEETS[entity_type]
+	var sheet_path: String = config["path"]
+	var frame_count: int = config["frames"]
+	var fps: float = config["fps"]
+
+	var sheet_texture = load(sheet_path) as Texture2D
+	if not sheet_texture:
+		push_warning("Failed to load spritesheet: %s" % sheet_path)
+		return null
+
+	var frame_width: int = sheet_texture.get_width() / frame_count
+	var frame_height: int = sheet_texture.get_height()
+
+	# Build SpriteFrames from atlas regions
+	var sprite_frames = SpriteFrames.new()
+	sprite_frames.set_animation_speed("default", fps)
+	sprite_frames.set_animation_loop("default", true)
+	for i in range(frame_count):
+		var atlas = AtlasTexture.new()
+		atlas.atlas = sheet_texture
+		atlas.region = Rect2(i * frame_width, 0, frame_width, frame_height)
+		atlas.filter_clip = true
+		sprite_frames.add_frame("default", atlas)
+
+	var sprite = AnimatedSprite3D.new()
+	sprite.sprite_frames = sprite_frames
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
+	sprite.pixel_size = final_size / frame_width
+	sprite.play("default")
+
+	var b = _get_sprite_brightness()
+	sprite.modulate = Color(b, b, b, 1.0)
+	sprite.set_meta("base_color", Color(b, b, b, 1.0))
+
+	sprite.visibility_range_end = VISIBILITY_RANGE_END
+	sprite.set_meta("grid_position", entity.world_position)
 	sprite.set_meta("entity_type", entity_type)
 
 	_add_examination_support(sprite, entity, final_size)
@@ -447,6 +602,57 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 
 	return mesh_inst
 
+
+
+
+func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity: WorldEntity = null) -> Sprite3D:
+	"""Create a lightweight Sprite3D for a light fixture (no health bar or signals).
+
+	Used by LIGHT_ONLY_ENTITIES. Cheaper than _create_billboard_for_entity():
+	no health bar, no signal connections. But DOES include examination support
+	so fixtures are examinable in FPV mode.
+
+	Args:
+		entity_type: Entity type for color/texture/scale lookup
+		world_3d: World position for the sprite
+		entity: WorldEntity for examination support (optional for backwards compat)
+
+	Returns:
+		Sprite3D positioned at the fixture location
+	"""
+	var sprite := Sprite3D.new()
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
+
+	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+	var final_size = BILLBOARD_SIZE * scale_mult
+
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		var texture = load(texture_path) as Texture2D
+		if texture:
+			sprite.texture = texture
+			sprite.pixel_size = final_size / texture.get_width()
+			var b = _get_sprite_brightness()
+			sprite.modulate = Color(b, b, b, 1.0)
+	else:
+		_apply_fallback_texture(sprite, entity_type, scale_mult)
+
+	# Shorter visibility range than gameplay entities — ceiling fixtures are small
+	sprite.visibility_range_end = 30.0
+
+	# Add examination support so fixtures are examinable in FPV
+	# Use a wide flat slab (not thin card) since billboard is rendering-only —
+	# the collision shape stays fixed in world space, needs to be hittable from below
+	if entity:
+		_add_examination_support(sprite, entity, final_size, Vector3(1.5, 0.2, 1.5))
+
+	return sprite
+
+
 func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null) -> void:
 	"""Add Examinable + StaticBody3D for raycast examination
 
@@ -489,8 +695,10 @@ func _apply_fallback_texture(sprite: Sprite3D, entity_type: String, scale_mult: 
 	image.fill(Color.WHITE)
 	sprite.texture = ImageTexture.create_from_image(image)
 	sprite.pixel_size = (BILLBOARD_SIZE * scale_mult) / 16.0
-	sprite.modulate = color  # Base color via modulate
-	sprite.set_meta("base_color", color)
+	var b = _get_sprite_brightness()
+	var bright_color = Color(color.r * b, color.g * b, color.b * b, color.a)
+	sprite.modulate = bright_color  # Base color × level brightness
+	sprite.set_meta("base_color", bright_color)
 
 func _get_health_bar_shader() -> Shader:
 	"""Get or create the shared health bar shader.
@@ -595,7 +803,7 @@ func _update_health_bar(world_pos: Vector2i, hp_percent: float) -> void:
 # ============================================================================
 
 func get_entity_at(world_pos: Vector2i) -> WorldEntity:
-	"""Get WorldEntity at world position
+	"""Get WorldEntity at world position (checks both gameplay and light caches)
 
 	Args:
 		world_pos: World tile coordinates
@@ -603,7 +811,10 @@ func get_entity_at(world_pos: Vector2i) -> WorldEntity:
 	Returns:
 		WorldEntity or null if no entity at position
 	"""
-	return entity_cache.get(world_pos, null)
+	var entity = entity_cache.get(world_pos, null)
+	if entity:
+		return entity
+	return light_entity_cache.get(world_pos, null)
 
 func has_entity_at(world_pos: Vector2i) -> bool:
 	"""Check if there's a living entity at world position
@@ -615,6 +826,8 @@ func has_entity_at(world_pos: Vector2i) -> bool:
 		true if entity exists and is alive (not dead)
 	"""
 	var entity = entity_cache.get(world_pos, null)
+	if not entity:
+		entity = light_entity_cache.get(world_pos, null)
 	return entity != null and not entity.is_dead
 
 func get_all_entity_positions() -> Array[Vector2i]:
@@ -713,6 +926,8 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 	# Get entity if not provided
 	if entity == null:
 		entity = entity_cache.get(world_pos, null)
+		if not entity:
+			entity = light_entity_cache.get(world_pos, null)
 
 	# Remove billboard
 	var billboard = entity_billboards[world_pos]
@@ -720,10 +935,13 @@ func _remove_entity_immediately(world_pos: Vector2i, entity: WorldEntity = null)
 		billboard.queue_free()
 	entity_billboards.erase(world_pos)
 	entity_cache.erase(world_pos)
+	light_entity_cache.erase(world_pos)
 
 	# Remove from reverse lookup
 	if entity:
 		entity_to_pos.erase(entity)
+
+	# (entity_lights cleanup removed — shader-based lighting)
 
 	# Remove health bar
 	if entity_health_bars.has(world_pos):
@@ -1054,6 +1272,7 @@ func clear_all_entities() -> void:
 
 	entity_billboards.clear()
 	entity_cache.clear()
+	light_entity_cache.clear()
 	entity_health_bars.clear()
 	entity_to_pos.clear()
 

@@ -36,9 +36,36 @@ var player_node: Node3D = null
 # Procedural generation mode (set by ChunkManager)
 var use_procedural_generation: bool = false
 
-# Cached materials for proximity fade (for updating player_position uniform)
+# Cached materials for proximity fade and lighting uniforms
 var wall_materials: Array[ShaderMaterial] = []
 var ceiling_materials: Array[ShaderMaterial] = []
+var floor_materials: Array[ShaderMaterial] = []
+
+# All lit materials (union of floor + wall + ceiling) for lighting uniform updates
+var all_lit_materials: Array[ShaderMaterial] = []
+
+# ============================================================================
+# LIGHTMAP-BASED LIGHTING
+# ============================================================================
+# Pre-baked 2D lightmap replaces per-fragment point light evaluation.
+# Fixture lights are baked into a texture when chunks load/unload.
+# Player light remains per-fragment (it moves every frame).
+# See shaders/psx_lighting.gdshaderinc for the shader-side implementation.
+
+# Lightmap dimensions: 256x256 pixels at 2 world units per pixel = 512x512 world coverage.
+# Bilinear filtering (filter_linear) in shader smooths between pixels.
+const LIGHTMAP_SIZE := 256
+const LIGHTMAP_CELL_SIZE := 2.0  # World units per pixel (= 1 grid tile)
+
+var _lightmap: Image
+var _lightmap_texture: ImageTexture
+var _lightmap_dirty := true
+var _lightmap_origin := Vector2.ZERO  # World XZ of pixel (0,0)
+
+# Player light config (per-fragment in shader, moves every frame)
+var _player_light_color := Vector3(1.0, 0.98, 0.9)  # Warm white
+var _player_light_range := 7.0
+var _player_light_energy := 0.6
 
 # Exit tile positions: tracked for minimap rendering
 var exit_tile_positions: Dictionary = {}  # Vector2i -> true (world positions of EXIT_STAIRS)
@@ -133,7 +160,7 @@ func _ready() -> void:
 	spraypaint_renderer = SpraypaintRenderer.new()
 	add_child(spraypaint_renderer)
 
-	print("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
+	Log.grid("[Grid3D] Initialized: %d x %d (octant size: %d)" % [grid_size.x, grid_size.y, grid_map.cell_octant_size])
 
 func configure_from_level(level_config: LevelConfig) -> void:
 	"""Configure grid from a LevelConfig resource"""
@@ -162,9 +189,11 @@ func configure_from_level(level_config: LevelConfig) -> void:
 
 	# Procedural mode: ChunkManager will populate via load_chunk()
 
-	# Cache materials and generate examination overlay
+	# Cache materials for proximity fade and lighting uniforms
 	_cache_wall_materials()
 	_cache_ceiling_materials()
+	_cache_floor_materials()
+	_build_all_lit_materials()
 	# Note: Examination overlay will be generated per-chunk as they load
 
 	# Lifecycle hook
@@ -334,6 +363,9 @@ func load_chunk(chunk: Chunk) -> void:
 	# NOTE: Entity rendering is handled by ChunkManager AFTER entity spawning
 	# because entities need is_walkable() which requires GridMap to be populated first
 
+	# Mark lightmap dirty — new chunk may have light-emitting entities
+	_lightmap_dirty = true
+
 func unload_chunk(chunk: Chunk) -> void:
 	"""Unload a chunk from GridMap
 
@@ -375,6 +407,9 @@ func unload_chunk(chunk: Chunk) -> void:
 
 	# Unload exit hole position tracking for chunk
 	_unload_exit_positions_for_chunk(chunk)
+
+	# Mark lightmap dirty — removed chunk may have had light-emitting entities
+	_lightmap_dirty = true
 
 
 # ============================================================================
@@ -620,33 +655,204 @@ func _cache_ceiling_materials() -> void:
 					if test_value == null:
 						push_warning("[Grid3D] Ceiling material (item %d) missing player_position uniform!" % item_id)
 
+func _cache_floor_materials() -> void:
+	"""Cache floor materials from MeshLibrary for lighting uniform updates"""
+	floor_materials.clear()
+
+	var mesh_library = grid_map.mesh_library
+	if not mesh_library:
+		return
+
+	for item_id in _floor_items:
+		var floor_mesh = mesh_library.get_item_mesh(item_id)
+		if not floor_mesh:
+			continue
+
+		for i in range(floor_mesh.get_surface_count()):
+			var material = floor_mesh.surface_get_material(i)
+			if material and material is ShaderMaterial:
+				if material not in floor_materials:
+					floor_materials.append(material)
+
+
+func _build_all_lit_materials() -> void:
+	"""Build combined list of all materials that receive lighting uniforms"""
+	all_lit_materials.clear()
+	for mat in floor_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	for mat in wall_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	for mat in ceiling_materials:
+		if mat not in all_lit_materials:
+			all_lit_materials.append(mat)
+	Log.grid("[Grid3D] Cached %d lit materials for lightmap lighting" % all_lit_materials.size())
+
+	# Initialize lightmap system (ambient + fixture lights baked into texture)
+	_init_lightmap()
+
+
 # Debug: Track frame count for periodic logging
 var _frame_count: int = 0
 
 func _process(_delta: float) -> void:
-	"""Update wall and ceiling shader uniforms with player position for line-of-sight fade"""
+	"""Update shader uniforms: proximity fade + lightmap rebuild + player light"""
 	_frame_count += 1
 
-	if not player_node or (wall_materials.is_empty() and ceiling_materials.is_empty()):
-		if _frame_count % 60 == 0:  # Log once per second
+	if not player_node or all_lit_materials.is_empty():
+		if _frame_count % 60 == 0:
 			if not player_node:
-				print("[Grid3D] No player_node set for proximity fade")
-			if wall_materials.is_empty():
-				print("[Grid3D] No wall materials cached")
-			if ceiling_materials.is_empty():
-				print("[Grid3D] No ceiling materials cached")
+				Log.warn(Log.Category.GRID, "[Grid3D] No player_node set for proximity fade")
 		return
 
-	# Update all materials with current player position
 	var player_pos = player_node.global_position
 
-	# Update wall materials
+	# Update proximity fade player position (wall + ceiling materials only)
 	for material in wall_materials:
 		material.set_shader_parameter("player_position", player_pos)
-
-	# Update ceiling materials
 	for material in ceiling_materials:
 		material.set_shader_parameter("player_position", player_pos)
+
+	# Rebuild lightmap when chunks change (ambient + fixture lights baked in)
+	if _lightmap_dirty and _lightmap_texture:
+		_rebuild_lightmap()
+
+	# Player light position updates every frame (it moves with the player)
+	var pl_color := Vector3(
+		_player_light_color.x * _player_light_energy,
+		_player_light_color.y * _player_light_energy,
+		_player_light_color.z * _player_light_energy
+	)
+	for material in all_lit_materials:
+		material.set_shader_parameter("player_light_pos", player_pos)
+		material.set_shader_parameter("player_light_color", pl_color)
+		material.set_shader_parameter("player_light_range", _player_light_range)
+
+func _init_lightmap() -> void:
+	"""Create lightmap Image + ImageTexture and bind to all lit materials.
+
+	Called once from _build_all_lit_materials(). The texture persists across
+	rebuilds — _rebuild_lightmap() updates pixel data and calls update().
+	"""
+	_lightmap = Image.create(LIGHTMAP_SIZE, LIGHTMAP_SIZE, false, Image.FORMAT_RGBF)
+	_lightmap.fill(Color.BLACK)
+	_lightmap_texture = ImageTexture.create_from_image(_lightmap)
+
+	var inv_size := 1.0 / (LIGHTMAP_SIZE * LIGHTMAP_CELL_SIZE)
+	for mat in all_lit_materials:
+		mat.set_shader_parameter("lightmap_tex", _lightmap_texture)
+		mat.set_shader_parameter("lightmap_inv_size", Vector2(inv_size, inv_size))
+		mat.set_shader_parameter("lightmap_origin", _lightmap_origin)
+
+	_lightmap_dirty = true
+	Log.grid("[Grid3D] Lightmap initialized: %dx%d (%.0f world units coverage)" % [
+		LIGHTMAP_SIZE, LIGHTMAP_SIZE, LIGHTMAP_SIZE * LIGHTMAP_CELL_SIZE])
+
+
+func _rebuild_lightmap() -> void:
+	"""Rebuild lightmap: fill with ambient, splat all fixture lights, upload to GPU.
+
+	Called from _process() when _lightmap_dirty is true (chunk load/unload).
+	Centers the lightmap on the current player position.
+	"""
+	if not player_node or not entity_renderer:
+		return
+
+	_lightmap_dirty = false
+
+	# Center lightmap on player, snapped to cell grid for stable sampling
+	var player_pos := player_node.global_position
+	var half_world := LIGHTMAP_SIZE * LIGHTMAP_CELL_SIZE * 0.5
+	_lightmap_origin = Vector2(
+		snappedf(player_pos.x - half_world, LIGHTMAP_CELL_SIZE),
+		snappedf(player_pos.z - half_world, LIGHTMAP_CELL_SIZE)
+	)
+
+	# Start from black — lightmap only stores point light contributions.
+	# Godot's vertex_lighting handles ambient + directional natively.
+	_lightmap.fill(Color.BLACK)
+
+	# Splat each light-emitting entity onto the lightmap
+	# All light emitters are in light_entity_cache (both light-only and gameplay entities)
+	var light_count := 0
+	for pos in entity_renderer.light_entity_cache:
+		var entity: WorldEntity = entity_renderer.light_entity_cache[pos]
+		if not entity or entity.is_dead:
+			continue
+
+		if not EntityRenderer.ENTITY_LIGHT_CONFIG.has(entity.entity_type):
+			continue
+		var config: Dictionary = EntityRenderer.ENTITY_LIGHT_CONFIG[entity.entity_type]
+		var world_3d: Vector3 = grid_to_world_centered(pos, 0.0)  # XZ only, Y irrelevant for 2D lightmap
+
+		_splat_light(
+			world_3d,
+			config.get("color", Color.WHITE),
+			config.get("energy", 1.0),
+			config.get("range", 8.0)
+		)
+		light_count += 1
+
+	# Upload updated pixel data to GPU (ImageTexture.update is efficient)
+	_lightmap_texture.update(_lightmap)
+
+	# Push updated origin to all materials
+	for mat in all_lit_materials:
+		mat.set_shader_parameter("lightmap_origin", _lightmap_origin)
+
+	if _frame_count < 10:  # Only log during startup
+		Log.grid("[Grid3D] Lightmap rebuilt: %d lights baked, origin=(%.0f, %.0f)" % [
+			light_count, _lightmap_origin.x, _lightmap_origin.y])
+
+
+func _splat_light(world_pos: Vector3, color: Color, energy: float, light_range: float) -> void:
+	"""Add a single light's contribution to the lightmap.
+
+	Uses the same quadratic attenuation as the shader's _attenuation() function.
+	Pure horizontal distance (no Lambert) — PSX aesthetic, omnidirectional ceiling lights.
+	"""
+	# Convert light world position to lightmap pixel coordinates
+	var lm_x := (world_pos.x - _lightmap_origin.x) / LIGHTMAP_CELL_SIZE
+	var lm_z := (world_pos.z - _lightmap_origin.y) / LIGHTMAP_CELL_SIZE
+
+	# Pixel radius of influence
+	var range_px := ceili(light_range / LIGHTMAP_CELL_SIZE)
+
+	# Bounding box (clamped to lightmap)
+	var ix_min := maxi(int(lm_x) - range_px, 0)
+	var ix_max := mini(int(lm_x) + range_px, LIGHTMAP_SIZE - 1)
+	var iz_min := maxi(int(lm_z) - range_px, 0)
+	var iz_max := mini(int(lm_z) + range_px, LIGHTMAP_SIZE - 1)
+
+	var light_r := color.r * energy
+	var light_g := color.g * energy
+	var light_b := color.b * energy
+
+	for iz in range(iz_min, iz_max + 1):
+		for ix in range(ix_min, ix_max + 1):
+			# World position of pixel center
+			var px_world_x := _lightmap_origin.x + (ix + 0.5) * LIGHTMAP_CELL_SIZE
+			var px_world_z := _lightmap_origin.y + (iz + 0.5) * LIGHTMAP_CELL_SIZE
+			var dx := px_world_x - world_pos.x
+			var dz := px_world_z - world_pos.z
+			var dist := sqrt(dx * dx + dz * dz)
+
+			if dist >= light_range:
+				continue
+
+			# Quadratic attenuation (matches shader's _attenuation function)
+			var ratio := clampf(dist / light_range, 0.0, 1.0)
+			var att := (1.0 - ratio) * (1.0 - ratio)
+
+			# Additive blend onto lightmap
+			var current := _lightmap.get_pixel(ix, iz)
+			_lightmap.set_pixel(ix, iz, Color(
+				current.r + light_r * att,
+				current.g + light_g * att,
+				current.b + light_b * att
+			))
+
 
 func set_player(player: Node3D) -> void:
 	"""Set player reference for line-of-sight proximity fade"""

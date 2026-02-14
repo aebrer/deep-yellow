@@ -251,6 +251,12 @@ var permitted_items: Array[Item] = []
 ## Enable snowfall particle effect (for outdoor/snowy levels)
 @export var enable_snowfall: bool = false
 
+## Sprite brightness multiplier for entities, items, and environment sprites.
+## Multiplies sprite modulate color so sprites reflect more light from point sources.
+## Higher values = sprites pop more under nearby lights (useful with low ambient).
+## 1.0 = default, 2.0 = 2x brighter albedo, etc.
+@export_range(0.5, 5.0) var sprite_brightness: float = 1.0
+
 ## Fixed player spawn position (Vector2i(-1, -1) = use random spawn logic)
 ## Set to a specific position for hand-crafted levels like tutorials
 @export var player_spawn_position: Vector2i = Vector2i(-1, -1)

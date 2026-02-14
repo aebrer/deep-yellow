@@ -289,6 +289,28 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - **Performance**: Scalability built in from start, not bolted on later
 
 
+### 3D World Y Coordinates (Empirically Confirmed)
+
+These values were confirmed via spike testing with debug spheres (Feb 2026).
+The GridMap cell_size is `Vector3(2.0, 1.0, 2.0)` but visual Y coordinates
+don't map 1:1 to cell units — always use these empirical values:
+
+| Y Value | What's There |
+|---------|-------------|
+| 4.4     | Ceiling surface (just below ceiling tiles) |
+| 2.5     | Midpoint / eye level |
+| 1.0     | Player / Entity billboards (`player_3d.gd`) |
+| 0.51    | Spraypaint floor text (`spraypaint_renderer.gd`) |
+| 0.48    | Void-fill floor plane (black, hides under-wall void) |
+| 0.0     | Bottom of floor cell (the void) |
+
+**Light fixture heights are per-level** — defined in level config, not hardcoded:
+- Ceiling fixtures (Level 0 fluorescent): Y=4.4
+- Barrel fires (Level -1): TBD (ground level, much lower)
+- Other fixture types will vary by level
+
+**Default lighting mode**: Ambient low + directional off (point lights provide all illumination).
+
 ### Key Files and Their Purposes
 
 **Autoloads (Singletons)** - `scripts/autoload/`
@@ -320,9 +342,7 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - `wait_action.gd` - Pass turn without moving
 - `pickup_item_action.gd` / `pickup_to_slot_action.gd` - Item pickup
 - `toggle_item_action.gd` / `reorder_item_action.gd` - Inventory management
-- `attack_preview_action.gd` / `attack_cooldown_action.gd` - Combat UI actions
-- `sanity_damage_action.gd` / `mana_blocked_action.gd` - Status effect actions
-- `control_hint_action.gd` / `item_status_action.gd` - Informational display actions
+- `sanity_damage_action.gd` - Sanity damage calculation (static helpers + preview)
 
 **Combat System** - `scripts/combat/`
 - `attack_executor.gd` - Executes attacks, calculates damage, spawns VFX
@@ -360,7 +380,6 @@ These are the ONLY controls currently implemented. Don't assume other inputs exi
 - `core_inventory.gd` - Main inventory UI
 - `stats_panel.gd` - HP/Sanity/Mana display
 - `status_bars.gd` - Top-of-screen HP/Sanity bars
-- `action_preview_ui.gd` - Action preview display
 - `examination_panel.gd` - Entity/item examination UI
 - `examination_crosshair.gd` - FPV crosshair
 - `minimap.gd` - Minimap display

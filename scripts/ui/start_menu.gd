@@ -162,13 +162,13 @@ func _build_3d_background() -> void:
 	viewport.msaa_3d = Viewport.MSAA_4X
 	container.add_child(viewport)
 
-	# World environment (Level 0 style)
+	# World environment (matches Level 0 gameplay lighting)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.82, 0.8, 0.75)  # Stained ceiling tiles at horizon
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(1.0, 0.95, 0.7)
-	env.ambient_light_energy = 0.5
+	env.ambient_light_color = Color(0.5, 0.45, 0.3)  # Warm bounce (matches Level 0)
+	env.ambient_light_energy = 0.15
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.8, 0.75, 0.5)
 	env.fog_density = 0.03
@@ -176,10 +176,11 @@ func _build_3d_background() -> void:
 	world_env.environment = env
 	viewport.add_child(world_env)
 
-	# Overhead light (fluorescent, straight down)
+	# Overhead light (warm fluorescent, straight down — slightly brighter than
+	# gameplay to compensate for no lightmap in the start menu corridor)
 	var light := DirectionalLight3D.new()
-	light.light_color = Color(0.95, 0.97, 1.0)
-	light.light_energy = 0.9
+	light.light_color = Color(0.95, 0.9, 0.7)  # Warm fluorescent tint
+	light.light_energy = 0.4
 	light.rotation_degrees = Vector3(-90, 0, 0)
 	viewport.add_child(light)
 

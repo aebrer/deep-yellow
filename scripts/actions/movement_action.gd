@@ -68,14 +68,3 @@ func execute(player) -> void:
 
 	# Advance turn counter
 	player.turn_count += 1
-
-func get_preview_info(player) -> Dictionary:
-	"""Get preview info for UI display"""
-	var target_pos = player.grid_position + direction
-
-	return {
-		"name": "Move Forward",
-		"target": "(%d, %d)" % [target_pos.x, target_pos.y],
-		"icon": "→",
-		"cost": ""
-	}

@@ -18,13 +18,3 @@ func execute(player) -> void:
 	"""Pass the turn without moving"""
 	# Advance turn counter
 	player.turn_count += 1
-
-func get_preview_info(player) -> Dictionary:
-	"""Get preview info for UI display"""
-	# Use control hint style icon with control hints
-	return {
-		"name": "Wait",
-		"target": "[RT/LMB]",
-		"icon": "🖱️",
-		"cost": ""
-	}
