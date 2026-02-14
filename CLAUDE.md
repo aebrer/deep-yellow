@@ -342,9 +342,7 @@ don't map 1:1 to cell units — always use these empirical values:
 - `wait_action.gd` - Pass turn without moving
 - `pickup_item_action.gd` / `pickup_to_slot_action.gd` - Item pickup
 - `toggle_item_action.gd` / `reorder_item_action.gd` - Inventory management
-- `attack_preview_action.gd` / `attack_cooldown_action.gd` - Combat UI actions
-- `sanity_damage_action.gd` / `mana_blocked_action.gd` - Status effect actions
-- `control_hint_action.gd` / `item_status_action.gd` - Informational display actions
+- `sanity_damage_action.gd` - Sanity damage calculation (static helpers + preview)
 
 **Combat System** - `scripts/combat/`
 - `attack_executor.gd` - Executes attacks, calculates damage, spawns VFX
@@ -382,7 +380,6 @@ don't map 1:1 to cell units — always use these empirical values:
 - `core_inventory.gd` - Main inventory UI
 - `stats_panel.gd` - HP/Sanity/Mana display
 - `status_bars.gd` - Top-of-screen HP/Sanity bars
-- `action_preview_ui.gd` - Action preview display
 - `examination_panel.gd` - Entity/item examination UI
 - `examination_crosshair.gd` - FPV crosshair
 - `minimap.gd` - Minimap display

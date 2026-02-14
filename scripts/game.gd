@@ -14,7 +14,6 @@ extends Control
 @onready var stats_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CharacterSheet/StatsPanel
 @onready var core_inventory_panel: VBoxContainer = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/CoreInventory
 @onready var examination_panel: ExaminationPanel = $MarginContainer/HBoxContainer/RightSide/MarginContainer/VBoxContainer/ExaminationPanel
-@onready var action_preview_ui: ActionPreviewUI = $TextUIOverlay/ActionPreviewUI
 @onready var minimap: Control = $MarginContainer/HBoxContainer/LeftSide/LogPanel/MarginContainer/HBoxContainer/Minimap/MarginContainer/AspectRatioContainer/MinimapControl
 @onready var fps_counter: Label = $FPSCounter
 
@@ -73,7 +72,6 @@ func _ready() -> void:
 		return
 
 	# Connect to player signals
-	player.action_preview_changed.connect(_on_player_action_preview_changed)
 	player.turn_completed.connect(_on_player_turn_completed)
 
 	# Connect to player death signal
@@ -96,7 +94,6 @@ func _ready() -> void:
 	# Wire up core inventory to player
 	if core_inventory_panel:
 		core_inventory_panel.set_player(player)
-		core_inventory_panel.reorder_state_changed.connect(_on_inventory_reorder_state_changed)
 
 	# Wire up minimap to grid and player
 	if minimap:
@@ -106,10 +103,6 @@ func _ready() -> void:
 			minimap.set_player(player)
 		else:
 			Log.error(Log.Category.SYSTEM, "Failed to find Grid3D for minimap")
-
-	# Connect to PauseManager to handle action preview on pause/unpause
-	if PauseManager:
-		PauseManager.pause_toggled.connect(_on_pause_toggled)
 
 	# Connect to window size changes (web-compatible!)
 	get_window().size_changed.connect(_on_window_size_changed)
@@ -188,68 +181,11 @@ func _on_log_message(category: Log.Category, level: Log.Level, message: String) 
 	# Append to log with minimal formatting
 	log_text.append_text("[color=%s][%s] %s[/color]\n" % [color, category_name, msg_lower])
 
-func _on_player_action_preview_changed(actions: Array[Action]) -> void:
-	"""Forward action preview to UI (text overlay - always clean)"""
-	if not action_preview_ui:
-		return
-
-	# When paused, ignore player state previews - pause hints are shown instead
-	if PauseManager and PauseManager.is_paused:
-		return
-
-	action_preview_ui.show_preview(actions, player)
-
 func _on_player_turn_completed() -> void:
 	"""Update minimap when player completes a turn"""
 	if minimap and player:
 		minimap.on_player_moved(player.grid_position)
 
-func _on_inventory_reorder_state_changed(is_reordering: bool) -> void:
-	"""Update action preview when entering/exiting reorder mode or when pausing"""
-	if not action_preview_ui or not PauseManager:
-		return
-
-	# Only show hints when paused
-	if not PauseManager.is_paused:
-		return
-
-	var hints: Array[Action] = []
-
-	if is_reordering:
-		# Reorder mode hints
-		hints.append(ControlHintAction.new("✋", "Hover over slot", "to select target"))
-		hints.append(ControlHintAction.new("🖱️", "LMB / A", "drop item"))
-		hints.append(ControlHintAction.new("🖱️", "RMB / X / B", "cancel"))
-	else:
-		# Normal pause mode hints
-		hints.append(ControlHintAction.new("🖱️", "Hover / Stick", "navigate inventory"))
-		hints.append(ControlHintAction.new("🖱️", "LMB / A", "toggle item ON/OFF"))
-		hints.append(ControlHintAction.new("🖱️", "RMB / X", "reorder item"))
-		hints.append(ControlHintAction.new("⏸️", "START / ESC / MMB", "unpause"))
-
-	action_preview_ui.show_preview(hints, player)
-
-func _on_pause_toggled(is_paused: bool) -> void:
-	"""Handle pause state changes - show/hide action preview"""
-	if not action_preview_ui:
-		return
-
-	if is_paused:
-		# When pausing, show the pause mode hints
-		_on_inventory_reorder_state_changed(false)
-	else:
-		# When unpausing, hide the action preview
-		# The player state will re-emit action_preview_changed when appropriate
-		action_preview_ui.hide_preview()
-
-func _on_codex_visibility_changed() -> void:
-	"""Hide action preview when codex opens, restore pause hints when it closes"""
-	if not action_preview_ui:
-		return
-	if codex_panel and codex_panel.visible:
-		action_preview_ui.hide_preview()
-	elif PauseManager and PauseManager.is_paused:
-		_on_inventory_reorder_state_changed(false)
 
 # ============================================================================
 # LAYOUT MANAGEMENT (Portrait/Landscape)
@@ -328,10 +264,6 @@ func _switch_to_portrait() -> void:
 	# Switch core inventory to horizontal layout
 	if core_inventory and core_inventory.has_method("set_layout_mode"):
 		core_inventory.set_layout_mode(1)  # 1 = HORIZONTAL
-
-	# Reposition action preview to top-right
-	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
-		action_preview_ui.set_portrait_mode(true)
 
 	# Switch examination panel to overlay mode (appears over info row)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
@@ -439,10 +371,6 @@ func _switch_to_landscape() -> void:
 	if core_inventory and core_inventory.has_method("set_layout_mode"):
 		core_inventory.set_layout_mode(0)  # 0 = VERTICAL
 
-	# Restore action preview to bottom-right
-	if action_preview_ui and action_preview_ui.has_method("set_portrait_mode"):
-		action_preview_ui.set_portrait_mode(false)
-
 	# Restore examination panel to embedded mode (in RightSide VBoxContainer)
 	if examination_panel and examination_panel.has_method("set_portrait_mode"):
 		examination_panel.set_portrait_mode(false)
@@ -515,9 +443,6 @@ func _create_codex_panel() -> void:
 	if settings_panel:
 		settings_panel.codex_panel = codex_panel
 
-	# Hide action preview when codex is open
-	codex_panel.visibility_changed.connect(_on_codex_visibility_changed)
-
 func _create_map_overlay_panel() -> void:
 	"""Create the map overlay panel (opened with X key/button)"""
 	map_overlay_panel = MapOverlayPanel.new()
@@ -529,24 +454,10 @@ func _create_map_overlay_panel() -> void:
 	map_overlay_panel.overlay_closed.connect(_on_map_overlay_closed)
 	map_overlay_panel.goto_requested.connect(_on_map_goto_requested)
 
-	# Hide action preview when map overlay is open
-	map_overlay_panel.visibility_changed.connect(_on_map_overlay_visibility_changed)
-
 func _on_map_overlay_closed() -> void:
 	"""Handle map overlay being closed."""
 	# goto_target is checked by idle_state on the next frame, triggering auto-explore
 	pass
-
-func _on_map_overlay_visibility_changed() -> void:
-	"""Hide action preview when map overlay opens, restore pause hints when it closes."""
-	if not action_preview_ui:
-		return
-	if map_overlay_panel and map_overlay_panel.visible:
-		# Deferred so it runs AFTER PauseManager.toggle_pause() signal handlers
-		# (which would otherwise re-show the preview via _on_pause_toggled)
-		action_preview_ui.call_deferred("hide_preview")
-	elif PauseManager and PauseManager.is_paused:
-		_on_inventory_reorder_state_changed(false)
 
 func _on_map_goto_requested(target_pos: Vector2i) -> void:
 	"""Handle Go To request from map overlay (marker navigation)."""

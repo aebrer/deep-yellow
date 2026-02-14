@@ -3,7 +3,6 @@ extends Control
 ## Horizontal HP and Sanity bars at top of game viewport
 ##
 ## Layout: HP bar on left 1/3, Sanity bar on right 1/3
-## (Center 1/3 is reserved for ActionPreviewUI)
 ##
 ## Features:
 ## - Smooth fill animation on damage/healing

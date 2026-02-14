@@ -26,12 +26,6 @@ const BAR_BG_COLOR = Color(0.0, 0.0, 0.0, 0.9)  # Black background
 # SIGNALS
 # ============================================================================
 
-## Emitted when action preview should update (for UI)
-## actions: Array of Action objects that will execute next turn
-## Note: Emitted by IdleState, connected in game_3d.gd
-@warning_ignore("unused_signal")
-signal action_preview_changed(actions: Array[Action])
-
 ## Emitted when a turn completes (for turn-based systems like ChunkManager)
 @warning_ignore("unused_signal")
 signal turn_completed()

@@ -127,7 +127,7 @@ func enter() -> void:
     # Apply current camera mode
     _apply_camera_mode()
     # Update UI
-    _update_action_preview()
+    # (action preview removed)
 
 func handle_input(event: InputEvent) -> void:
     # Camera toggle (C / SELECT)
@@ -148,7 +148,7 @@ func _toggle_camera() -> void:
     else:
         camera_mode = CameraMode.FPV
     _apply_camera_mode()
-    _update_action_preview()
+    # (action preview removed)
 
 func _apply_camera_mode() -> void:
     match camera_mode:
@@ -179,7 +179,7 @@ func process_frame(delta: float) -> void:
         _update_examination_target()
 
     # Update action preview
-    _update_action_preview()
+    # (action preview removed)
 ```
 
 **Delete**: `scripts/player/states/look_mode_state.gd`
@@ -188,45 +188,7 @@ func process_frame(delta: float) -> void:
 - Remove LookModeState registration
 - Update any references to LookModeState
 
-### Phase 3: Update Action Preview UI
-
-**File**: `scripts/ui/action_preview_ui.gd`
-
-**Changes**:
-- Header should reflect new control scheme
-- Add camera mode indicator
-
-```gdscript
-func _update_header() -> void:
-    if is_paused:
-        header_label.text = "GAME PAUSED"
-        return
-
-    var move_btn = "[Left Click]" if current_input_device == InputManager.InputDevice.MOUSE_KEYBOARD else "[RT]"
-    var wait_btn = "[Right Click]" if current_input_device == InputManager.InputDevice.MOUSE_KEYBOARD else "[LT]"
-
-    # Show both actions in header
-    header_label.text = "%s Move  •  %s Wait" % [move_btn, wait_btn]
-```
-
-**File**: `scripts/player/states/idle_state.gd` (`_update_action_preview`)
-
-**Changes**:
-- Remove "Look Mode" hint (no longer relevant)
-- Show camera toggle hint instead
-
-```gdscript
-func _update_action_preview() -> void:
-    # ... existing code ...
-
-    # Replace look mode hint with camera toggle hint
-    var toggle_btn = "[C]" if InputManager.current_input_device == InputManager.InputDevice.MOUSE_KEYBOARD else "[SELECT]"
-    var current_mode = "FPV" if camera_mode == CameraMode.FPV else "Tactical"
-    var toggle_hint = ControlHintAction.new("📷", "Camera: %s" % current_mode, toggle_btn)
-    actions.append(toggle_hint)
-```
-
-### Phase 4: Update Camera Behavior
+### Phase 3: Update Camera Behavior
 
 **File**: `scripts/player/first_person_camera.gd`
 
@@ -324,7 +286,6 @@ Update **Key Files** section:
 | `scripts/player/states/look_mode_state.gd` | **DELETE** | Functionality merged into IdleState |
 | `scripts/player/input_state_machine.gd` | Edit | Remove LookModeState, update pause handler |
 | `scripts/player/first_person_camera.gd` | Edit | Increase default FOV (75→90), expand max (90→110) |
-| `scripts/ui/action_preview_ui.gd` | Edit | Update header to show both actions |
 | `CLAUDE.md` | Edit | Update control mappings, key files, design patterns |
 
 ---
