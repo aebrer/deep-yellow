@@ -84,9 +84,25 @@ gh release create $VERSION \
 Use a HEREDOC for multi-line release notes. Include a link to the itch.io page:
 `[aebrer.itch.io/deep-yellow](https://aebrer.itch.io/deep-yellow)`
 
-### Step 8: itch.io devlog (manual)
+### Step 8: Generate itch.io devlog post
 
-Remind Drew that butler can't post devlogs — this step is manual via the itch.io web interface if desired.
+Butler can't post devlogs — Drew will paste this manually. Generate a devlog markdown file at `/tmp/deep-yellow-devlog-${VERSION}.md` for copy-pasting into itch.io.
+
+**Process:**
+
+1. Read the GitHub release notes just created in Step 7
+2. Read the commit log since the previous tag: `git log --oneline <prev_tag>..<new_tag>`
+3. Write a devlog post that:
+   - Uses the release title as the heading
+   - Rewrites the changelog into player-facing language (not commit messages)
+   - Groups changes into sections like "New Features", "Improvements", "Bug Fixes" as appropriate
+   - Keeps the tone consistent with previous devlogs (conversational, technical but accessible)
+   - Omits internal/chore changes that don't affect players (dead code removal, doc updates, CI changes)
+   - Ends with a brief "What's Next" sentence or two if there are obvious open issues to mention
+4. Save to `/tmp/deep-yellow-devlog-${VERSION}.md`
+5. Suggest tags for the post
+
+Drew will review, edit if needed, and paste into the itch.io devlog form.
 
 ## Notes
 
