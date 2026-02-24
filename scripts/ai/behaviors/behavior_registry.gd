@@ -42,7 +42,6 @@ func _init_behaviors() -> void:
 		"vending_machine": _VendingMachineBehavior.new(),
 		"exit_hole": _ExitHoleBehavior.new(),
 		"fluorescent_light": _LightFixtureBehavior.new(),
-		"fluorescent_light_broken": _LightFixtureBehavior.new(),
 		"barrel_fire": _BarrelFireBehavior.new(),
 	}
 

@@ -536,8 +536,6 @@ func _place_doors(grid: Array, rng: RandomNumberGenerator) -> void:
 ## 5 tiles = 10 world units between lights. With range 12, adjacent lights
 ## overlap significantly for dense fluorescent coverage.
 const LIGHT_SPACING := 5
-## Probability that a light fixture is broken (dark, no light emission)
-const LIGHT_BROKEN_CHANCE := 0.15
 ## Random offset range for light positions (prevents perfectly regular grid)
 const LIGHT_JITTER := 1
 
@@ -545,7 +543,7 @@ func _place_lights(grid: Array, chunk: Chunk, rng: RandomNumberGenerator) -> voi
 	"""Place fluorescent ceiling light entities on walkable floor tiles.
 
 	Uses a regular grid with jitter for natural-looking coverage.
-	Some fixtures are broken (no light emission) to create dark areas.
+	Each light gets a unique entropy-locked personality from its world position.
 	"""
 	var chunk_world := chunk.position * Chunk.SIZE
 	var light_count := 0
@@ -560,10 +558,10 @@ func _place_lights(grid: Array, chunk: Chunk, rng: RandomNumberGenerator) -> voi
 				continue
 
 			var world_pos := Vector2i(x, y) + chunk_world
-			var entity_type := "fluorescent_light_broken" if rng.randf() < LIGHT_BROKEN_CHANCE else "fluorescent_light"
 
-			var light_entity := WorldEntity.new(entity_type, world_pos, 99999.0, 0)
+			var light_entity := WorldEntity.new("fluorescent_light", world_pos, 99999.0, 0)
 			EntityRegistry.apply_defaults(light_entity)
+			LightFixtureBehavior.setup_flicker(light_entity)
 
 			var sc := chunk.get_sub_chunk(Vector2i(x / SubChunk.SIZE, y / SubChunk.SIZE))
 			if sc:

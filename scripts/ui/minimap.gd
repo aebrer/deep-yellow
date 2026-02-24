@@ -626,7 +626,7 @@ func _draw_entities(player_pos: Vector2i) -> void:
 
 	# Entity types to skip on minimap (environmental fixtures, too numerous to render)
 	const MINIMAP_HIDDEN_ENTITIES := [
-		"fluorescent_light", "fluorescent_light_broken", "barrel_fire",
+		"fluorescent_light", "barrel_fire",
 	]
 
 	for entity_pos in entity_positions:

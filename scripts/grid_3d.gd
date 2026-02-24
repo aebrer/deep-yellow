@@ -696,8 +696,12 @@ func _build_all_lit_materials() -> void:
 # Debug: Track frame count for periodic logging
 var _frame_count: int = 0
 
-func _process(_delta: float) -> void:
-	"""Update shader uniforms: proximity fade + lightmap rebuild + player light"""
+# Flicker tick accumulator — fires entity_renderer.tick_flicker() at ~1 Hz
+const FLICKER_TICK_INTERVAL := 1.0  # seconds between entropy lock ticks
+var _flicker_tick_accumulator := 0.0
+
+func _process(delta: float) -> void:
+	"""Update shader uniforms: proximity fade + lightmap rebuild + player light + flicker"""
 	_frame_count += 1
 
 	if not player_node or all_lit_materials.is_empty():
@@ -714,7 +718,14 @@ func _process(_delta: float) -> void:
 	for material in ceiling_materials:
 		material.set_shader_parameter("player_position", player_pos)
 
-	# Rebuild lightmap when chunks change (ambient + fixture lights baked in)
+	# Flicker tick: run entropy lock on all fluorescent lights at ~1 Hz
+	_flicker_tick_accumulator += delta
+	if _flicker_tick_accumulator >= FLICKER_TICK_INTERVAL:
+		_flicker_tick_accumulator -= FLICKER_TICK_INTERVAL
+		if entity_renderer and entity_renderer.tick_flicker():
+			_lightmap_dirty = true  # A light changed state — rebake lightmap
+
+	# Rebuild lightmap when chunks change or flicker state changes
 	if _lightmap_dirty and _lightmap_texture:
 		_rebuild_lightmap()
 
@@ -779,6 +790,10 @@ func _rebuild_lightmap() -> void:
 	for pos in entity_renderer.light_entity_cache:
 		var entity: WorldEntity = entity_renderer.light_entity_cache[pos]
 		if not entity or entity.is_dead:
+			continue
+
+		# Skip flickered-off lights (no light contribution when off)
+		if not entity.flicker_on:
 			continue
 
 		if not EntityRenderer.ENTITY_LIGHT_CONFIG.has(entity.entity_type):

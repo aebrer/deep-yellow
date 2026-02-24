@@ -57,6 +57,10 @@ var entity_to_pos: Dictionary = {}  # WorldEntity -> Vector2i
 ## Project-wide invalid position sentinel
 const INVALID_POSITION := Vector2i(-999999, -999999)
 
+## Preloaded flicker textures (persist across chunk cycles)
+static var _tex_light_on: Texture2D = preload("res://assets/textures/entities/fluorescent_light.png")
+static var _tex_light_off: Texture2D = preload("res://assets/textures/entities/fluorescent_light_broken.png")
+
 # ============================================================================
 # SIGNALS
 # ============================================================================
@@ -91,7 +95,6 @@ const ENTITY_COLORS = {
 	"vending_machine": Color(0.6, 0.6, 0.7),        # Metallic gray-blue
 	"exit_hole": Color(0.15, 0.1, 0.1),             # Dark pit
 	"fluorescent_light": Color(1.0, 0.95, 0.8),    # Warm white
-	"fluorescent_light_broken": Color(0.3, 0.3, 0.3),  # Dark grey (dead tube)
 	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
 
@@ -111,7 +114,6 @@ const ENTITY_TEXTURES = {
 	"exit_hole": "res://assets/textures/entities/exit_hole.png",
 	"vending_machine": "res://assets/textures/entities/vending_machine.png",
 	"fluorescent_light": "res://assets/textures/entities/fluorescent_light.png",
-	"fluorescent_light_broken": "res://assets/textures/entities/fluorescent_light_broken.png",
 	"barrel_fire": "res://assets/textures/entities/barrel_fire.png",
 }
 
@@ -122,7 +124,6 @@ const ENTITY_SCALE_OVERRIDES = {
 	"tutorial_mannequin": 2.0,  # Life-sized mannequin
 	"vending_machine": 2.5,    # Tall vending machine
 	"fluorescent_light": 0.8,  # Ceiling fixture, smaller sprite
-	"fluorescent_light_broken": 0.8,
 	"barrel_fire": 1.5,        # Ground-level barrel
 }
 
@@ -134,7 +135,6 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"tutorial_mannequin": 2.0,  # Raised to match 2x size scale
 	"vending_machine": 2.5,    # Tall machine, raised to match scale
 	"fluorescent_light": 4.4,  # Ceiling surface (empirically confirmed)
-	"fluorescent_light_broken": 4.4,
 	"barrel_fire": 1.4,        # Slightly raised so barrel sits on ground naturally
 }
 
@@ -153,7 +153,7 @@ const ENTITY_SPRITESHEETS = {
 ## These are environmental fixtures: too numerous for full entity overhead.
 ## Goes into light_entity_cache only (not entity_cache), keeping gameplay queries fast.
 ## Their behavior must set skip_turn_processing = true (see EntityBehavior).
-const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "fluorescent_light_broken"]
+const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light"]
 
 ## Light emission configuration — the single source of truth for "this entity emits light".
 ## Any entity type listed here is added to light_entity_cache on spawn.
@@ -242,6 +242,9 @@ func render_chunk_entities(chunk: Chunk) -> void:
 				# Only add to light cache if entity actually emits light (has a config entry)
 				if ENTITY_LIGHT_CONFIG.has(entity_type):
 					light_entity_cache[world_pos] = entity
+				# Apply initial flicker visual (ensures correct texture on chunk load)
+				if entity.flicker_rng:
+					_apply_flicker_visual(world_pos, entity.flicker_on)
 				continue
 
 			# Skip if billboard already exists
@@ -407,6 +410,51 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		if health_bar:
 			health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
 
+
+# ============================================================================
+# FLICKER SYSTEM (entropy-locked fluorescent light flickering)
+# ============================================================================
+
+func tick_flicker() -> bool:
+	"""Run one entropy-lock tick on all fluorescent lights.
+
+	Each light's RNG probabilistically reseeds, then deterministically
+	evaluates its on/off state. Between reseeds the output is stable
+	(same seed → same randf() → same state). Reseeds create transitions.
+
+	Returns true if any light changed state (caller should dirty the lightmap).
+	"""
+	var any_changed := false
+
+	for pos in light_entity_cache:
+		var entity: WorldEntity = light_entity_cache[pos]
+		if not entity or entity.is_dead or not entity.flicker_rng:
+			continue
+
+		var was_on := entity.flicker_on
+
+		# Entropy lock: probabilistic reseed breaks the current pattern
+		if entity.flicker_rng.randf() > entity.reseed_threshold:
+			entity.flicker_seed = entity.flicker_rng.randi()
+
+		# Reset to locked seed — deterministic from here
+		entity.flicker_rng.seed = entity.flicker_seed
+
+		# Choose state from weighted pool
+		entity.flicker_on = entity.flicker_rng.randf() < entity.on_weight
+
+		if entity.flicker_on != was_on:
+			any_changed = true
+			_apply_flicker_visual(pos, entity.flicker_on)
+
+	return any_changed
+
+func _apply_flicker_visual(pos: Vector2i, is_on: bool) -> void:
+	"""Swap sprite texture to match current flicker state."""
+	var sprite = entity_billboards.get(pos, null) as Sprite3D
+	if not sprite:
+		return
+	sprite.texture = _tex_light_on if is_on else _tex_light_off
 
 # ============================================================================
 # BILLBOARD CREATION
