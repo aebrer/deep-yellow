@@ -116,7 +116,6 @@ func _bfs_find_unexplored(from: Vector2i, restrict_chunk: Vector2i) -> Vector2i:
 func is_explored(pos: Vector2i) -> bool:
 	return explored_tiles.has(pos)
 
-## Reset all exploration data (called on level change)
 func mark_vending_machine_visited(pos: Vector2i) -> void:
 	"""Mark a vending machine as visited so auto-explore won't stop for it again."""
 	visited_vending_machines[pos] = true
@@ -131,6 +130,12 @@ func mark_item_dismissed(pos: Vector2i) -> void:
 func is_item_dismissed(pos: Vector2i) -> bool:
 	return dismissed_items.has(pos)
 
+func invalidate_target() -> void:
+	"""Clear cached BFS target, forcing a fresh search from the player's current position.
+	Called when auto-explore is cancelled so re-entry doesn't path to the old destination."""
+	_cached_target = NO_TARGET
+
+## Reset all exploration data (called on level change)
 func reset() -> void:
 	explored_tiles.clear()
 	visited_vending_machines.clear()

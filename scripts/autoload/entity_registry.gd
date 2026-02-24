@@ -264,20 +264,6 @@ func _load_entities() -> void:
 	fluorescent_light.blocks_movement = false
 	_entities["fluorescent_light"] = fluorescent_light
 
-	# Fluorescent Light — Broken (Level 0 dark variant, no light emission)
-	var fluorescent_light_broken = EntityInfo.new()
-	fluorescent_light_broken.entity_id = "fluorescent_light_broken"
-	fluorescent_light_broken.entity_name = "Broken Light"
-	fluorescent_light_broken.visual_description = "A dead fluorescent fixture. The tube is dark — either burnt out or shattered. Fragments of glass and phosphor dust litter the ceiling panel."
-	fluorescent_light_broken.clearance_info[0] = ""
-	fluorescent_light_broken.clearance_info[1] = "No electrical activity detected. The tube appears to have failed naturally, though 'naturally' is a generous term here."
-	fluorescent_light_broken.clearance_info[2] = "Areas with broken fixtures tend to cluster together. Whether this is coincidence or something deliberate is unclear."
-	fluorescent_light_broken.object_class = "Safe"
-	fluorescent_light_broken.threat_level = 0
-	fluorescent_light_broken.hostile = false
-	fluorescent_light_broken.blocks_movement = false
-	_entities["fluorescent_light_broken"] = fluorescent_light_broken
-
 	# Barrel Fire (Level -1 ground-level light source)
 	var barrel_fire = EntityInfo.new()
 	barrel_fire.entity_id = "barrel_fire"

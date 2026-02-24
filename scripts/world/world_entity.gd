@@ -92,6 +92,33 @@ var is_exit: bool = false
 var faction: String = ""
 
 # ============================================================================
+# PROPERTIES - Flicker State (entropy-locked light fixtures)
+# ============================================================================
+# NOTE: Not serialized in to_dict(). Personality is deterministic from
+# hash(world_position) via LightFixtureBehavior.setup_flicker(), so it
+# reconstructs identically without persistence.
+
+## Whether this light is currently on (emitting light, lit texture).
+## Only meaningful for entities with flicker_rng set up.
+var flicker_on: bool = true
+
+## Per-entity seeded RNG for entropy locking.
+## null for non-flickering entities.
+var flicker_rng: RandomNumberGenerator = null
+
+## The entropy lock's current seed. Reset to this each tick for deterministic output.
+## Probabilistic reseeding breaks the pattern and creates new stable states.
+var flicker_seed: int = 0
+
+## How likely the seed is to hold each tick. High = stable patterns, low = chaotic.
+## Range [0.0, 1.0]. If randf() > reseed_threshold, seed resets.
+var reseed_threshold: float = 0.85
+
+## Probability of being ON at each evaluation. High = mostly on, low = mostly off.
+## Range [0.0, 1.0]. flicker_on = randf() < on_weight.
+var on_weight: float = 0.9
+
+# ============================================================================
 # INITIALIZATION
 # ============================================================================
 

@@ -36,6 +36,7 @@ extends Node3D
 
 var snowfall: Snowfall = null
 var chunk_indicator: ChunkLoadingIndicator = null
+var control_hints: ControlHints = null
 var void_plane: MeshInstance3D = null
 
 ## Y position for the void-fill plane (empirically confirmed, see CLAUDE.md)
@@ -86,6 +87,10 @@ func _ready() -> void:
 	# Chunk loading indicator (in-viewport overlay)
 	chunk_indicator = ChunkLoadingIndicator.new()
 	$ViewportUILayer.add_child(chunk_indicator)
+
+	# Persistent MOVE/WAIT control hints
+	control_hints = ControlHints.new()
+	$ViewportUILayer.add_child(control_hints)
 
 	# Create void-fill plane after initial chunks load
 	if ChunkManager and not ChunkManager.initial_load_completed.is_connected(_create_void_plane):
