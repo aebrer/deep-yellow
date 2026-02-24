@@ -94,6 +94,9 @@ var faction: String = ""
 # ============================================================================
 # PROPERTIES - Flicker State (entropy-locked light fixtures)
 # ============================================================================
+# NOTE: Not serialized in to_dict(). Personality is deterministic from
+# hash(world_position) via LightFixtureBehavior.setup_flicker(), so it
+# reconstructs identically without persistence.
 
 ## Whether this light is currently on (emitting light, lit texture).
 ## Only meaningful for entities with flicker_rng set up.

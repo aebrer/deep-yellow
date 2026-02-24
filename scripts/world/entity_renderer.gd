@@ -416,11 +416,10 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 # ============================================================================
 
 func tick_flicker() -> bool:
-	"""Run one entropy-lock tick on all fluorescent lights.
+	"""Tick all fluorescent lights and update visuals for any that changed.
 
-	Each light's RNG probabilistically reseeds, then deterministically
-	evaluates its on/off state. Between reseeds the output is stable
-	(same seed → same randf() → same state). Reseeds create transitions.
+	Delegates state mutation to LightFixtureBehavior.tick() — EntityRenderer
+	only handles the visual side (texture swap).
 
 	Returns true if any light changed state (caller should dirty the lightmap).
 	"""
@@ -431,19 +430,7 @@ func tick_flicker() -> bool:
 		if not entity or entity.is_dead or not entity.flicker_rng:
 			continue
 
-		var was_on := entity.flicker_on
-
-		# Entropy lock: probabilistic reseed breaks the current pattern
-		if entity.flicker_rng.randf() > entity.reseed_threshold:
-			entity.flicker_seed = entity.flicker_rng.randi()
-
-		# Reset to locked seed — deterministic from here
-		entity.flicker_rng.seed = entity.flicker_seed
-
-		# Choose state from weighted pool
-		entity.flicker_on = entity.flicker_rng.randf() < entity.on_weight
-
-		if entity.flicker_on != was_on:
+		if LightFixtureBehavior.tick(entity):
 			any_changed = true
 			_apply_flicker_visual(pos, entity.flicker_on)
 

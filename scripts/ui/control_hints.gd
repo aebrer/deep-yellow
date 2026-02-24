@@ -12,7 +12,7 @@ extends Control
 # CONSTANTS
 # ============================================================================
 
-## Gamepad labels (from CONTROL_MAPPINGS in settings_panel.gd)
+## Control labels — keep in sync with CONTROL_MAPPINGS in settings_panel.gd
 const GAMEPAD_MOVE := "🎮 RT"
 const GAMEPAD_WAIT := "🎮 LT"
 

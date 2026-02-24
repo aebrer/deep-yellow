@@ -762,10 +762,10 @@ func _init_lightmap() -> void:
 
 
 func _rebuild_lightmap() -> void:
-	"""Rebuild lightmap: fill with ambient, splat all fixture lights, upload to GPU.
+	"""Rebuild lightmap: clear to black, splat fixture light contributions, upload to GPU.
 
-	Called from _process() when _lightmap_dirty is true (chunk load/unload).
-	Centers the lightmap on the current player position.
+	Called from _process() when _lightmap_dirty is true (chunk load/unload,
+	flicker state change). Centers the lightmap on the current player position.
 	"""
 	if not player_node or not entity_renderer:
 		return
