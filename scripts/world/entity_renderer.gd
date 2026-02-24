@@ -135,7 +135,7 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"vending_machine": 2.5,    # Tall machine, raised to match scale
 	"fluorescent_light": 4.4,  # Ceiling surface (empirically confirmed)
 	"fluorescent_light_broken": 4.4,
-	"barrel_fire": 1.0,        # Ground level (default billboard height)
+	"barrel_fire": 1.4,        # Slightly raised so barrel sits on ground naturally
 }
 
 ## Animated entity spritesheets — entities with frame-by-frame animation.

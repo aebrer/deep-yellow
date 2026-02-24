@@ -63,8 +63,9 @@ func enter() -> void:
 	if player and player.stats:
 		hp_before_step = player.stats.current_hp
 
-	# Show HUD indicator
+	# Show HUD indicator, hide control hints (MOVE/WAIT not relevant during auto-explore)
 	_show_hud_indicator(true)
+	_set_control_hints_visible(false)
 
 	# Mark current position as explored
 	_mark_current_explored()
@@ -113,6 +114,7 @@ func enter() -> void:
 func exit() -> void:
 	super.exit()
 	_show_hud_indicator(false)
+	_set_control_hints_visible(true)
 
 # ============================================================================
 # INPUT - Any input cancels auto-explore
@@ -274,9 +276,11 @@ func process_frame(delta: float) -> void:
 		waiting_for_turn = true
 		transition_to("PreTurnState")
 	else:
-		# Movement blocked — clear path and try again next frame
-		Log.state("Auto-explore: Movement blocked, recalculating path")
-		_clear_cached_path()
+		# Movement blocked — cancel auto-explore entirely
+		Log.state("Auto-explore: Movement blocked, cancelling")
+		Log.player("Auto-explore stopped: path blocked")
+		transition_to("IdleState")
+		return
 
 # ============================================================================
 # STOP CONDITIONS
@@ -587,6 +591,14 @@ func _rotate_camera_to_direction(direction: Vector2i) -> void:
 	# Also sync tactical camera
 	if player.camera_rig:
 		tween.tween_property(player.camera_rig.h_pivot, "rotation_degrees:y", final_yaw, 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+func _set_control_hints_visible(is_visible: bool) -> void:
+	"""Show or hide the persistent MOVE/WAIT control hints"""
+	if not player:
+		return
+	var game_3d = player.get_parent()
+	if game_3d and game_3d.control_hints:
+		game_3d.control_hints.visible = is_visible
 
 func _show_hud_indicator(visible: bool) -> void:
 	"""Show or hide the AUTO-EXPLORE HUD indicator"""
