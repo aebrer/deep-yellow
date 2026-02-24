@@ -115,6 +115,11 @@ func exit() -> void:
 	super.exit()
 	_show_hud_indicator(false)
 	_set_control_hints_visible(true)
+	# Only clear cached state on actual cancellation (not turn transitions).
+	# During a turn, waiting_for_turn is true — we want to preserve the path.
+	if not waiting_for_turn:
+		_clear_cached_path()
+		ExplorationTracker.invalidate_target()
 
 # ============================================================================
 # INPUT - Any input cancels auto-explore

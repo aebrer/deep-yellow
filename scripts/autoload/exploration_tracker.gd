@@ -131,6 +131,11 @@ func mark_item_dismissed(pos: Vector2i) -> void:
 func is_item_dismissed(pos: Vector2i) -> bool:
 	return dismissed_items.has(pos)
 
+func invalidate_target() -> void:
+	"""Clear cached BFS target, forcing a fresh search from the player's current position.
+	Called when auto-explore is cancelled so re-entry doesn't path to the old destination."""
+	_cached_target = NO_TARGET
+
 func reset() -> void:
 	explored_tiles.clear()
 	visited_vending_machines.clear()
