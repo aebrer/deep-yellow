@@ -43,6 +43,10 @@ extends Resource
 ## Whether this entity type is an exit (minimap coloring, special interactions)
 @export var is_exit: bool = false
 
+## Destination level for explicit stair/exit entities.
+## -999999 means "not a level transition". Exit entities must set this explicitly.
+@export var exit_destination_level_id: int = -999999
+
 ## Faction tag for AI grouping (e.g., "bacteria" for cooperative healing)
 @export var faction: String = ""
 

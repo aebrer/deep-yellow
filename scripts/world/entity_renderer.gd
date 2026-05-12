@@ -90,10 +90,16 @@ const ENTITY_COLORS = {
 	"bacteria_spawn": Color(0.5, 1.0, 0.5),    # Light green
 	"bacteria_motherload": Color(0.0, 0.8, 0.0),  # Dark green
 	"bacteria_spreader": Color(0.3, 0.6, 0.2),   # Darker green with yellow tint
+	"sodden": Color(0.35, 0.65, 0.75),
+	"drowner": Color(0.05, 0.18, 0.25),
+	"ambassador": Color(0.75, 0.95, 1.0),
 	"smiler": Color(1.0, 1.0, 0.8),             # Pale yellow/white (eerie glow)
 	"tutorial_mannequin": Color(0.85, 0.75, 0.65),  # Pale beige plastic
 	"vending_machine": Color(0.6, 0.6, 0.7),        # Metallic gray-blue
 	"exit_hole": Color(0.15, 0.1, 0.1),             # Dark pit
+	"tutorial_to_lobby_stairs": Color(0.15, 0.1, 0.1),
+	"lobby_to_poolrooms_stairs": Color(0.05, 0.35, 0.45),
+	"poolrooms_to_lobby_stairs": Color(0.7, 0.65, 0.35),
 	"fluorescent_light": Color(1.0, 0.95, 0.8),    # Warm white
 	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
@@ -102,6 +108,9 @@ const ENTITY_COLORS = {
 enum RenderMode { BILLBOARD, FLOOR_DECAL }
 const ENTITY_RENDER_MODES = {
 	"exit_hole": RenderMode.FLOOR_DECAL,
+	"tutorial_to_lobby_stairs": RenderMode.FLOOR_DECAL,
+	"lobby_to_poolrooms_stairs": RenderMode.FLOOR_DECAL,
+	"poolrooms_to_lobby_stairs": RenderMode.FLOOR_DECAL,
 }
 
 ## Entity textures (loaded on demand)
@@ -112,6 +121,9 @@ const ENTITY_TEXTURES = {
 	"smiler": "res://assets/textures/entities/smiler.png",
 	"tutorial_mannequin": "res://assets/textures/entities/tutorial_mannequin.png",
 	"exit_hole": "res://assets/textures/entities/exit_hole.png",
+	"tutorial_to_lobby_stairs": "res://assets/textures/entities/exit_hole.png",
+	"lobby_to_poolrooms_stairs": "res://assets/textures/entities/exit_hole.png",
+	"poolrooms_to_lobby_stairs": "res://assets/textures/entities/exit_hole.png",
 	"vending_machine": "res://assets/textures/entities/vending_machine.png",
 	"fluorescent_light": "res://assets/textures/entities/fluorescent_light.png",
 	"barrel_fire": "res://assets/textures/entities/barrel_fire.png",
@@ -120,6 +132,9 @@ const ENTITY_TEXTURES = {
 ## Per-entity scale overrides (multiplier on BILLBOARD_SIZE)
 const ENTITY_SCALE_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Boss-sized
+	"sodden": 1.5,
+	"drowner": 1.6,
+	"ambassador": 2.2,
 	"smiler": 2.0,  # Large, imposing presence
 	"tutorial_mannequin": 2.0,  # Life-sized mannequin
 	"vending_machine": 2.5,    # Tall vending machine
@@ -131,6 +146,9 @@ const ENTITY_SCALE_OVERRIDES = {
 ## See CLAUDE.md "3D World Y Coordinates" for empirically confirmed values
 const ENTITY_HEIGHT_OVERRIDES = {
 	"bacteria_motherload": 2.0,  # Raised to match 2x size scale
+	"sodden": 1.4,
+	"drowner": 1.2,
+	"ambassador": 2.4,
 	"smiler": 3.0,  # Floats ominously above the floor
 	"tutorial_mannequin": 2.0,  # Raised to match 2x size scale
 	"vending_machine": 2.5,    # Tall machine, raised to match scale

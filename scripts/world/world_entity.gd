@@ -87,6 +87,10 @@ var blocks_movement: bool = true
 ## Whether this entity is an exit (for minimap coloring, special interactions)
 var is_exit: bool = false
 
+## Destination level for explicit stair/exit entities.
+## -999999 means "not a level transition" and is intentionally loud if used as stairs.
+var exit_destination_level_id: int = -999999
+
 ## Faction tag for AI grouping (e.g., "bacteria" for spreader healing)
 ## Entities with the same faction can interact cooperatively
 var faction: String = ""
@@ -225,6 +229,7 @@ func to_dict() -> Dictionary:
 		"hostile": hostile,
 		"blocks_movement": blocks_movement,
 		"is_exit": is_exit,
+		"exit_destination_level_id": exit_destination_level_id,
 		"faction": faction,
 	}
 	# Serialize last_seen_player_pos if set

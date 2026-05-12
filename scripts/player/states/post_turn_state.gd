@@ -58,14 +58,22 @@ func _check_exit_stairs() -> bool:
 	if tile_type != SubChunk.TileType.EXIT_STAIRS:
 		return false
 
-	# Determine destination level
-	var destinations: Array[int] = current_level.exit_destinations
-	if destinations.is_empty():
-		Log.warn(Log.Category.SYSTEM, "EXIT_STAIRS found but no exit_destinations configured!")
+	# Determine destination from the explicit stair entity/type at this tile.
+	# exit_destinations is only an allowlist/preload hint, never an ordered progression rule.
+	var exit_entity: WorldEntity = ChunkManager.get_exit_entity_at_tile(player.grid_position, current_level.level_id)
+	if not exit_entity:
+		Log.error(Log.Category.SYSTEM, "EXIT_STAIRS tile at %s has no explicit exit entity; refusing implicit transition" % player.grid_position)
 		return false
 
-	var target_level_id: int = destinations[0]  # First destination for now
-	Log.system("EXIT_STAIRS triggered! Transitioning to level %d" % target_level_id)
+	var target_level_id: int = exit_entity.exit_destination_level_id
+	if target_level_id == -999999:
+		Log.error(Log.Category.SYSTEM, "Exit entity '%s' at %s has no explicit destination" % [exit_entity.entity_type, player.grid_position])
+		return false
+
+	if not current_level.exit_destinations.has(target_level_id):
+		Log.warn(Log.Category.SYSTEM, "Exit entity '%s' leads to level %d, which is not in exit_destinations preload allowlist" % [exit_entity.entity_type, target_level_id])
+
+	Log.system("EXIT_STAIRS '%s' triggered! Transitioning to level %d" % [exit_entity.entity_type, target_level_id])
 
 	# Use ChunkManager.change_level() for mid-run level transition
 	# This preserves run state (seed, corruption) while switching level geometry

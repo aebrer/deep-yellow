@@ -209,6 +209,41 @@ func _load_entities() -> void:
 	bacteria_spreader.faction = "bacteria"
 	_entities["bacteria_spreader"] = bacteria_spreader
 
+	# Sodden (Level 1 slow melee threat)
+	var sodden = EntityInfo.new()
+	sodden.entity_id = "sodden"
+	sodden.entity_name = "Sodden"
+	sodden.visual_description = "A waterlogged humanoid shape drags itself through the shallow pool. Its skin has the pale blue cast of something left underwater too long."
+	sodden.clearance_info[1] = "Slow but resilient. It follows footfalls through the water."
+	sodden.clearance_info[2] = "Melee threat. Less explosive than bacteria, but harder to put down."
+	sodden.object_class = "Euclid"
+	sodden.threat_level = 2
+	_entities["sodden"] = sodden
+
+	# Drowner (Level 1 water ambusher)
+	var drowner = EntityInfo.new()
+	drowner.entity_id = "drowner"
+	drowner.entity_name = "Drowner"
+	drowner.visual_description = "A dark figure just beneath the waterline. Long arms break the surface first, reaching from the blue-black pools."
+	drowner.clearance_info[1] = "Most active near deeper water. It closes distance quickly once disturbed."
+	drowner.clearance_info[2] = "Avoid being pinned near blocked deep-water basins; retreat paths matter."
+	drowner.object_class = "Keter"
+	drowner.threat_level = 3
+	_entities["drowner"] = drowner
+
+	# Ambassador (Level 1 rare passive entity)
+	var ambassador = EntityInfo.new()
+	ambassador.entity_id = "ambassador"
+	ambassador.entity_name = "Ambassador"
+	ambassador.visual_description = "A tall, still silhouette reflected in the tile and water. It keeps its distance, moving only when observed too closely."
+	ambassador.clearance_info[1] = "Rare nonstandard Poolrooms entity. Passive in current field observations."
+	ambassador.clearance_info[2] = "It appears to avoid contact rather than hunt. Later reports may expand this behavior."
+	ambassador.object_class = "Euclid"
+	ambassador.threat_level = 0
+	ambassador.hostile = false
+	ambassador.blocks_movement = false
+	_entities["ambassador"] = ambassador
+
 	# Debug Enemy (testing entity)
 	var debug_enemy = EntityInfo.new()
 	debug_enemy.entity_id = "debug_enemy"
@@ -278,7 +313,7 @@ func _load_entities() -> void:
 	barrel_fire.blocks_movement = true  # Ground-level obstacle, blocks player and AI pathing
 	_entities["barrel_fire"] = barrel_fire
 
-	# Exit Hole (visual marker for EXIT_STAIRS tiles)
+	# Exit Hole (legacy visual marker for EXIT_STAIRS tiles with no route definition)
 	var exit_hole = EntityInfo.new()
 	exit_hole.entity_id = "exit_hole"
 	exit_hole.entity_name = "Dark Pit"
@@ -292,6 +327,48 @@ func _load_entities() -> void:
 	exit_hole.blocks_movement = false
 	exit_hole.is_exit = true
 	_entities["exit_hole"] = exit_hole
+
+	# Explicit stair route: tutorial -> Level 0 lobby
+	var tutorial_to_lobby = EntityInfo.new()
+	tutorial_to_lobby.entity_id = "tutorial_to_lobby_stairs"
+	tutorial_to_lobby.entity_name = "Dark Pit"
+	tutorial_to_lobby.visual_description = "A yawning hole in the ground. Cold air rises from below. It feels like the only way out."
+	tutorial_to_lobby.clearance_info[1] = "Route marker: Kingston, Ontario to the Lobby."
+	tutorial_to_lobby.object_class = "Safe"
+	tutorial_to_lobby.threat_level = 0
+	tutorial_to_lobby.hostile = false
+	tutorial_to_lobby.blocks_movement = false
+	tutorial_to_lobby.is_exit = true
+	tutorial_to_lobby.exit_destination_level_id = 0
+	_entities["tutorial_to_lobby_stairs"] = tutorial_to_lobby
+
+	# Explicit stair route: Level 0 lobby -> Level 1 poolrooms
+	var lobby_to_poolrooms = EntityInfo.new()
+	lobby_to_poolrooms.entity_id = "lobby_to_poolrooms_stairs"
+	lobby_to_poolrooms.entity_name = "Wet Tile Stairwell"
+	lobby_to_poolrooms.visual_description = "A damp stairwell drops beneath the carpet. The concrete steps are slick with chlorinated water, and blue-green light ripples from below."
+	lobby_to_poolrooms.clearance_info[1] = "Route marker: the Lobby to the Poolrooms."
+	lobby_to_poolrooms.object_class = "Safe"
+	lobby_to_poolrooms.threat_level = 0
+	lobby_to_poolrooms.hostile = false
+	lobby_to_poolrooms.blocks_movement = false
+	lobby_to_poolrooms.is_exit = true
+	lobby_to_poolrooms.exit_destination_level_id = 1
+	_entities["lobby_to_poolrooms_stairs"] = lobby_to_poolrooms
+
+	# Explicit stair route: Level 1 poolrooms -> Level 0 lobby
+	var poolrooms_to_lobby = EntityInfo.new()
+	poolrooms_to_lobby.entity_id = "poolrooms_to_lobby_stairs"
+	poolrooms_to_lobby.entity_name = "Dry Service Stairs"
+	poolrooms_to_lobby.visual_description = "A narrow maintenance stair rises out of the water. Yellowed carpet fibers cling to the top step."
+	poolrooms_to_lobby.clearance_info[1] = "Route marker: the Poolrooms back to the Lobby."
+	poolrooms_to_lobby.object_class = "Safe"
+	poolrooms_to_lobby.threat_level = 0
+	poolrooms_to_lobby.hostile = false
+	poolrooms_to_lobby.blocks_movement = false
+	poolrooms_to_lobby.is_exit = true
+	poolrooms_to_lobby.exit_destination_level_id = 0
+	_entities["poolrooms_to_lobby_stairs"] = poolrooms_to_lobby
 
 
 # ============================================================================
@@ -320,6 +397,7 @@ func apply_defaults(entity: WorldEntity) -> void:
 	entity.hostile = info.hostile
 	entity.blocks_movement = info.blocks_movement
 	entity.is_exit = info.is_exit
+	entity.exit_destination_level_id = info.exit_destination_level_id
 	entity.faction = info.faction
 
 func _get_unknown_entity_info() -> Dictionary:

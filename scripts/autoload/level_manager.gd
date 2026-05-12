@@ -50,6 +50,7 @@ const LEVEL_CONFIG_PATTERN := "level_%02d/level_%02d_config.tres"
 const PRELOADED_CONFIGS := {
 	-1: preload("res://assets/levels/level_neg1/level_neg1_config.tres"),
 	0: preload("res://assets/levels/level_00/level_00_config.tres"),
+	1: preload("res://assets/levels/level_01/level_01_config.tres"),
 }
 
 # ============================================================================
@@ -87,7 +88,7 @@ func _build_level_registry() -> void:
 
 	# Hardcoded list of known levels
 	# Add new levels here as they're created
-	var known_levels := [-1, 0]  # Level -1 (tutorial) and Level 0 exist
+	var known_levels := [-1, 0, 1]  # Tutorial, Lobby, and Poolrooms exist
 
 	for level_id in known_levels:
 		var config_path := LEVEL_CONFIG_DIR + LEVEL_CONFIG_PATTERN % [level_id, level_id]

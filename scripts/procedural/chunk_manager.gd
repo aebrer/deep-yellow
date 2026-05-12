@@ -121,6 +121,10 @@ func _register_levels() -> void:
 	level_generators[0] = Level0Generator.new()
 	level_configs[0] = Level0Config.new()
 
+	# Level 1: The Poolrooms
+	level_generators[1] = Level1Generator.new()
+	level_configs[1] = Level1Config.new()
+
 func _on_node_added(node: Node) -> void:
 	"""Detect when game scene loads and initialize chunk generation"""
 	# The root Control node from game.tscn is named "Game"
@@ -616,6 +620,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 			entity.blocks_movement = entity_entry["blocks_movement"]
 		if entity_entry.has("is_exit"):
 			entity.is_exit = entity_entry["is_exit"]
+		if entity_entry.has("exit_destination_level_id"):
+			entity.exit_destination_level_id = entity_entry["exit_destination_level_id"]
 		if entity_entry.has("faction"):
 			entity.faction = entity_entry["faction"]
 
@@ -928,13 +934,11 @@ func tile_to_chunk(tile_pos: Vector2i) -> Vector2i:
 func _cut_border_hallways(new_chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
 	"""Cut hallways between newly generated chunk and existing adjacent chunks.
 
-	When a chunk is generated, this function checks all 4 cardinal neighbors.
-	For each neighbor that already exists AND hasn't had a hallway cut yet,
-	it cuts a straight hallway across the border (10 tiles on each side = 20 total).
-
-	This ensures connectivity between all adjacent chunks while avoiding
-	duplicate cuts (the border key tracks which borders have been processed).
+	Level 1 uses generator-owned basin/channel edge connectivity; do not carve
+	straight Level 0 hallways through the Poolrooms.
 	"""
+	if level_id == 1:
+		return
 	# Cardinal directions: right, left, down, up
 	var directions := [
 		Vector2i(1, 0),   # East neighbor
@@ -1223,6 +1227,26 @@ func get_tile_type(tile_pos: Vector2i, level_id: int) -> int:
 
 	return chunk.get_tile(tile_pos)
 
+func get_exit_entity_at_tile(tile_pos: Vector2i, level_id: int) -> WorldEntity:
+	"""Get the explicit stair/exit entity at a world tile.
+
+	Exit destinations live on the entity definition/type, not on level ordering or
+	exit_destinations array order. Returns null if no routed exit entity is present.
+	"""
+	var chunk := get_chunk_at_tile(tile_pos, level_id)
+	if not chunk:
+		return null
+
+	var subchunk := chunk.get_sub_chunk_at_tile(tile_pos)
+	if not subchunk:
+		return null
+
+	for entity in subchunk.world_entities:
+		if entity.world_position == tile_pos and entity.is_exit:
+			return entity
+
+	return null
+
 # ============================================================================
 # RUN MANAGEMENT
 # ============================================================================
@@ -1277,9 +1301,9 @@ func change_level(target_level_id: int) -> void:
 
 	Unlike start_new_run(), this preserves run state:
 	  KEPT: world_seed, corruption_tracker, chunks_without_items (pity timer),
-	        visited_chunks (EXP tracking across levels), level_generators/configs
+			visited_chunks (EXP tracking across levels), level_generators/configs
 	  CLEARED: loaded_chunks, generating_chunks, pathfinding graph,
-	           last_player_chunk, initial_load state, generation flags
+			   last_player_chunk, initial_load state, generation flags
 
 	Args:
 		target_level_id: Level to transition to

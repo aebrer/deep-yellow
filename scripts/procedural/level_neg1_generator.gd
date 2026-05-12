@@ -63,6 +63,15 @@ func _carve_rect(chunk: Chunk, x1: int, y1: int, x2: int, y2: int) -> void:
 		for x in range(x1, x2):
 			_carve_floor(chunk, x, y)
 
+func _add_exit_entity(chunk: Chunk, local_pos: Vector2i, entity_type: String) -> void:
+	"""Attach an explicit routed exit entity to an EXIT_STAIRS tile."""
+	var world_pos := local_pos + chunk.position * Chunk.SIZE
+	var exit_entity := WorldEntity.new(entity_type, world_pos, 99999.0, 0)
+	EntityRegistry.apply_defaults(exit_entity)
+	var sc := chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
+	if sc:
+		sc.add_world_entity(exit_entity)
+
 # ============================================================================
 # ROOM LAYOUT — All coordinates are local to chunk (0-127)
 # Layout runs south-to-north (decreasing Y): spawn at high Y, exit at low Y
@@ -97,10 +106,11 @@ func _carve_exit_hallway(chunk: Chunk) -> void:
 # Exit area: 6×6, centered at x=64, y=74-80
 func _carve_exit_area(chunk: Chunk) -> void:
 	_carve_rect(chunk, 61, 74, 67, 80)
-	# Place exit stairs at center
+	# Place explicit routed stairs at center (tutorial -> Level 0)
 	var exit_pos := Vector2i(64, 77)
 	chunk.set_tile(exit_pos, EXIT_STAIRS)
 	chunk.set_tile_at_layer(exit_pos, 1, CEILING)
+	_add_exit_entity(chunk, exit_pos, "tutorial_to_lobby_stairs")
 
 # ============================================================================
 # TUTORIAL CONTENT PLACEMENT

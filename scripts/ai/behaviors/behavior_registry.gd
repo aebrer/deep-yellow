@@ -11,6 +11,9 @@ const _BacteriaSpawnBehavior = preload("res://scripts/ai/behaviors/bacteria_spaw
 const _BacteriaMotherloadBehavior = preload("res://scripts/ai/behaviors/bacteria_motherload_behavior.gd")
 const _SmilerBehavior = preload("res://scripts/ai/behaviors/smiler_behavior.gd")
 const _BacteriaSpreaderBehavior = preload("res://scripts/ai/behaviors/bacteria_spreader_behavior.gd")
+const _SoddenBehavior = preload("res://scripts/ai/behaviors/sodden_behavior.gd")
+const _DrownerBehavior = preload("res://scripts/ai/behaviors/drowner_behavior.gd")
+const _AmbassadorBehavior = preload("res://scripts/ai/behaviors/ambassador_behavior.gd")
 const _TutorialMannequinBehavior = preload("res://scripts/ai/behaviors/tutorial_mannequin_behavior.gd")
 const _VendingMachineBehavior = preload("res://scripts/ai/behaviors/vending_machine_behavior.gd")
 const _ExitHoleBehavior = preload("res://scripts/ai/behaviors/exit_hole_behavior.gd")
@@ -37,10 +40,16 @@ func _init_behaviors() -> void:
 		"bacteria_spawn": _BacteriaSpawnBehavior.new(),
 		"bacteria_motherload": _BacteriaMotherloadBehavior.new(),
 		"bacteria_spreader": _BacteriaSpreaderBehavior.new(),
+		"sodden": _SoddenBehavior.new(),
+		"drowner": _DrownerBehavior.new(),
+		"ambassador": _AmbassadorBehavior.new(),
 		"smiler": _SmilerBehavior.new(),
 		"tutorial_mannequin": _TutorialMannequinBehavior.new(),
 		"vending_machine": _VendingMachineBehavior.new(),
 		"exit_hole": _ExitHoleBehavior.new(),
+		"tutorial_to_lobby_stairs": _ExitHoleBehavior.new(),
+		"lobby_to_poolrooms_stairs": _ExitHoleBehavior.new(),
+		"poolrooms_to_lobby_stairs": _ExitHoleBehavior.new(),
 		"fluorescent_light": _LightFixtureBehavior.new(),
 		"barrel_fire": _BarrelFireBehavior.new(),
 	}

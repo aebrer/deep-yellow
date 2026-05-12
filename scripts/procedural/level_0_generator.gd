@@ -149,6 +149,9 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	# Apply to chunk (with variant placement)
 	_apply_grid_to_chunk(grid, chunk, rng)
 
+	# Place explicit Lobby -> Poolrooms stairs. The entity type defines the route.
+	_place_poolrooms_stairs(grid, chunk, rng)
+
 	var time_after_apply := Time.get_ticks_usec()
 
 	# Calculate timing breakdown (in milliseconds)
@@ -567,6 +570,51 @@ func _place_lights(grid: Array, chunk: Chunk, rng: RandomNumberGenerator) -> voi
 			if sc:
 				sc.add_world_entity(light_entity)
 				light_count += 1
+
+func _place_poolrooms_stairs(grid: Array, chunk: Chunk, _rng: RandomNumberGenerator) -> void:
+	"""Place an explicit Lobby -> Poolrooms stair route.
+
+	The first pass guarantees one route in the origin chunk for playtesting while
+	keeping the route definition on the stair entity type, not on level order.
+	"""
+	if chunk.position != Vector2i(0, 0):
+		return
+
+	var stair_pos := _find_nearest_floor_in_grid(grid, Vector2i(96, 96), 48)
+	if stair_pos == Vector2i(-1, -1):
+		return
+
+	chunk.set_tile(stair_pos, SubChunk.TileType.EXIT_STAIRS)
+	chunk.set_tile_at_layer(stair_pos, 1, SubChunk.TileType.CEILING)
+	_add_exit_entity(chunk, stair_pos, "lobby_to_poolrooms_stairs")
+
+func _find_nearest_floor_in_grid(grid: Array, center: Vector2i, max_radius: int) -> Vector2i:
+	"""Find a floor tile near a desired local chunk position."""
+	if center.x >= 0 and center.x < Chunk.SIZE and center.y >= 0 and center.y < Chunk.SIZE:
+		if grid[center.y][center.x] == FLOOR:
+			return center
+
+	for radius in range(1, max_radius + 1):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if abs(dx) + abs(dy) != radius:
+					continue
+				var pos := center + Vector2i(dx, dy)
+				if pos.x < 1 or pos.x >= Chunk.SIZE - 1 or pos.y < 1 or pos.y >= Chunk.SIZE - 1:
+					continue
+				if grid[pos.y][pos.x] == FLOOR:
+					return pos
+
+	return Vector2i(-1, -1)
+
+func _add_exit_entity(chunk: Chunk, local_pos: Vector2i, entity_type: String) -> void:
+	"""Attach an explicit routed exit entity to an EXIT_STAIRS tile."""
+	var world_pos := local_pos + chunk.position * Chunk.SIZE
+	var exit_entity := WorldEntity.new(entity_type, world_pos, 99999.0, 0)
+	EntityRegistry.apply_defaults(exit_entity)
+	var sc := chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
+	if sc:
+		sc.add_world_entity(exit_entity)
 
 
 # ============================================================================
