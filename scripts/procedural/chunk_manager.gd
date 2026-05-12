@@ -934,11 +934,10 @@ func tile_to_chunk(tile_pos: Vector2i) -> Vector2i:
 func _cut_border_hallways(new_chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
 	"""Cut hallways between newly generated chunk and existing adjacent chunks.
 
-	Level 1 uses generator-owned basin/channel edge connectivity; do not carve
-	straight Level 0 hallways through the Poolrooms.
+	This now runs for all levels (including Level 1) to guarantee connectivity.
+	The straight floor hallway is a reliable fallback when generator-owned
+	connectivity is insufficient.
 	"""
-	if level_id == 1:
-		return
 	# Cardinal directions: right, left, down, up
 	var directions := [
 		Vector2i(1, 0),   # East neighbor

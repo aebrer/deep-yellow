@@ -150,6 +150,8 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	_apply_grid_to_chunk(grid, chunk, rng)
 
 	# Place explicit Lobby -> Poolrooms stairs. The entity type defines the route.
+	# TODO: Currently forced in origin chunk for debugging. Should scale spawn
+	# probability with corruption (rare at low corruption, more common later).
 	_place_poolrooms_stairs(grid, chunk, rng)
 
 	var time_after_apply := Time.get_ticks_usec()
