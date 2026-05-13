@@ -582,7 +582,7 @@ func _place_poolrooms_stairs(grid: Array, chunk: Chunk, _rng: RandomNumberGenera
 	if chunk.position != Vector2i(0, 0):
 		return
 
-	var stair_pos := _find_nearest_floor_in_grid(grid, Vector2i(96, 96), 48)
+	var stair_pos := _find_nearest_floor_in_grid(grid, chunk, Vector2i(96, 96), 48)
 	if stair_pos == Vector2i(-1, -1):
 		return
 
@@ -590,11 +590,14 @@ func _place_poolrooms_stairs(grid: Array, chunk: Chunk, _rng: RandomNumberGenera
 	chunk.set_tile_at_layer(stair_pos, 1, SubChunk.TileType.CEILING)
 	_add_exit_entity(chunk, stair_pos, "lobby_to_poolrooms_stairs")
 
-func _find_nearest_floor_in_grid(grid: Array, center: Vector2i, max_radius: int) -> Vector2i:
-	"""Find a floor tile near a desired local chunk position."""
+func _find_nearest_floor_in_grid(grid: Array, chunk: Chunk, center: Vector2i, max_radius: int) -> Vector2i:
+	"""Find a floor tile near a desired local chunk position, avoiding tiles with entities."""
 	if center.x >= 0 and center.x < Chunk.SIZE and center.y >= 0 and center.y < Chunk.SIZE:
 		if grid[center.y][center.x] == FLOOR:
-			return center
+			var world_pos := center + chunk.position * Chunk.SIZE
+			var sc := chunk.get_sub_chunk_at_tile(world_pos)
+			if sc and sc.get_entity_at(world_pos) == null:
+				return center
 
 	for radius in range(1, max_radius + 1):
 		for dy in range(-radius, radius + 1):
@@ -605,7 +608,10 @@ func _find_nearest_floor_in_grid(grid: Array, center: Vector2i, max_radius: int)
 				if pos.x < 1 or pos.x >= Chunk.SIZE - 1 or pos.y < 1 or pos.y >= Chunk.SIZE - 1:
 					continue
 				if grid[pos.y][pos.x] == FLOOR:
-					return pos
+					var world_pos := pos + chunk.position * Chunk.SIZE
+					var sc := chunk.get_sub_chunk_at_tile(world_pos)
+					if sc and sc.get_entity_at(world_pos) == null:
+						return pos
 
 	return Vector2i(-1, -1)
 
