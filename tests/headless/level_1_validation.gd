@@ -89,6 +89,8 @@ func _validate_level_1_content() -> void:
 	_check(_contains("res://scripts/world/entity_renderer.gd", "\"sodden\""), "EntityRenderer should have sodden visual config")
 	_check(_contains("res://scripts/world/entity_renderer.gd", "\"drowner\""), "EntityRenderer should have drowner visual config")
 	_check(_contains("res://scripts/world/entity_renderer.gd", "\"ambassador\""), "EntityRenderer should have ambassador visual config")
+	_check(_contains("res://scripts/world/entity_renderer.gd", "\"poolroom_light\""), "EntityRenderer should have poolroom light visual config")
+	_check(_contains("res://scripts/ai/behaviors/behavior_registry.gd", "\"poolroom_light\""), "BehaviorRegistry should map poolroom light to flicker behavior")
 
 func _validate_generators() -> void:
 	var level1 := _read("res://scripts/procedural/level_1_generator.gd")
@@ -115,3 +117,6 @@ func _validate_visual_assets() -> void:
 	_check(FileAccess.file_exists("res://assets/textures/entities/sodden.png"), "Sodden entity texture should exist")
 	_check(FileAccess.file_exists("res://assets/textures/entities/drowner.png"), "Drowner entity texture should exist")
 	_check(FileAccess.file_exists("res://assets/textures/entities/ambassador.png"), "Ambassador entity texture should exist")
+	_check(FileAccess.file_exists("res://assets/textures/entities/lobby_to_poolrooms_stairs.png"), "Wet Tile Stairwell texture should exist")
+	_check(FileAccess.file_exists("res://assets/textures/entities/poolroom_light.png"), "Poolroom light texture should exist")
+	_check(FileAccess.file_exists("res://assets/textures/entities/poolroom_light_broken.png"), "Poolroom broken light texture should exist")

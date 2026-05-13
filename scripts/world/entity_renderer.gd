@@ -60,6 +60,8 @@ const INVALID_POSITION := Vector2i(-999999, -999999)
 ## Preloaded flicker textures (persist across chunk cycles)
 static var _tex_light_on: Texture2D = preload("res://assets/textures/entities/fluorescent_light.png")
 static var _tex_light_off: Texture2D = preload("res://assets/textures/entities/fluorescent_light_broken.png")
+static var _tex_poolroom_light_on: Texture2D = preload("res://assets/textures/entities/poolroom_light.png")
+static var _tex_poolroom_light_off: Texture2D = preload("res://assets/textures/entities/poolroom_light_broken.png")
 
 # ============================================================================
 # SIGNALS
@@ -101,6 +103,7 @@ const ENTITY_COLORS = {
 	"lobby_to_poolrooms_stairs": Color(0.05, 0.35, 0.45),
 	"poolrooms_to_lobby_stairs": Color(0.7, 0.65, 0.35),
 	"fluorescent_light": Color(1.0, 0.95, 0.8),    # Warm white
+	"poolroom_light": Color(0.65, 0.95, 1.0),      # Cool cyan-white
 	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
 
@@ -122,13 +125,14 @@ const ENTITY_TEXTURES = {
 	"tutorial_mannequin": "res://assets/textures/entities/tutorial_mannequin.png",
 	"exit_hole": "res://assets/textures/entities/exit_hole.png",
 	"tutorial_to_lobby_stairs": "res://assets/textures/entities/exit_hole.png",
-	"lobby_to_poolrooms_stairs": "res://assets/textures/entities/exit_hole.png",
-	"poolrooms_to_lobby_stairs": "res://assets/textures/entities/exit_hole.png",
+	"lobby_to_poolrooms_stairs": "res://assets/textures/entities/lobby_to_poolrooms_stairs.png",
+	"poolrooms_to_lobby_stairs": "res://assets/textures/entities/lobby_to_poolrooms_stairs.png",
 	"sodden": "res://assets/textures/entities/sodden.png",
 	"drowner": "res://assets/textures/entities/drowner.png",
 	"ambassador": "res://assets/textures/entities/ambassador.png",
 	"vending_machine": "res://assets/textures/entities/vending_machine.png",
 	"fluorescent_light": "res://assets/textures/entities/fluorescent_light.png",
+	"poolroom_light": "res://assets/textures/entities/poolroom_light.png",
 	"barrel_fire": "res://assets/textures/entities/barrel_fire.png",
 }
 
@@ -142,6 +146,7 @@ const ENTITY_SCALE_OVERRIDES = {
 	"tutorial_mannequin": 2.0,  # Life-sized mannequin
 	"vending_machine": 2.5,    # Tall vending machine
 	"fluorescent_light": 0.8,  # Ceiling fixture, smaller sprite
+	"poolroom_light": 0.8,     # Ceiling fixture, smaller sprite
 	"barrel_fire": 1.5,        # Ground-level barrel
 }
 
@@ -156,6 +161,7 @@ const ENTITY_HEIGHT_OVERRIDES = {
 	"tutorial_mannequin": 2.0,  # Raised to match 2x size scale
 	"vending_machine": 2.5,    # Tall machine, raised to match scale
 	"fluorescent_light": 4.4,  # Ceiling surface (empirically confirmed)
+	"poolroom_light": 4.4,     # Ceiling surface (empirically confirmed)
 	"barrel_fire": 1.4,        # Slightly raised so barrel sits on ground naturally
 }
 
@@ -174,7 +180,7 @@ const ENTITY_SPRITESHEETS = {
 ## These are environmental fixtures: too numerous for full entity overhead.
 ## Goes into light_entity_cache only (not entity_cache), keeping gameplay queries fast.
 ## Their behavior must set skip_turn_processing = true (see EntityBehavior).
-const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light"]
+const LIGHT_ONLY_ENTITIES: Array[String] = ["fluorescent_light", "poolroom_light"]
 
 ## Light emission configuration — the single source of truth for "this entity emits light".
 ## Any entity type listed here is added to light_entity_cache on spawn.
@@ -190,6 +196,12 @@ const ENTITY_LIGHT_CONFIG = {
 		"color": Color(0.95, 0.9, 0.7),
 		"energy": 2.0,
 		"range": 12.0,
+		"attenuation": 1.0,
+	},
+	"poolroom_light": {
+		"color": Color(0.65, 0.95, 1.0),
+		"energy": 2.4,
+		"range": 13.0,
 		"attenuation": 1.0,
 	},
 	"barrel_fire": {
@@ -214,6 +226,11 @@ const HIT_EMOJI_JITTER = 0.4  # Random position offset range (world units)
 const HEALTH_BAR_WIDTH = 0.5  # World units (larger for visibility)
 const HEALTH_BAR_HEIGHT = 0.08  # World units (thicker)
 const HEALTH_BAR_OFFSET_Y = 0.4  # Above entity sprite
+const HEALTH_BAR_OFFSET_OVERRIDES = {
+	"sodden": 1.0,
+	"drowner": 1.0,
+	"ambassador": 1.2,
+}
 const HEALTH_BAR_BG_COLOR = Color(0.0, 0.0, 0.0, 0.9)  # Black background (very visible)
 const HEALTH_BAR_FG_COLOR = Color(0.9, 0.15, 0.15, 1.0)  # Bright red health
 
@@ -284,7 +301,7 @@ func render_chunk_entities(chunk: Chunk) -> void:
 					light_entity_cache[world_pos] = entity
 
 				# Create health bar (as sibling, not child - avoids billboard nesting issues)
-				var health_bar = _create_health_bar(billboard.position)
+				var health_bar = _create_health_bar(billboard.position, entity_type)
 				add_child(health_bar)
 				entity_health_bars[world_pos] = health_bar
 
@@ -362,7 +379,7 @@ func add_entity_billboard(entity: WorldEntity) -> void:
 		entity_cache[world_pos] = entity
 
 		# Create health bar
-		var health_bar = _create_health_bar(billboard.position)
+		var health_bar = _create_health_bar(billboard.position, entity.entity_type)
 		add_child(health_bar)
 		entity_health_bars[world_pos] = health_bar
 		health_bar.visible = false  # Hidden at full HP
@@ -396,6 +413,7 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 	var billboard = entity_billboards[old_pos]
 	var entity = entity_cache[old_pos]
 	var health_bar = entity_health_bars.get(old_pos, null)
+	var health_bar_offset_y: float = HEALTH_BAR_OFFSET_OVERRIDES.get(entity.entity_type, HEALTH_BAR_OFFSET_Y)
 
 	# No signal reconnection needed - hp_changed is bound to entity reference,
 	# not position. The callback looks up current position via entity_to_pos.
@@ -424,12 +442,12 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		tween.tween_property(billboard, "position", new_world_3d, Player3D.MOVE_TWEEN_DURATION)
 		if health_bar:
 			tween.parallel().tween_property(health_bar, "position",
-				new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0),
+				new_world_3d + Vector3(0, health_bar_offset_y, 0),
 				Player3D.MOVE_TWEEN_DURATION)
 	else:
 		billboard.position = new_world_3d
 		if health_bar:
-			health_bar.position = new_world_3d + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
+			health_bar.position = new_world_3d + Vector3(0, health_bar_offset_y, 0)
 
 
 # ============================================================================
@@ -462,7 +480,11 @@ func _apply_flicker_visual(pos: Vector2i, is_on: bool) -> void:
 	var sprite = entity_billboards.get(pos, null) as Sprite3D
 	if not sprite:
 		return
-	sprite.texture = _tex_light_on if is_on else _tex_light_off
+	var entity: WorldEntity = light_entity_cache.get(pos, null)
+	if entity and entity.entity_type == "poolroom_light":
+		sprite.texture = _tex_poolroom_light_on if is_on else _tex_poolroom_light_off
+	else:
+		sprite.texture = _tex_light_on if is_on else _tex_light_off
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -599,7 +621,8 @@ func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_si
 func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 	"""Create a floor decal (flat quad) for entities like exit holes
 
-	Uses no_depth_test material so the decal renders on top of floor geometry.
+	Uses a small Y offset above the floor while preserving depth testing so
+	walls and obstacles properly occlude the decal.
 
 	Args:
 		entity: WorldEntity to create decal for
@@ -625,7 +648,6 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	mat.alpha_scissor_threshold = 0.1
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.no_depth_test = true
 	mat.render_priority = 1
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -641,10 +663,13 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 	mesh_inst.mesh = quad
 	mesh_inst.rotation_degrees.x = -90.0  # Lie flat on floor
 
-	# Position slightly above floor
-	var world_3d = grid_3d.grid_to_world_centered(world_pos, 0.05) if grid_3d else Vector3(
+	# Position slightly above the visible floor surface. Floor tile visuals sit near
+	# Y=0.5 in this project; using 0.05 worked only while no_depth_test forced the
+	# decal through geometry. Keep depth testing and lift the decal instead.
+	const FLOOR_DECAL_Y := 0.56
+	var world_3d = grid_3d.grid_to_world_centered(world_pos, FLOOR_DECAL_Y) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,
-		0.05,
+		FLOOR_DECAL_Y,
 		world_pos.y * 2.0 + 1.0
 	)
 	mesh_inst.position = world_3d
@@ -796,7 +821,7 @@ void fragment() {
 """
 	return _health_bar_shader
 
-func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
+func _create_health_bar(entity_pos: Vector3, entity_type: String = "") -> MeshInstance3D:
 	"""Create a health bar using a shader for proper fill behavior.
 
 	Uses a single quad mesh with a shader that handles the fill direction.
@@ -804,13 +829,15 @@ func _create_health_bar(entity_pos: Vector3) -> MeshInstance3D:
 
 	Args:
 		entity_pos: World position of the entity
+		entity_type: Entity type for per-sprite offset overrides
 
 	Returns:
 		MeshInstance3D with health bar shader
 	"""
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "HealthBar"
-	mesh_instance.position = entity_pos + Vector3(0, HEALTH_BAR_OFFSET_Y, 0)
+	var offset_y: float = HEALTH_BAR_OFFSET_OVERRIDES.get(entity_type, HEALTH_BAR_OFFSET_Y)
+	mesh_instance.position = entity_pos + Vector3(0, offset_y, 0)
 
 	# Create quad mesh
 	var quad = QuadMesh.new()

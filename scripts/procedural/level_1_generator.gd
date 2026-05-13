@@ -11,6 +11,11 @@ const EXIT_STAIRS := SubChunk.TileType.EXIT_STAIRS
 const SHALLOW_WATER := SubChunk.TileType.FLOOR_SHALLOW_WATER
 const DEEP_WATER := SubChunk.TileType.DEEP_WATER
 
+## Match Level 0's dense entropy-locked fixture placement cadence so the
+## Poolrooms has enough per-light personalities for visible organic flicker.
+const LIGHT_SPACING := 5
+const LIGHT_JITTER := 1
+
 func _init() -> void:
 	var config := ProceduralLevelConfig.new()
 	config.level_id = 1
@@ -28,8 +33,8 @@ func generate_chunk(chunk: Chunk, world_seed: int) -> void:
 	_build_room_grid(chunk, rng)
 	_add_pool_barriers(chunk, rng)
 	_add_pillars(chunk, rng)
-	_add_irregular_lights(chunk, rng)
 	_place_return_stairs(chunk, rng)
+	_add_irregular_lights(chunk, rng)
 
 	chunk.state = Chunk.State.LOADED
 
@@ -205,18 +210,35 @@ func _add_pillars(chunk: Chunk, rng: RandomNumberGenerator) -> void:
 # ============================================================================
 
 func _add_irregular_lights(chunk: Chunk, rng: RandomNumberGenerator) -> void:
+	"""Place Poolrooms ceiling lights using Level 0's dense entropy-lock pattern.
+
+	The flicker setup is intentionally the exact same per-world-position seed
+	mechanism as Level 0. Dense grid placement gives the room enough independent
+	light personalities that some fixtures visibly flicker while others settle on
+	or off.
+	"""
 	var chunk_world := chunk.position * Chunk.SIZE
-	for _i in range(rng.randi_range(12, 20)):
-		var local_pos := _find_random_walkable_local(chunk, rng)
-		if local_pos == Vector2i(-1, -1):
-			continue
-		var world_pos := local_pos + chunk_world
-		var light := WorldEntity.new("fluorescent_light", world_pos, 99999.0, 0)
-		EntityRegistry.apply_defaults(light)
-		LightFixtureBehavior.setup_flicker(light)
-		var sc := chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
-		if sc:
-			sc.add_world_entity(light)
+
+	for gy in range(LIGHT_SPACING / 2, Chunk.SIZE, LIGHT_SPACING):
+		for gx in range(LIGHT_SPACING / 2, Chunk.SIZE, LIGHT_SPACING):
+			var x: int = clampi(gx + rng.randi_range(-LIGHT_JITTER, LIGHT_JITTER), 0, Chunk.SIZE - 1)
+			var y: int = clampi(gy + rng.randi_range(-LIGHT_JITTER, LIGHT_JITTER), 0, Chunk.SIZE - 1)
+			var local_pos := Vector2i(x, y)
+			var tile := _get_tile_local(chunk, local_pos)
+			if tile == EXIT_STAIRS:
+				continue
+			if _has_entity_at_local(chunk, local_pos):
+				continue
+			if not SubChunk.is_floor_type(tile):
+				continue
+
+			var world_pos := local_pos + chunk_world
+			var light := WorldEntity.new("poolroom_light", world_pos, 99999.0, 0)
+			EntityRegistry.apply_defaults(light)
+			LightFixtureBehavior.setup_flicker(light)
+			var sc := chunk.get_sub_chunk(Vector2i(local_pos.x / SubChunk.SIZE, local_pos.y / SubChunk.SIZE))
+			if sc:
+				sc.add_world_entity(light)
 
 func _place_return_stairs(chunk: Chunk, _rng: RandomNumberGenerator) -> void:
 	if chunk.position != Vector2i(0, 0):
@@ -236,9 +258,22 @@ func _place_return_stairs(chunk: Chunk, _rng: RandomNumberGenerator) -> void:
 func _find_random_walkable_local(chunk: Chunk, rng: RandomNumberGenerator) -> Vector2i:
 	for _attempt in range(80):
 		var pos := Vector2i(rng.randi_range(2, Chunk.SIZE - 3), rng.randi_range(2, Chunk.SIZE - 3))
-		if SubChunk.is_floor_type(_get_tile_local(chunk, pos)):
+		var tile := _get_tile_local(chunk, pos)
+		if tile == EXIT_STAIRS:
+			continue
+		if _has_entity_at_local(chunk, pos):
+			continue
+		if SubChunk.is_floor_type(tile):
 			return pos
 	return Vector2i(-1, -1)
+
+func _has_entity_at_local(chunk: Chunk, local_pos: Vector2i) -> bool:
+	var world_pos := local_pos + chunk.position * Chunk.SIZE
+	for subchunk in chunk.sub_chunks:
+		for entity in subchunk.world_entities:
+			if entity and not entity.is_dead and entity.world_position == world_pos:
+				return true
+	return false
 
 func _find_nearest_walkable_local(chunk: Chunk, center: Vector2i, max_radius: int) -> Vector2i:
 	if SubChunk.is_floor_type(_get_tile_local(chunk, center)):

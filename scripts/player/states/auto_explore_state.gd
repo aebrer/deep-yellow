@@ -192,6 +192,8 @@ func process_frame(delta: float) -> void:
 			# Already adjacent to interrupt target — stop
 			if interrupt["reason"] == "vending machine detected":
 				ExplorationTracker.mark_vending_machine_visited(obj_pos)
+			elif interrupt["reason"] == "stairs detected":
+				ExplorationTracker.mark_stairs_visited(obj_pos)
 			Log.state("Auto-explore: Stopped - %s (adjacent)" % interrupt["reason"])
 			Log.player("Auto-explore stopped: %s" % interrupt["reason"])
 			transition_to("IdleState")
@@ -205,9 +207,11 @@ func process_frame(delta: float) -> void:
 	if _cached_path.is_empty() or _cached_path_index >= _cached_path.size():
 		# If we were pathing to an interrupt target, stop now (we've arrived adjacent)
 		if _pathing_to_interrupt:
-			# Mark vending machine as visited if that's what we stopped for
+			# Mark persistent interrupt targets as visited if that's what we stopped for
 			if _interrupt_reason == "vending machine detected":
 				ExplorationTracker.mark_vending_machine_visited(_cached_target)
+			elif _interrupt_reason == "stairs detected":
+				ExplorationTracker.mark_stairs_visited(_cached_target)
 			Log.state("Auto-explore: Stopped - %s (arrived adjacent)" % _interrupt_reason)
 			Log.player("Auto-explore stopped: %s" % _interrupt_reason)
 			transition_to("IdleState")
@@ -443,6 +447,8 @@ func _find_stairs_in_range(perception_range: float) -> Vector2i:
 		for dx in range(-range_int, range_int + 1):
 			var pos: Vector2i = player.grid_position + Vector2i(dx, dy)
 			if Vector2(dx, dy).length() > perception_range:
+				continue
+			if ExplorationTracker.is_stairs_visited(pos):
 				continue
 			var tile_type := ChunkManager.get_tile_type(pos, current_level.level_id)
 			if tile_type == SubChunk.TileType.EXIT_STAIRS:

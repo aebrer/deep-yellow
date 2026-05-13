@@ -11,6 +11,9 @@ var explored_tiles: Dictionary = {}
 ## Vending machines the player has already stopped at (position → true)
 var visited_vending_machines: Dictionary = {}
 
+## Exit stairs the player has already stopped at (position → true)
+var visited_stairs: Dictionary = {}
+
 ## Items the player chose to leave on ground (position → true)
 var dismissed_items: Dictionary = {}
 
@@ -123,6 +126,13 @@ func mark_vending_machine_visited(pos: Vector2i) -> void:
 func is_vending_machine_visited(pos: Vector2i) -> bool:
 	return visited_vending_machines.has(pos)
 
+func mark_stairs_visited(pos: Vector2i) -> void:
+	"""Mark exit stairs as visited so auto-explore won't stop for them again."""
+	visited_stairs[pos] = true
+
+func is_stairs_visited(pos: Vector2i) -> bool:
+	return visited_stairs.has(pos)
+
 func mark_item_dismissed(pos: Vector2i) -> void:
 	"""Mark an item position as dismissed so auto-explore won't stop for it again."""
 	dismissed_items[pos] = true
@@ -139,5 +149,6 @@ func invalidate_target() -> void:
 func reset() -> void:
 	explored_tiles.clear()
 	visited_vending_machines.clear()
+	visited_stairs.clear()
 	dismissed_items.clear()
 	_cached_target = NO_TARGET

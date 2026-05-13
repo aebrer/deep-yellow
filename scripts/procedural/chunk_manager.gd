@@ -569,7 +569,7 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 
 	var chunk_world_pos = chunk.position * CHUNK_SIZE
 	var spawned_count = 0
-	var occupied_positions: Array[Vector2i] = []
+	var occupied_positions: Array[Vector2i] = _get_existing_entity_positions_in_chunk(chunk)
 
 	# Get valid entity types for current corruption
 	var valid_entities = _get_valid_entities_for_corruption(level_config.entity_spawn_table, corruption)
@@ -749,6 +749,21 @@ func _select_weighted_entity(valid_entities: Array, corruption: float) -> Dictio
 
 ## Invalid position sentinel (project-wide standard)
 const INVALID_POSITION := Vector2i(-999999, -999999)
+
+func _get_existing_entity_positions_in_chunk(chunk: Chunk) -> Array[Vector2i]:
+	"""Collect positions already occupied by generator-placed entities.
+
+	Entity spawning runs before EntityRenderer has populated its cache, so the
+	renderer cannot be the authority here. Chunk data already contains exits,
+	lights, and other generator-placed entities; reserve those positions before
+	choosing random enemy spawn tiles.
+	"""
+	var positions: Array[Vector2i] = []
+	for subchunk in chunk.sub_chunks:
+		for entity in subchunk.world_entities:
+			if entity and not entity.is_dead:
+				positions.append(entity.world_position)
+	return positions
 
 func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[Vector2i]) -> Vector2i:
 	"""Find a random walkable position in the chunk that isn't already occupied.
@@ -1096,6 +1111,9 @@ func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_grid
 	"""
 	chunk.set_tile(world_pos, SubChunk.TileType.FLOOR)
 	chunk.set_tile_at_layer(world_pos, 1, SubChunk.TileType.CEILING)
+	# Keep map overlay cache in sync for both new chunks and already-rendered
+	# neighbor chunks carved by border hallway cutting.
+	tile_cache[world_pos] = SubChunk.TileType.FLOOR
 
 	# Update GridMap visuals AND pathfinder if chunk is already rendered
 	if update_gridmap:

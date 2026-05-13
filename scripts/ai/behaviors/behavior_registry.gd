@@ -51,6 +51,7 @@ func _init_behaviors() -> void:
 		"lobby_to_poolrooms_stairs": _ExitHoleBehavior.new(),
 		"poolrooms_to_lobby_stairs": _ExitHoleBehavior.new(),
 		"fluorescent_light": _LightFixtureBehavior.new(),
+		"poolroom_light": _LightFixtureBehavior.new(),
 		"barrel_fire": _BarrelFireBehavior.new(),
 	}
 
