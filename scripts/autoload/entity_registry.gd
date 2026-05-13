@@ -148,6 +148,42 @@ func _load_entities() -> void:
 	neg1_ceiling.threat_level = 0
 	_entities["level_neg1_ceiling"] = neg1_ceiling
 
+	# Create Level 1: Floor (white ceramic pool tile)
+	var level_1_floor = EntityInfo.new()
+	level_1_floor.entity_id = "level_1_floor"
+	level_1_floor.entity_name = "Ceramic Pool Tile"
+	level_1_floor.visual_description = "White ceramic tiles run beneath a film of condensation. Blue-green light pools in the grout lines, and every step leaves a wet print."
+	level_1_floor.clearance_info[0] = ""
+	level_1_floor.clearance_info[1] = "Glazed ceramic, standard pool construction. The grout remains wet even where no water is visible."
+	level_1_floor.clearance_info[2] = "The tile layout repeats too precisely across distant rooms, but individual cracks and stains do not line up between visits."
+	level_1_floor.object_class = "Safe"
+	level_1_floor.threat_level = 0
+	_entities["level_1_floor"] = level_1_floor
+
+	# Create Level 1: Wall (white ceramic pool wall)
+	var level_1_wall = EntityInfo.new()
+	level_1_wall.entity_id = "level_1_wall"
+	level_1_wall.entity_name = "Poolroom Tile Wall"
+	level_1_wall.visual_description = "A wall of white ceramic tile beaded with moisture. Reflections of unseen water ripple across its surface."
+	level_1_wall.clearance_info[0] = ""
+	level_1_wall.clearance_info[1] = "Subway-style tile over sealed backing. No mortar seams are visible beyond the grout."
+	level_1_wall.clearance_info[2] = "The wall gives a hollow echo when struck, suggesting a cavity or another flooded room beyond it. Attempts to breach it have failed."
+	level_1_wall.object_class = "Safe"
+	level_1_wall.threat_level = 0
+	_entities["level_1_wall"] = level_1_wall
+
+	# Create Level 1: Ceiling (damp poolroom ceiling)
+	var level_1_ceiling = EntityInfo.new()
+	level_1_ceiling.entity_id = "level_1_ceiling"
+	level_1_ceiling.entity_name = "Damp Poolroom Ceiling"
+	level_1_ceiling.visual_description = "A low white ceiling sweats cold droplets. Recessed fixtures cast cyan light through patches of mist."
+	level_1_ceiling.clearance_info[0] = ""
+	level_1_ceiling.clearance_info[1] = "Moisture accumulation is constant. Droplets fall upward as often as downward when not observed directly."
+	level_1_ceiling.clearance_info[2] = "The ceiling height and fixture spacing do not remain consistent between adjacent basins, despite the tile grid aligning perfectly."
+	level_1_ceiling.object_class = "Safe"
+	level_1_ceiling.threat_level = 0
+	_entities["level_1_ceiling"] = level_1_ceiling
+
 	# Bacteria Spawn (Level 0 basic enemy)
 	# threat_level 1 matches level_00_config.gd entity_spawn_table
 	var bacteria_spawn = EntityInfo.new()
@@ -209,6 +245,41 @@ func _load_entities() -> void:
 	bacteria_spreader.faction = "bacteria"
 	_entities["bacteria_spreader"] = bacteria_spreader
 
+	# Sodden (Level 1 slow melee threat)
+	var sodden = EntityInfo.new()
+	sodden.entity_id = "sodden"
+	sodden.entity_name = "Sodden"
+	sodden.visual_description = "A waterlogged humanoid shape drags itself through the shallow pool. Its skin has the pale blue cast of something left underwater too long."
+	sodden.clearance_info[1] = "Slow but resilient. It follows footfalls through the water."
+	sodden.clearance_info[2] = "Melee threat. Less explosive than bacteria, but harder to put down."
+	sodden.object_class = "Euclid"
+	sodden.threat_level = 2
+	_entities["sodden"] = sodden
+
+	# Drowner (Level 1 water ambusher)
+	var drowner = EntityInfo.new()
+	drowner.entity_id = "drowner"
+	drowner.entity_name = "Drowner"
+	drowner.visual_description = "A dark figure just beneath the waterline. Long arms break the surface first, reaching from the blue-black pools."
+	drowner.clearance_info[1] = "Most active near deeper water. It closes distance quickly once disturbed."
+	drowner.clearance_info[2] = "Avoid being pinned near blocked deep-water basins; retreat paths matter."
+	drowner.object_class = "Keter"
+	drowner.threat_level = 3
+	_entities["drowner"] = drowner
+
+	# Ambassador (Level 1 rare passive entity)
+	var ambassador = EntityInfo.new()
+	ambassador.entity_id = "ambassador"
+	ambassador.entity_name = "Ambassador"
+	ambassador.visual_description = "A tall, still silhouette reflected in the tile and water. It keeps its distance, moving only when observed too closely."
+	ambassador.clearance_info[1] = "Rare nonstandard Poolrooms entity. Passive in current field observations."
+	ambassador.clearance_info[2] = "It appears to avoid contact rather than hunt. Later reports may expand this behavior."
+	ambassador.object_class = "Euclid"
+	ambassador.threat_level = 0
+	ambassador.hostile = false
+	ambassador.blocks_movement = false
+	_entities["ambassador"] = ambassador
+
 	# Debug Enemy (testing entity)
 	var debug_enemy = EntityInfo.new()
 	debug_enemy.entity_id = "debug_enemy"
@@ -264,6 +335,20 @@ func _load_entities() -> void:
 	fluorescent_light.blocks_movement = false
 	_entities["fluorescent_light"] = fluorescent_light
 
+	# Poolroom Light (Level 1 ceiling fixture — same entropy-locked flicker behavior)
+	var poolroom_light = EntityInfo.new()
+	poolroom_light.entity_id = "poolroom_light"
+	poolroom_light.entity_name = "Recessed Pool Light"
+	poolroom_light.visual_description = "A recessed oval fixture set into damp ceramic ceiling tile. Cold blue-green light leaks through a wet diffuser and ripples across the water below."
+	poolroom_light.clearance_info[0] = ""
+	poolroom_light.clearance_info[1] = "The housing is sealed against moisture, though condensation beads inside the lens. Color temperature skews cold cyan-white."
+	poolroom_light.clearance_info[2] = "Each fixture flickers in a stable but organic pattern, as if its failures have settled into a private rhythm. No wiring is visible above the tile."
+	poolroom_light.object_class = "Safe"
+	poolroom_light.threat_level = 0
+	poolroom_light.hostile = false
+	poolroom_light.blocks_movement = false
+	_entities["poolroom_light"] = poolroom_light
+
 	# Barrel Fire (Level -1 ground-level light source)
 	var barrel_fire = EntityInfo.new()
 	barrel_fire.entity_id = "barrel_fire"
@@ -278,7 +363,7 @@ func _load_entities() -> void:
 	barrel_fire.blocks_movement = true  # Ground-level obstacle, blocks player and AI pathing
 	_entities["barrel_fire"] = barrel_fire
 
-	# Exit Hole (visual marker for EXIT_STAIRS tiles)
+	# Exit Hole (legacy visual marker for EXIT_STAIRS tiles with no route definition)
 	var exit_hole = EntityInfo.new()
 	exit_hole.entity_id = "exit_hole"
 	exit_hole.entity_name = "Dark Pit"
@@ -292,6 +377,48 @@ func _load_entities() -> void:
 	exit_hole.blocks_movement = false
 	exit_hole.is_exit = true
 	_entities["exit_hole"] = exit_hole
+
+	# Explicit stair route: tutorial -> Level 0 lobby
+	var tutorial_to_lobby = EntityInfo.new()
+	tutorial_to_lobby.entity_id = "tutorial_to_lobby_stairs"
+	tutorial_to_lobby.entity_name = "Dark Pit"
+	tutorial_to_lobby.visual_description = "A yawning hole in the ground. Cold air rises from below. It feels like the only way out."
+	tutorial_to_lobby.clearance_info[1] = "Route marker: Kingston, Ontario to the Lobby."
+	tutorial_to_lobby.object_class = "Safe"
+	tutorial_to_lobby.threat_level = 0
+	tutorial_to_lobby.hostile = false
+	tutorial_to_lobby.blocks_movement = false
+	tutorial_to_lobby.is_exit = true
+	tutorial_to_lobby.exit_destination_level_id = 0
+	_entities["tutorial_to_lobby_stairs"] = tutorial_to_lobby
+
+	# Explicit stair route: Level 0 lobby -> Level 1 poolrooms
+	var lobby_to_poolrooms = EntityInfo.new()
+	lobby_to_poolrooms.entity_id = "lobby_to_poolrooms_stairs"
+	lobby_to_poolrooms.entity_name = "Wet Tile Stairwell"
+	lobby_to_poolrooms.visual_description = "A wet tiled stairwell cuts through the carpet. Broad slick steps descend into blue-green chlorinated darkness, and the air smells sharply of pool water."
+	lobby_to_poolrooms.clearance_info[1] = "Route marker: the Lobby to the Poolrooms. Chlorinated humidity rises from below."
+	lobby_to_poolrooms.object_class = "Safe"
+	lobby_to_poolrooms.threat_level = 0
+	lobby_to_poolrooms.hostile = false
+	lobby_to_poolrooms.blocks_movement = false
+	lobby_to_poolrooms.is_exit = true
+	lobby_to_poolrooms.exit_destination_level_id = 1
+	_entities["lobby_to_poolrooms_stairs"] = lobby_to_poolrooms
+
+	# Explicit stair route: Level 1 poolrooms -> Level 0 lobby
+	var poolrooms_to_lobby = EntityInfo.new()
+	poolrooms_to_lobby.entity_id = "poolrooms_to_lobby_stairs"
+	poolrooms_to_lobby.entity_name = "Dry Service Stairs"
+	poolrooms_to_lobby.visual_description = "A tiled maintenance stair rises out of the shallow water. The lower steps are slick and blue-white; the upper landing dries into yellowed carpet fibers."
+	poolrooms_to_lobby.clearance_info[1] = "Route marker: the Poolrooms back to the Lobby. Ceramic construction terminates abruptly at damp office carpet."
+	poolrooms_to_lobby.object_class = "Safe"
+	poolrooms_to_lobby.threat_level = 0
+	poolrooms_to_lobby.hostile = false
+	poolrooms_to_lobby.blocks_movement = false
+	poolrooms_to_lobby.is_exit = true
+	poolrooms_to_lobby.exit_destination_level_id = 0
+	_entities["poolrooms_to_lobby_stairs"] = poolrooms_to_lobby
 
 
 # ============================================================================
@@ -320,6 +447,7 @@ func apply_defaults(entity: WorldEntity) -> void:
 	entity.hostile = info.hostile
 	entity.blocks_movement = info.blocks_movement
 	entity.is_exit = info.is_exit
+	entity.exit_destination_level_id = info.exit_destination_level_id
 	entity.faction = info.faction
 
 func _get_unknown_entity_info() -> Dictionary:

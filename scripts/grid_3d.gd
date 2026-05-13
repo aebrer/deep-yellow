@@ -440,10 +440,11 @@ func _scan_exit_stairs_for_chunk(chunk: Chunk) -> void:
 						var world_tile_pos := sub_world_offset + Vector2i(tile_x, tile_y)
 						exit_tile_positions[world_tile_pos] = true
 
-						# Spawn exit_hole entity if not already present
+						# Spawn a legacy visual marker only if the generator did not place an
+						# explicit routed stair entity at this tile.
 						var existing = false
 						for entity in sub_chunk.world_entities:
-							if entity.world_position == world_tile_pos and entity.entity_type == "exit_hole":
+							if entity.world_position == world_tile_pos and entity.is_exit:
 								existing = true
 								break
 						if not existing:

@@ -121,6 +121,10 @@ func _register_levels() -> void:
 	level_generators[0] = Level0Generator.new()
 	level_configs[0] = Level0Config.new()
 
+	# Level 1: The Poolrooms
+	level_generators[1] = Level1Generator.new()
+	level_configs[1] = Level1Config.new()
+
 func _on_node_added(node: Node) -> void:
 	"""Detect when game scene loads and initialize chunk generation"""
 	# The root Control node from game.tscn is named "Game"
@@ -565,7 +569,7 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 
 	var chunk_world_pos = chunk.position * CHUNK_SIZE
 	var spawned_count = 0
-	var occupied_positions: Array[Vector2i] = []
+	var occupied_positions: Array[Vector2i] = _get_existing_entity_positions_in_chunk(chunk)
 
 	# Get valid entity types for current corruption
 	var valid_entities = _get_valid_entities_for_corruption(level_config.entity_spawn_table, corruption)
@@ -616,6 +620,8 @@ func _spawn_entities_in_chunk(chunk: Chunk, chunk_key: Vector3i) -> void:
 			entity.blocks_movement = entity_entry["blocks_movement"]
 		if entity_entry.has("is_exit"):
 			entity.is_exit = entity_entry["is_exit"]
+		if entity_entry.has("exit_destination_level_id"):
+			entity.exit_destination_level_id = entity_entry["exit_destination_level_id"]
 		if entity_entry.has("faction"):
 			entity.faction = entity_entry["faction"]
 
@@ -743,6 +749,21 @@ func _select_weighted_entity(valid_entities: Array, corruption: float) -> Dictio
 
 ## Invalid position sentinel (project-wide standard)
 const INVALID_POSITION := Vector2i(-999999, -999999)
+
+func _get_existing_entity_positions_in_chunk(chunk: Chunk) -> Array[Vector2i]:
+	"""Collect positions already occupied by generator-placed entities.
+
+	Entity spawning runs before EntityRenderer has populated its cache, so the
+	renderer cannot be the authority here. Chunk data already contains exits,
+	lights, and other generator-placed entities; reserve those positions before
+	choosing random enemy spawn tiles.
+	"""
+	var positions: Array[Vector2i] = []
+	for subchunk in chunk.sub_chunks:
+		for entity in subchunk.world_entities:
+			if entity and not entity.is_dead:
+				positions.append(entity.world_position)
+	return positions
 
 func _find_random_walkable_in_chunk(chunk_world_pos: Vector2i, occupied: Array[Vector2i]) -> Vector2i:
 	"""Find a random walkable position in the chunk that isn't already occupied.
@@ -928,12 +949,9 @@ func tile_to_chunk(tile_pos: Vector2i) -> Vector2i:
 func _cut_border_hallways(new_chunk: Chunk, chunk_pos: Vector2i, level_id: int) -> void:
 	"""Cut hallways between newly generated chunk and existing adjacent chunks.
 
-	When a chunk is generated, this function checks all 4 cardinal neighbors.
-	For each neighbor that already exists AND hasn't had a hallway cut yet,
-	it cuts a straight hallway across the border (10 tiles on each side = 20 total).
-
-	This ensures connectivity between all adjacent chunks while avoiding
-	duplicate cuts (the border key tracks which borders have been processed).
+	This now runs for all levels (including Level 1) to guarantee connectivity.
+	The straight floor hallway is a reliable fallback when generator-owned
+	connectivity is insufficient.
 	"""
 	# Cardinal directions: right, left, down, up
 	var directions := [
@@ -1091,8 +1109,16 @@ func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_grid
 		world_pos: World tile position
 		update_gridmap: If true, also update the GridMap visuals AND pathfinder (for already-loaded chunks)
 	"""
+	# Only carve hallways through walls — preserve existing floor, water, and stairs.
+	var existing := chunk.get_tile(world_pos)
+	if SubChunk.is_floor_type(existing) or SubChunk.is_deep_water_type(existing):
+		return
+
 	chunk.set_tile(world_pos, SubChunk.TileType.FLOOR)
 	chunk.set_tile_at_layer(world_pos, 1, SubChunk.TileType.CEILING)
+	# Keep map overlay cache in sync for both new chunks and already-rendered
+	# neighbor chunks carved by border hallway cutting.
+	tile_cache[world_pos] = SubChunk.TileType.FLOOR
 
 	# Update GridMap visuals AND pathfinder if chunk is already rendered
 	if update_gridmap:
@@ -1223,6 +1249,26 @@ func get_tile_type(tile_pos: Vector2i, level_id: int) -> int:
 
 	return chunk.get_tile(tile_pos)
 
+func get_exit_entity_at_tile(tile_pos: Vector2i, level_id: int) -> WorldEntity:
+	"""Get the explicit stair/exit entity at a world tile.
+
+	Exit destinations live on the entity definition/type, not on level ordering or
+	exit_destinations array order. Returns null if no routed exit entity is present.
+	"""
+	var chunk := get_chunk_at_tile(tile_pos, level_id)
+	if not chunk:
+		return null
+
+	var subchunk := chunk.get_sub_chunk_at_tile(tile_pos)
+	if not subchunk:
+		return null
+
+	for entity in subchunk.world_entities:
+		if entity.world_position == tile_pos and entity.is_exit:
+			return entity
+
+	return null
+
 # ============================================================================
 # RUN MANAGEMENT
 # ============================================================================
@@ -1277,9 +1323,9 @@ func change_level(target_level_id: int) -> void:
 
 	Unlike start_new_run(), this preserves run state:
 	  KEPT: world_seed, corruption_tracker, chunks_without_items (pity timer),
-	        visited_chunks (EXP tracking across levels), level_generators/configs
+			visited_chunks (EXP tracking across levels), level_generators/configs
 	  CLEARED: loaded_chunks, generating_chunks, pathfinding graph,
-	           last_player_chunk, initial_load state, generation flags
+			   last_player_chunk, initial_load state, generation flags
 
 	Args:
 		target_level_id: Level to transition to

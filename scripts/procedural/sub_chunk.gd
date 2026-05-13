@@ -22,13 +22,15 @@ enum TileType {
 	FLOOR_DOOR_A_OPEN = 12,
 	FLOOR_DOOR_B_OPEN = 13,
 	FLOOR_DOOR_C_OPEN = 14,
-	# Wall variants (20-29)
+	FLOOR_SHALLOW_WATER = 15,
+	# Wall/blocked variants (20-29)
 	WALL_CRACKED = 20,
 	WALL_HOLE = 21,
 	WALL_MOULDY = 22,
 	WALL_DOOR_A_CLOSED = 23,
 	WALL_DOOR_B_CLOSED = 24,
 	WALL_DOOR_C_CLOSED = 25,
+	DEEP_WATER = 26,
 	# Ceiling variants (30-39)
 	CEILING_STAIN = 30,
 	CEILING_HOLE = 31,
@@ -49,6 +51,18 @@ static func is_wall_type(tile: int) -> bool:
 static func is_ceiling_type(tile: int) -> bool:
 	"""Check if tile is any ceiling variant (CEILING, CEILING_STAIN, CEILING_HOLE)"""
 	return tile == TileType.CEILING or (tile >= 30 and tile <= 39)
+
+static func is_shallow_water_type(tile: int) -> bool:
+	"""Check if tile is walkable shallow water."""
+	return tile == TileType.FLOOR_SHALLOW_WATER
+
+static func is_deep_water_type(tile: int) -> bool:
+	"""Check if tile is blocked/hazardous deep water."""
+	return tile == TileType.DEEP_WATER
+
+static func is_water_type(tile: int) -> bool:
+	"""Check if tile is any water tile."""
+	return is_shallow_water_type(tile) or is_deep_water_type(tile)
 
 static func is_door_closed(tile: int) -> bool:
 	"""Check if tile is a closed door (wall variant that can be opened)"""

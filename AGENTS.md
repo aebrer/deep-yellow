@@ -1,10 +1,6 @@
-# CLAUDE.md - Deep Yellow
+# AGENTS.md — Deep Yellow
 
 **Project**: DEEP YELLOW - Turn-based Roguelike in Godot 4.6
-**Developer**: Drew Brereton (aebrer) - Python/generative art background, learning game dev
-
-General working style, communication preferences, debugging process, and commit conventions
-are in the global `~/CLAUDE.md`. This file covers Deep Yellow-specific context only.
 
 ---
 
