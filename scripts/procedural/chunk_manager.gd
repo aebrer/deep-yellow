@@ -1109,6 +1109,11 @@ func _set_tile_floor_with_ceiling(chunk: Chunk, world_pos: Vector2i, update_grid
 		world_pos: World tile position
 		update_gridmap: If true, also update the GridMap visuals AND pathfinder (for already-loaded chunks)
 	"""
+	# Only carve hallways through walls — preserve existing floor, water, and stairs.
+	var existing := chunk.get_tile(world_pos)
+	if SubChunk.is_floor_type(existing) or SubChunk.is_deep_water_type(existing):
+		return
+
 	chunk.set_tile(world_pos, SubChunk.TileType.FLOOR)
 	chunk.set_tile_at_layer(world_pos, 1, SubChunk.TileType.CEILING)
 	# Keep map overlay cache in sync for both new chunks and already-rendered

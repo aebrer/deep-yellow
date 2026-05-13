@@ -1054,11 +1054,15 @@ func _remove_dead_entity_from_subchunk(entity: WorldEntity) -> void:
 	if not grid_3d:
 		return
 
-	var chunk_manager = grid_3d.get_node_or_null("ChunkManager")
+	var chunk_manager = get_node_or_null("/root/ChunkManager")
 	if not chunk_manager:
 		return
 
-	var chunk = chunk_manager.get_chunk_at_tile(entity.world_position, 0)
+	var level_id := 0
+	var current_level = LevelManager.get_current_level()
+	if current_level:
+		level_id = current_level.level_id
+	var chunk = chunk_manager.get_chunk_at_tile(entity.world_position, level_id)
 	if not chunk:
 		return
 
