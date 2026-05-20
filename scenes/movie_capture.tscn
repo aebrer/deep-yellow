@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://c0a7v8qn1yf3d"]
+
+[ext_resource type="Script" path="res://scripts/tools/movie_capture.gd" id="1_moviecap"]
+
+[node name="MovieCapture" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_moviecap")
+capture_duration = 60.0
+warmup_duration = 30.0
+output_resolution = Vector2i(640, 480)
+camera_mode = 0

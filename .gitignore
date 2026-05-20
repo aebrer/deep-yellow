@@ -40,8 +40,9 @@ web_deployment/*
 # OS generated files
 Thumbs.db
 
-# Screenshots (development only, not for repo)
+# Screenshots/videos (development + capture output only, not for repo)
 screenshots/
+assets/videos/
 
 # tmp folder for random shit
 tmp/
