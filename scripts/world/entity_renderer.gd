@@ -599,6 +599,9 @@ func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_si
 
 	var sprite = AnimatedSprite3D.new()
 	sprite.sprite_frames = sprite_frames
+	# Remember the source sheet so toggling Sprite Detail can re-snap frames live
+	sprite.set_meta("snap_src_tex", load(sheet_path))
+	sprite.set_meta("snap_frames", frame_count)
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	sprite.shaded = false

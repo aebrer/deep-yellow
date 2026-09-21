@@ -98,10 +98,25 @@ static func _refresh_snap_nodes(node: Node) -> void:
 	if node.has_meta("snap_src_tex"):
 		if node is MeshInstance3D:
 			_apply_snap_to_mesh(node as MeshInstance3D)
-		elif node is Sprite3D and not (node is AnimatedSprite3D):
+		elif node is AnimatedSprite3D:
+			_resnap_animated_sheet(node as AnimatedSprite3D)
+		elif node is Sprite3D:
 			node.set("texture", snap_texture(node.get_meta("snap_src_tex")))
 	for child in node.get_children():
 		_refresh_snap_nodes(child)
+
+## Re-point every AtlasTexture frame of an AnimatedSprite3D at the currently
+## snapped variant of its source sheet (sprite_frames are mutated in place).
+static func _resnap_animated_sheet(sprite: AnimatedSprite3D) -> void:
+	var src: Texture2D = sprite.get_meta("snap_src_tex")
+	var frames: int = int(sprite.get_meta("snap_frames"))
+	var snapped_sheet := snap_texture(src, frames)
+	var sheet: SpriteFrames = sprite.sprite_frames
+	for anim_name in sheet.get_animation_names():
+		for i in sheet.get_frame_count(anim_name):
+			var frame_tex = sheet.get_frame_texture(anim_name, i)
+			if frame_tex is AtlasTexture:
+				frame_tex.atlas = snapped_sheet
 
 ## Auto-explore settings
 static var auto_explore_speed: float = 10.0  # turns per second
