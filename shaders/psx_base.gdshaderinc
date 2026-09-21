@@ -1,6 +1,8 @@
 render_mode LIT, CULL, shadows_disabled, DEPTH, BLEND, specular_disabled;
 
 global uniform float precision_multiplier : hint_range(0.0, 1.0) = 1.0;
+// PSX texture pixel snapping: snap albedo UVs to a N-pixel grid per texture repeat (0 = off, 128 = PSX look)
+global uniform float pixel_snap_resolution : hint_range(0.0, 2048.0) = 0.0;
 uniform vec4 modulate_color : source_color = vec4(1.0);
 
 #ifdef POINT_LIGHTING
@@ -158,9 +160,20 @@ void fragment()
 	vec2 texture_uv = vec2(NORMAL.x / 2.0 + 0.5, (-NORMAL.y) / 2.0 + 0.5);  // Special thanks to Adam McLaughlan
 #elif !defined(NO_TEXTURE)
 	vec2 texture_uv = UV;
+	if (pixel_snap_resolution > 0.0) {
+		texture_uv = (floor(texture_uv * pixel_snap_resolution) + 0.5) / pixel_snap_resolution;
+	}
 #endif
 
 	vec4 color_base = COLOR * modulate_color;
+
+#if defined(NO_TEXTURE) || defined(METAL)
+	// Keep pixel_snap_resolution referenced in variants that don't sample UVs,
+	// otherwise the compiler strips the global uniform and Godot warns.
+	if (pixel_snap_resolution < 0.0) {
+		color_base.a = 0.0;
+	}
+#endif
 
 #ifdef NO_TEXTURE
 	ALBEDO = color_base.rgb;

@@ -4,6 +4,12 @@ extends Node
 ## Shared math and helper functions used across the codebase.
 ## Autoloaded as "Utilities" for global access.
 
+func _ready() -> void:
+	# Global shader uniforms must be registered once per session (Godot requirement).
+	RenderingServer.global_shader_parameter_add(
+			"pixel_snap_resolution", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0
+	)
+
 # ============================================================================
 # DEBUG FLAGS
 # ============================================================================
@@ -23,6 +29,14 @@ const DEBUG_SPAWN_ENTITY := ""
 ## Movement smoothing (tween between grid positions)
 ## Can be toggled off for motion sickness or preference for instant snapping
 static var movement_smoothing: bool = true
+
+## Texture pixel snap: quantizes albedo UVs to an N-pixel grid per texture repeat,
+## giving hi-res textures a chunky PSX look. 0 = off (crisp), 128 = PSX, 64 = chunky.
+static var texture_pixel_snap: float = 0.0
+
+static func set_texture_pixel_snap(pixels: float) -> void:
+	texture_pixel_snap = pixels
+	RenderingServer.global_shader_parameter_set("pixel_snap_resolution", pixels)
 
 ## Auto-explore settings
 static var auto_explore_speed: float = 10.0  # turns per second

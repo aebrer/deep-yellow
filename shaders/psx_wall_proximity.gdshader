@@ -15,6 +15,7 @@ render_mode vertex_lighting, cull_back, depth_prepass_alpha, blend_mix, specular
 
 // Global uniforms
 global uniform float precision_multiplier : hint_range(0.0, 1.0) = 1.0;
+global uniform float pixel_snap_resolution : hint_range(0.0, 2048.0) = 0.0;
 
 // Base PSX uniforms
 uniform vec4 modulate_color : source_color = vec4(1.0);
@@ -79,7 +80,11 @@ void vertex() {
 
 void fragment() {
 	vec4 color_base = COLOR * modulate_color;
-	vec4 texture_color = texture(albedoTex, UV);
+	vec2 snap_uv = UV;
+	if (pixel_snap_resolution > 0.0) {
+		snap_uv = (floor(snap_uv * pixel_snap_resolution) + 0.5) / pixel_snap_resolution;
+	}
+	vec4 texture_color = texture(albedoTex, snap_uv);
 	ALBEDO = (color_base * texture_color).rgb;
 
 	// Add lightmap point lighting on top of Godot's vertex_lighting

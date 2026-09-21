@@ -55,3 +55,4 @@ data/mazes
 *.import
 
 .dreb/
+experiments/

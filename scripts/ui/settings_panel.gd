@@ -45,6 +45,7 @@ var sensitivity_value_label: Label
 var fov_slider: HSlider
 var fov_value_label: Label
 var smoothing_button: Button
+var texture_snap_button: Button
 var ae_settings_button: Button
 var codex_button: Button
 
@@ -220,6 +221,12 @@ func _build_content() -> void:
 	smoothing_button.pressed.connect(_on_smoothing_toggled)
 	content_vbox.add_child(smoothing_button)
 	focusable_controls.append(smoothing_button)
+
+	# --- Texture Detail (PSX pixel snap) ---
+	texture_snap_button = _create_toggle_button(_texture_snap_label())
+	texture_snap_button.pressed.connect(_on_texture_snap_toggled)
+	content_vbox.add_child(texture_snap_button)
+	focusable_controls.append(texture_snap_button)
 
 	# --- Auto-Explore Settings (sub-panel button) ---
 	ae_settings_button = _create_action_button("Auto-Explore Settings")
@@ -722,6 +729,22 @@ func _on_smoothing_toggled() -> void:
 		return
 	Utilities.movement_smoothing = not Utilities.movement_smoothing
 	smoothing_button.text = "Move Smoothing: ON" if Utilities.movement_smoothing else "Move Smoothing: OFF"
+
+# Texture detail cycle: HD (off) -> PSX (128px) -> CHUNKY (64px)
+const TEXTURE_SNAP_STEPS: Array[float] = [0.0, 128.0, 64.0]
+const TEXTURE_SNAP_NAMES: Array[String] = ["HD", "PSX", "CHUNKY"]
+var _texture_snap_index: int = 0
+
+func _texture_snap_label() -> String:
+	return "Texture Detail: " + TEXTURE_SNAP_NAMES[_texture_snap_index]
+
+func _on_texture_snap_toggled() -> void:
+	"""Cycle texture pixel snap: HD -> PSX -> CHUNKY"""
+	if not _accepting_input:
+		return
+	_texture_snap_index = (_texture_snap_index + 1) % TEXTURE_SNAP_STEPS.size()
+	Utilities.set_texture_pixel_snap(TEXTURE_SNAP_STEPS[_texture_snap_index])
+	texture_snap_button.text = _texture_snap_label()
 
 func _on_ae_speed_changed(value: float) -> void:
 	Utilities.auto_explore_speed = value

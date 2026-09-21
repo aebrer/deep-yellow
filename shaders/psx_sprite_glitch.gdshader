@@ -5,6 +5,7 @@ render_mode unshaded, cull_back, shadows_disabled, depth_draw_opaque, blend_mix,
 
 // Base sprite texture (set manually via set_shader_parameter)
 uniform sampler2D albedoTex : source_color, filter_nearest, repeat_enable;
+global uniform float pixel_snap_resolution : hint_range(0.0, 2048.0) = 0.0;
 uniform float alpha_scissor : hint_range(0, 1) = 0.1;
 
 // Glitch parameters
@@ -20,6 +21,9 @@ void fragment() {
 	uv.x += scanline * 0.08 * glitch_intensity;
 
 	// Chromatic aberration (RGB channel separation)
+	if (pixel_snap_resolution > 0.0) {
+		uv = (floor(uv * pixel_snap_resolution) + 0.5) / pixel_snap_resolution;
+	}
 	float aberration = glitch_intensity * 0.02;
 	float r = texture(albedoTex, uv + vec2(aberration, 0.0)).r;
 	float g = texture(albedoTex, uv).g;
