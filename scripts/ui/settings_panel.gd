@@ -46,6 +46,7 @@ var fov_slider: HSlider
 var fov_value_label: Label
 var smoothing_button: Button
 var texture_snap_button: Button
+var sprite_snap_button: Button
 var ae_settings_button: Button
 var codex_button: Button
 
@@ -227,6 +228,12 @@ func _build_content() -> void:
 	texture_snap_button.pressed.connect(_on_texture_snap_toggled)
 	content_vbox.add_child(texture_snap_button)
 	focusable_controls.append(texture_snap_button)
+
+	# --- Sprite Detail (entity/item pixel snap) ---
+	sprite_snap_button = _create_toggle_button(_sprite_snap_label())
+	sprite_snap_button.pressed.connect(_on_sprite_snap_toggled)
+	content_vbox.add_child(sprite_snap_button)
+	focusable_controls.append(sprite_snap_button)
 
 	# --- Auto-Explore Settings (sub-panel button) ---
 	ae_settings_button = _create_action_button("Auto-Explore Settings")
@@ -733,10 +740,14 @@ func _on_smoothing_toggled() -> void:
 # Texture detail cycle: HD (off) -> PSX (128px) -> CHUNKY (64px)
 const TEXTURE_SNAP_STEPS: Array[float] = [0.0, 128.0, 64.0]
 const TEXTURE_SNAP_NAMES: Array[String] = ["HD", "PSX", "CHUNKY"]
-var _texture_snap_index: int = 0
+var _texture_snap_index: int = 1  # default: PSX
+var _sprite_snap_index: int = 1  # default: PSX
 
 func _texture_snap_label() -> String:
 	return "Texture Detail: " + TEXTURE_SNAP_NAMES[_texture_snap_index]
+
+func _sprite_snap_label() -> String:
+	return "Sprite Detail: " + TEXTURE_SNAP_NAMES[_sprite_snap_index]
 
 func _on_texture_snap_toggled() -> void:
 	"""Cycle texture pixel snap: HD -> PSX -> CHUNKY"""
@@ -745,6 +756,14 @@ func _on_texture_snap_toggled() -> void:
 	_texture_snap_index = (_texture_snap_index + 1) % TEXTURE_SNAP_STEPS.size()
 	Utilities.set_texture_pixel_snap(TEXTURE_SNAP_STEPS[_texture_snap_index])
 	texture_snap_button.text = _texture_snap_label()
+
+func _on_sprite_snap_toggled() -> void:
+	"""Cycle entity/item sprite pixel snap: HD -> PSX -> CHUNKY"""
+	if not _accepting_input:
+		return
+	_sprite_snap_index = (_sprite_snap_index + 1) % TEXTURE_SNAP_STEPS.size()
+	Utilities.set_sprite_pixel_snap(TEXTURE_SNAP_STEPS[_sprite_snap_index])
+	sprite_snap_button.text = _sprite_snap_label()
 
 func _on_ae_speed_changed(value: float) -> void:
 	Utilities.auto_explore_speed = value

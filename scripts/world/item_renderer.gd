@@ -151,7 +151,7 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 
 	# Use the item's ground sprite
 	if item_resource.ground_sprite:
-		sprite.texture = item_resource.ground_sprite
+		Utilities.apply_snap_texture(sprite, item_resource.ground_sprite)
 		# Calculate pixel_size based on texture dimensions
 		var texture_size = item_resource.ground_sprite.get_size()
 		sprite.pixel_size = BILLBOARD_SIZE / max(texture_size.x, texture_size.y)

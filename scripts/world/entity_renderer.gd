@@ -482,9 +482,9 @@ func _apply_flicker_visual(pos: Vector2i, is_on: bool) -> void:
 		return
 	var entity: WorldEntity = light_entity_cache.get(pos, null)
 	if entity and entity.entity_type == "poolroom_light":
-		sprite.texture = _tex_poolroom_light_on if is_on else _tex_poolroom_light_off
+		Utilities.apply_snap_texture(sprite, _tex_poolroom_light_on if is_on else _tex_poolroom_light_off)
 	else:
-		sprite.texture = _tex_light_on if is_on else _tex_light_off
+		Utilities.apply_snap_texture(sprite, _tex_light_on if is_on else _tex_light_off)
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -538,7 +538,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	if texture_path != "" and ResourceLoader.exists(texture_path):
 		var texture = load(texture_path) as Texture2D
 		if texture:
-			sprite.texture = texture
+			Utilities.apply_snap_texture(sprite, texture)
 			sprite.pixel_size = final_size / texture.get_width()
 			var b = _get_sprite_brightness()
 			sprite.modulate = Color(b, b, b, 1.0)
@@ -581,6 +581,7 @@ func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_si
 	if not sheet_texture:
 		push_warning("Failed to load spritesheet: %s" % sheet_path)
 		return null
+	sheet_texture = Utilities.snap_texture(sheet_texture, frame_count)
 
 	var frame_width: int = sheet_texture.get_width() / frame_count
 	var frame_height: int = sheet_texture.get_height()
@@ -662,6 +663,8 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 	var mesh_inst = MeshInstance3D.new()
 	mesh_inst.mesh = quad
 	mesh_inst.rotation_degrees.x = -90.0  # Lie flat on floor
+	if texture:
+		Utilities.apply_snap_texture(mesh_inst, texture)
 
 	# Position slightly above the visible floor surface. Floor tile visuals sit near
 	# Y=0.5 in this project; using 0.05 worked only while no_depth_test forced the
@@ -715,7 +718,7 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 	if texture_path != "" and ResourceLoader.exists(texture_path):
 		var texture = load(texture_path) as Texture2D
 		if texture:
-			sprite.texture = texture
+			Utilities.apply_snap_texture(sprite, texture)
 			sprite.pixel_size = final_size / texture.get_width()
 			var b = _get_sprite_brightness()
 			sprite.modulate = Color(b, b, b, 1.0)

@@ -7,7 +7,7 @@ extends Node
 func _ready() -> void:
 	# Global shader uniforms must be registered once per session (Godot requirement).
 	RenderingServer.global_shader_parameter_add(
-			"pixel_snap_resolution", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0
+			"pixel_snap_resolution", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 128.0
 	)
 
 # ============================================================================
@@ -32,11 +32,76 @@ static var movement_smoothing: bool = true
 
 ## Texture pixel snap: quantizes albedo UVs to an N-pixel grid per texture repeat,
 ## giving hi-res textures a chunky PSX look. 0 = off (crisp), 128 = PSX, 64 = chunky.
-static var texture_pixel_snap: float = 0.0
+## Default: PSX.
+static var texture_pixel_snap: float = 128.0
 
 static func set_texture_pixel_snap(pixels: float) -> void:
 	texture_pixel_snap = pixels
 	RenderingServer.global_shader_parameter_set("pixel_snap_resolution", pixels)
+
+## Sprite pixel snap: same idea for entities/items/decals (Sprite3D + StandardMaterial3D
+## paths that don't run the PSX shaders). Textures are downscaled to N px wide at
+## assignment; 0 = off. Default: PSX.
+static var sprite_pixel_snap: float = 128.0
+static var _sprite_snap_cache: Dictionary = {}
+
+static func set_sprite_pixel_snap(pixels: float) -> void:
+	sprite_pixel_snap = pixels
+	_sprite_snap_cache.clear()
+	_refresh_snap_nodes(Engine.get_main_loop().root)
+
+## Returns a pixel-snapped variant of tex (downscaled to sprite_pixel_snap px wide).
+## frames: number of horizontal frames in the sheet (sprite sheets snap per-frame).
+## Textures without a resource_path (runtime-generated) are returned unchanged.
+static func snap_texture(tex: Texture2D, frames: int = 1) -> Texture2D:
+	if tex == null or sprite_pixel_snap <= 0.0:
+		return tex
+	var path: String = tex.resource_path
+	if path == "":
+		return tex
+	var w: int = tex.get_width()
+	var h: int = tex.get_height()
+	var target_per_frame: int = int(sprite_pixel_snap)
+	if int(float(w) / maxi(frames, 1)) <= target_per_frame:
+		return tex
+	var key := "%s@%d" % [path, target_per_frame]
+	if _sprite_snap_cache.has(key):
+		return _sprite_snap_cache[key]
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return tex
+	var nw: int = clampi(target_per_frame * maxi(frames, 1), 1, w)
+	var nh: int = maxi(1, int(round(h * float(nw) / float(w))))
+	img.resize(nw, nh, Image.INTERPOLATE_BILINEAR)
+	var snapped := ImageTexture.create_from_image(img)
+	_sprite_snap_cache[key] = snapped
+	return snapped
+
+## Assigns a pixel-snapped texture to a Sprite3D or MeshInstance3D (decal),
+## remembering the source so toggling the snap level can re-apply.
+static func apply_snap_texture(node: Node, texture: Texture2D, frames: int = 1) -> void:
+	node.set_meta("snap_src_tex", texture)
+	if node is MeshInstance3D:
+		_apply_snap_to_mesh(node as MeshInstance3D)
+	else:
+		node.set("texture", snap_texture(texture, frames))
+
+static func _apply_snap_to_mesh(mesh_instance: MeshInstance3D) -> void:
+	var src: Texture2D = mesh_instance.get_meta("snap_src_tex")
+	var mat: StandardMaterial3D = null
+	if mesh_instance.mesh is QuadMesh:
+		mat = (mesh_instance.mesh as QuadMesh).material as StandardMaterial3D
+	if mat and mat.albedo_texture:
+		mat.albedo_texture = snap_texture(src)
+
+static func _refresh_snap_nodes(node: Node) -> void:
+	if node.has_meta("snap_src_tex"):
+		if node is MeshInstance3D:
+			_apply_snap_to_mesh(node as MeshInstance3D)
+		elif node is Sprite3D and not (node is AnimatedSprite3D):
+			node.set("texture", snap_texture(node.get_meta("snap_src_tex")))
+	for child in node.get_children():
+		_refresh_snap_nodes(child)
 
 ## Auto-explore settings
 static var auto_explore_speed: float = 10.0  # turns per second
