@@ -56,3 +56,6 @@ data/mazes
 
 .dreb/
 experiments/
+
+# Python bytecode from the texture pipeline tools
+__pycache__/

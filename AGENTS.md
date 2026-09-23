@@ -257,6 +257,21 @@ Key rules:
 - Scripts live in `_claude_scripts/textures/<name>/generate.py`, run in project venv
 - Textures MUST be tileable (use modulo wrapping for all pixel operations)
 
+### High-resolution floors (image-model scans)
+
+`_claude_scripts/texture_pipeline/README.md` covers the pipeline used for the level -1 / 0 /
+1 floors and the exit-hole decal: `make_tileable.py` → `polish.py` → `add_grout.py` /
+`make_hole.py`, gated by `banding.py` and `score.py`. Read it before touching a floor
+texture — the three rules that cost the most to learn:
+
+- **Never ask the image model for a tileable texture.** It paints a soft border band, and
+  that band is the "blur at the tile junctions" bug. Generate full-bleed, tile afterwards.
+- **Judge textures through `game_sim.py`, never a resized preview.** UVs are snapped to 128
+  texels per repeat and point-sampled, so a filtered preview hides both the banding and the
+  moiré the player sees.
+- **Colour-match to the texture being replaced**, ring only, means only — matching a blurry
+  outgoing texture's *contrast* undoes the detail work.
+
 ---
 
 ## Deploying to itch.io
