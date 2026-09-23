@@ -57,7 +57,8 @@ data/mazes
 # settings change, not when a texture's pixels change, so they do not cause diff churn.
 # The churn source is .godot/, ignored at the top of this file.
 
-.dreb/
+# dreb agent working dirs (.dreb/ memory+config, .dreb-dashboard-uploads/ pasted images)
+.dreb*
 experiments/
 
 # Python bytecode from the texture pipeline tools
