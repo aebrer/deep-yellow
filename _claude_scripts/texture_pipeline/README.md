@@ -194,8 +194,10 @@ Then install, reimport, and validate:
 - **A variant tile's subject repeats once per tile.** Accepted, and the originals did the
   same. Breaking it means authoring 2–3 offset variants and registering them in
   `assets/level_00_mesh_library.tres`, not editing these textures.
-- **`*.import` is gitignored**, so the mipmap settings on `floor_tile.png` and
-  `exit_hole.png` are local to whoever set them. Fine for a build made here, silently
-  different from a fresh clone. Mipmaps matter now that the poolroom has crisp grout.
+- **Mipmaps and VRAM compression live in `*.import`, and those files must stay tracked.**
+  They were ignored for a while, which meant a fresh clone re-imported the poolroom floor
+  and the exit-hole decal without mipmaps — the crisp grout crawls at distance, and nothing
+  on the importing machine shows it. If a floor looks different on someone else's build,
+  diff its `.import` before suspecting the pixels.
 - `raw/` holds the six scans that shipped (16 MB). Rejected generations are not kept; they
   are reproducible from the prompts in the git history of this branch.
