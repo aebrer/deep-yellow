@@ -39,11 +39,14 @@ static func set_texture_pixel_snap(pixels: float) -> void:
 	texture_pixel_snap = pixels
 	RenderingServer.global_shader_parameter_set("pixel_snap_resolution", pixels)
 
-## Sprite pixel snap: same idea for entities/items/decals (Sprite3D + StandardMaterial3D
-## paths that don't run the PSX shaders). Textures are downscaled to N px wide at
-## assignment; 0 = off. Default: PSX.
+## Sprite pixel snap: same idea for entities/items (Sprite3D paths that don't run
+## the PSX shaders). Textures are downscaled to N px wide at assignment; 0 = off.
+## Default: PSX.
 static var sprite_pixel_snap: float = 128.0
 static var _sprite_snap_cache: Dictionary = {}
+
+## Which texture dimension a billboard's world size is measured against.
+enum SnapRef { WIDTH, LONGEST_SIDE }
 
 static func set_sprite_pixel_snap(pixels: float) -> void:
 	sprite_pixel_snap = pixels
@@ -70,6 +73,13 @@ static func snap_texture(tex: Texture2D, frames: int = 1) -> Texture2D:
 	var img := tex.get_image()
 	if img == null or img.is_empty():
 		return tex
+	if img.is_compressed():
+		# Imported textures can hand back VRAM-compressed data, which cannot be
+		# resized in place — decompress to RGBA first or the downscale silently no-ops.
+		var err := img.decompress()
+		if err != OK:
+			push_warning("Utilities: cannot decompress %s for pixel snap (err %d)" % [path, err])
+			return tex
 	var nw: int = clampi(target_per_frame * maxi(frames, 1), 1, w)
 	var nh: int = maxi(1, int(round(h * float(nw) / float(w))))
 	img.resize(nw, nh, Image.INTERPOLATE_BILINEAR)
@@ -77,46 +87,69 @@ static func snap_texture(tex: Texture2D, frames: int = 1) -> Texture2D:
 	_sprite_snap_cache[key] = snapped
 	return snapped
 
-## Assigns a pixel-snapped texture to a Sprite3D or MeshInstance3D (decal),
-## remembering the source so toggling the snap level can re-apply.
-static func apply_snap_texture(node: Node, texture: Texture2D, frames: int = 1) -> void:
-	node.set_meta("snap_src_tex", texture)
-	if node is MeshInstance3D:
-		_apply_snap_to_mesh(node as MeshInstance3D)
-	else:
-		node.set("texture", snap_texture(texture, frames))
+## Assign a pixel-snapped texture to a billboard and pin its world-space size.
+##
+## Sprite3D sizes itself from its texture (world size = texture size * pixel_size),
+## so pixel_size MUST be derived from the SNAPPED texture. Deriving it from the
+## source texture shrinks the sprite by the snap ratio (512px sheet at PSX = 1/4 size).
+## AnimatedSprite3D is a sibling of Sprite3D (both extend SpriteBase3D) and has no
+## texture property of its own — its frames are re-cut instead.
+##
+## world_size: desired world-space size of the sprite's reference side.
+static func apply_snap_sprite(
+		sprite: SpriteBase3D, texture: Texture2D, world_size: float,
+		frames: int = 1, ref: SnapRef = SnapRef.WIDTH
+) -> void:
+	sprite.set_meta("snap_src_tex", texture)
+	sprite.set_meta("snap_frames", frames)
+	sprite.set_meta("snap_world_size", world_size)
+	sprite.set_meta("snap_ref", ref)
+	_apply_snap_to_sprite(sprite)
 
-static func _apply_snap_to_mesh(mesh_instance: MeshInstance3D) -> void:
-	var src: Texture2D = mesh_instance.get_meta("snap_src_tex")
-	var mat: StandardMaterial3D = null
-	if mesh_instance.mesh is QuadMesh:
-		mat = (mesh_instance.mesh as QuadMesh).material as StandardMaterial3D
-	if mat and mat.albedo_texture:
-		mat.albedo_texture = snap_texture(src)
+## Swap the texture on an already-snapped billboard (light on/off states) while
+## keeping the world size apply_snap_sprite() pinned.
+static func swap_snap_sprite(sprite: Sprite3D, texture: Texture2D) -> void:
+	if not sprite.has_meta("snap_world_size"):
+		sprite.set("texture", snap_texture(texture))
+		return
+	sprite.set_meta("snap_src_tex", texture)
+	_apply_snap_to_sprite(sprite)
+
+static func _apply_snap_to_sprite(sprite: SpriteBase3D) -> void:
+	var frames: int = maxi(1, int(sprite.get_meta("snap_frames")))
+	var snapped := snap_texture(sprite.get_meta("snap_src_tex"), frames)
+	if sprite is AnimatedSprite3D:
+		_resnap_animated_sheet(sprite as AnimatedSprite3D, snapped, frames)
+	else:
+		sprite.set("texture", snapped)
+	# Reference side in the snapped texture's own pixels (per frame for sheets)
+	var ref_px: int = maxi(1, snapped.get_width() / frames)
+	if int(sprite.get_meta("snap_ref")) == SnapRef.LONGEST_SIDE:
+		ref_px = maxi(ref_px, snapped.get_height())
+	sprite.pixel_size = float(sprite.get_meta("snap_world_size")) / float(ref_px)
 
 static func _refresh_snap_nodes(node: Node) -> void:
-	if node.has_meta("snap_src_tex"):
-		if node is MeshInstance3D:
-			_apply_snap_to_mesh(node as MeshInstance3D)
-		elif node is AnimatedSprite3D:
-			_resnap_animated_sheet(node as AnimatedSprite3D)
-		elif node is Sprite3D:
-			node.set("texture", snap_texture(node.get_meta("snap_src_tex")))
+	if node.has_meta("snap_world_size"):
+		_apply_snap_to_sprite(node as SpriteBase3D)
 	for child in node.get_children():
 		_refresh_snap_nodes(child)
 
-## Re-point every AtlasTexture frame of an AnimatedSprite3D at the currently
-## snapped variant of its source sheet (sprite_frames are mutated in place).
-static func _resnap_animated_sheet(sprite: AnimatedSprite3D) -> void:
-	var src: Texture2D = sprite.get_meta("snap_src_tex")
-	var frames: int = int(sprite.get_meta("snap_frames"))
-	var snapped_sheet := snap_texture(src, frames)
+## Re-point every AtlasTexture frame of an AnimatedSprite3D at a snapped variant of
+## its source sheet AND re-cut the regions for that sheet's pixel size: frame
+## regions live in the atlas' own pixel space, so they have to move with the atlas
+## (re-pointing without re-cutting puts frames 1..N outside a downscaled sheet).
+static func _resnap_animated_sheet(sprite: AnimatedSprite3D, snapped_sheet: Texture2D, frames: int) -> void:
 	var sheet: SpriteFrames = sprite.sprite_frames
+	if sheet == null:
+		return
+	var frame_width: int = maxi(1, snapped_sheet.get_width() / frames)
+	var frame_height: int = snapped_sheet.get_height()
 	for anim_name in sheet.get_animation_names():
 		for i in sheet.get_frame_count(anim_name):
 			var frame_tex = sheet.get_frame_texture(anim_name, i)
 			if frame_tex is AtlasTexture:
 				frame_tex.atlas = snapped_sheet
+				frame_tex.region = Rect2(i * frame_width, 0, frame_width, frame_height)
 
 ## Auto-explore settings
 static var auto_explore_speed: float = 10.0  # turns per second

@@ -679,6 +679,9 @@ func _cache_floor_materials() -> void:
 func _build_all_lit_materials() -> void:
 	"""Build combined list of all materials that receive lighting uniforms"""
 	all_lit_materials.clear()
+	# Floor decal materials are derived from this level's floor material, so they
+	# have to be rebuilt per level (modulate_color differs between levels).
+	_lit_decal_materials.clear()
 	for mat in floor_materials:
 		if mat not in all_lit_materials:
 			all_lit_materials.append(mat)
@@ -692,6 +695,70 @@ func _build_all_lit_materials() -> void:
 
 	# Initialize lightmap system (ambient + fixture lights baked into texture)
 	_init_lightmap()
+
+
+# ============================================================================
+# FLOOR DECAL MATERIALS (exit holes, stairs)
+# ============================================================================
+# A decal lies flat on the floor, so it has to brighten and darken exactly like
+# the tiles around it. That means running the same lit shader as the floor with
+# the same modulate_color, and being fed the same lightmap/player-light uniforms.
+# An unshaded decal renders at raw albedo and glows against the lit floor.
+
+const LIT_DECAL_SHADER := preload("res://shaders/psx_lit_decal.gdshader")
+
+var _lit_decal_materials: Dictionary = {}  # texture path -> ShaderMaterial
+
+
+func get_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
+	"""Lit material for a one-cell quad on the floor, matched to this level's floor.
+
+	Returns null when no floor material is cached yet — the caller keeps its
+	unshaded fallback and the warning says why the decal will not match.
+	"""
+	if texture == null:
+		return null
+
+	var key: String = texture.resource_path
+	if _lit_decal_materials.has(key):
+		return _lit_decal_materials[key]
+
+	if floor_materials.is_empty():
+		push_warning("[Grid3D] No floor material cached — decal %s will not match floor lighting" % key)
+		return null
+
+	# Derive from the level's floor material so tone (modulate_color) and UV
+	# transform match; one GridMap cell of floor and one decal quad both use
+	# UV 0..1, so pixel_snap_resolution gives both the same texel size.
+	var floor_mat: ShaderMaterial = floor_materials[0]
+	var mat := ShaderMaterial.new()
+	mat.shader = LIT_DECAL_SHADER
+	mat.set_shader_parameter("modulate_color", floor_mat.get_shader_parameter("modulate_color"))
+	mat.set_shader_parameter("albedoTex", texture)
+	mat.set_shader_parameter("alpha_scissor", 0.1)
+	mat.set_shader_parameter("uv_scale", floor_mat.get_shader_parameter("uv_scale"))
+	mat.set_shader_parameter("uv_offset", floor_mat.get_shader_parameter("uv_offset"))
+
+	_lit_decal_materials[key] = mat
+	register_lit_material(mat)
+	return mat
+
+
+func register_lit_material(mat: ShaderMaterial) -> void:
+	"""Add a runtime-created material to the lightmap + player-light update loop.
+
+	_process() only pushes lighting uniforms to all_lit_materials, so anything
+	created after level setup (decals, future runtime geometry) must opt in here
+	or it samples a stale lightmap origin.
+	"""
+	if mat in all_lit_materials:
+		return
+	all_lit_materials.append(mat)
+	if _lightmap_texture:
+		var inv_size := 1.0 / (LIGHTMAP_SIZE * LIGHTMAP_CELL_SIZE)
+		mat.set_shader_parameter("lightmap_tex", _lightmap_texture)
+		mat.set_shader_parameter("lightmap_inv_size", Vector2(inv_size, inv_size))
+		mat.set_shader_parameter("lightmap_origin", _lightmap_origin)
 
 
 # Debug: Track frame count for periodic logging

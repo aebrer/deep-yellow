@@ -151,10 +151,11 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 
 	# Use the item's ground sprite
 	if item_resource.ground_sprite:
-		Utilities.apply_snap_texture(sprite, item_resource.ground_sprite)
-		# Calculate pixel_size based on texture dimensions
-		var texture_size = item_resource.ground_sprite.get_size()
-		sprite.pixel_size = BILLBOARD_SIZE / max(texture_size.x, texture_size.y)
+		# Longest side maps to BILLBOARD_SIZE at every Sprite Detail level
+		Utilities.apply_snap_sprite(
+				sprite, item_resource.ground_sprite, BILLBOARD_SIZE, 1,
+				Utilities.SnapRef.LONGEST_SIDE
+		)
 	else:
 		# Fallback: colored square if no sprite defined
 		var rarity = item_data.get("rarity", ItemRarity.Tier.COMMON)
