@@ -52,7 +52,10 @@ tmp/*
 data/mazes
 
 # godot
-*.import
+# *.import files ARE meant to be version controlled — they hold the per-asset import
+# settings (VRAM compression, mipmaps) and the asset UID. Godot rewrites them only when
+# settings change, not when a texture's pixels change, so they do not cause diff churn.
+# The churn source is .godot/, ignored at the top of this file.
 
 .dreb/
 experiments/
