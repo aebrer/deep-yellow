@@ -27,6 +27,7 @@ from scipy import ndimage
 def key_matte(path: str, out_path: str, bright: bool) -> None:
     a = np.asarray(Image.open(path).convert("RGBA")).astype(np.float64)
     luma = 0.2126 * a[:, :, 0] + 0.7152 * a[:, :, 1] + 0.0722 * a[:, :, 2]
+    chroma = a[:, :, :3].max(axis=2) - a[:, :, :3].min(axis=2)  # 0 = achromatic
 
     ring = np.concatenate([
         luma[:3, :].ravel(), luma[-3:, :].ravel(), luma[:, :3].ravel(), luma[:, -3:].ravel()])
@@ -43,20 +44,31 @@ def key_matte(path: str, out_path: str, bright: bool) -> None:
     background = np.isin(labels, list(touching))
 
     if bright:
-        # The model paints a soft contact shadow under the subject, and that shadow is
-        # light grey, not white, so a single white threshold leaves a pale halo around the
-        # sprite on a dark floor. Ramp instead: fully gone at the matte's own brightness,
-        # fading out across the shadow's range. Only border-connected pixels are affected,
-        # so pale highlights INSIDE the subject (mould bloom, wet sheen) are untouched.
+        # HARD alpha, no ramp. Ramping across the model's soft contact shadow looks
+        # principled but produces semi-transparent pixels whose RGB is still the white
+        # field's — over a dark sprite they survive the 0.5 alpha cut and blend as pale
+        # specks ("white interior pixels that should be transparent"). And the blend cannot
+        # be undone: an un-premultiply of pure white is still white at any alpha, so the
+        # maths cannot tell "light subject at 35%" from "matte at 100%". So take the whole
+        # pale region, shadow included, as matte and cut it off clean. These sprites are
+        # point-sampled at 128px anyway, where a hard edge is what the look wants.
+        #
+        # Only BORDER-CONNECTED pale pixels go, so pale highlights inside the subject (a
+        # drowned face, mould bloom, a fogged lens) survive; and enclosed pixels that are
+        # the matte's exact colour are punched out too, because connectivity alone leaves
+        # the field trapped under a raised arm or between legs.
+        # A light-neutral band counts as matte as well: the model's contact shadow fades to a
+# colourless grey wash that no single luma line can catch without eating the art. The
+# art's own pale highlights are TINTED (a drowned face is blue-grey, mould is warm), so
+# pale AND achromatic AND connected to the field is unambiguously matte.
         soft_lo = max(170.0, thr - 45.0)
-        near = luma >= soft_lo
-        soft_labels, _ = ndimage.label(near)
-        soft_touching = set(np.unique(np.concatenate([
-            soft_labels[0, :], soft_labels[-1, :], soft_labels[:, 0], soft_labels[:, -1]]))) - {0}
-        halo = np.isin(soft_labels, list(soft_touching)) & ~background
-        ramp = np.clip((thr - luma) / (thr - soft_lo), 0.0, 1.0)
-        alpha = a[:, :, 3] * np.where(halo, ramp, 1.0)
-        alpha[background] = 0.0
+        pale = (luma >= soft_lo) | ((luma >= 150.0) & (chroma < 10))
+        pale_labels, _ = ndimage.label(pale)
+        pale_touching = set(np.unique(np.concatenate([
+            pale_labels[0, :], pale_labels[-1, :], pale_labels[:, 0], pale_labels[:, -1]]))) - {0}
+        background = np.isin(pale_labels, list(pale_touching))
+        enclosed = (luma >= thr) & (chroma < 8)
+        alpha = np.where(background | enclosed, 0.0, 255.0)
     else:
         feather = ndimage.gaussian_filter(background.astype(np.float64), 1.2)
         alpha = a[:, :, 3] * np.clip(1.0 - feather * 1.35, 0.0, 1.0)
