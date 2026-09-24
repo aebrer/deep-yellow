@@ -174,6 +174,11 @@ const ENTITY_SPRITESHEETS = {
 		"frames": 4,
 		"fps": 6.0,
 	},
+	"drowner": {
+		"path": "res://assets/textures/entities/drowner_spritesheet.png",
+		"frames": 4,
+		"fps": 6.0,
+	},
 }
 
 ## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).
@@ -603,43 +608,15 @@ func _create_animated_billboard(entity: WorldEntity, world_3d: Vector3, final_si
 	"""
 	var entity_type = entity.entity_type
 	var config = ENTITY_SPRITESHEETS[entity_type]
-	var sheet_path: String = config["path"]
-	var frame_count: int = config["frames"]
-	var fps: float = config["fps"]
+	var b = _get_sprite_brightness()
 
-	var sheet_texture = load(sheet_path) as Texture2D
-	if not sheet_texture:
-		push_warning("Failed to load spritesheet: %s" % sheet_path)
+	# Construction (atlas regions, billboard flags, pixel snap, playback) is shared with
+	# animated items in AnimatedBillboard; what is left here is the entity plumbing.
+	var sprite := AnimatedBillboard.create(
+			config["path"], config["frames"], config["fps"], world_3d, final_size, b)
+	if sprite == null:
 		return null
 
-	var frame_width: int = sheet_texture.get_width() / frame_count
-	var frame_height: int = sheet_texture.get_height()
-
-	# Build SpriteFrames from atlas regions
-	var sprite_frames = SpriteFrames.new()
-	sprite_frames.set_animation_speed("default", fps)
-	sprite_frames.set_animation_loop("default", true)
-	for i in range(frame_count):
-		var atlas = AtlasTexture.new()
-		atlas.atlas = sheet_texture
-		atlas.region = Rect2(i * frame_width, 0, frame_width, frame_height)
-		atlas.filter_clip = true
-		sprite_frames.add_frame("default", atlas)
-
-	var sprite = AnimatedSprite3D.new()
-	sprite.sprite_frames = sprite_frames
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = false
-	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
-	sprite.position = world_3d
-	# Snaps the sheet, re-cuts the atlas regions for the snapped sheet's pixel
-	# size, and pins the world size (re-done live when Sprite Detail toggles)
-	Utilities.apply_snap_sprite(sprite, sheet_texture, final_size, frame_count)
-	sprite.play("default")
-
-	var b = _get_sprite_brightness()
-	sprite.modulate = Color(b, b, b, 1.0)
 	sprite.set_meta("base_color", Color(b, b, b, 1.0))
 
 	sprite.visibility_range_end = VISIBILITY_RANGE_END

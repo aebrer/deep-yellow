@@ -34,6 +34,27 @@ bright blue yeti.
 
 ## Getting a usable cutout
 
+**Always pass `transparent: true`.** This is the default path, not a special case. Without
+it the model paints its own idea of a background — a flat white field, or a **magenta** one
+(its training-time stand-in for alpha) — and that has to be keyed off, which is where the
+pale-halo, white-speck and grey-wash defects all come from. Dark subjects are fine: the
+drowner, which is nearly all black, came back through RGBA with a clean silhouette and
+0.97/0.98 IoU against the shipped sprite. RGBA output arrives ready to composite.
+
+**Ask for a cut-out with NO cast shadow** — "uniform pure white, hard edges, no contact
+shadow, no reflection, no ground plane". A soft contact shadow is the most expensive thing
+to key around: it pools under the object and between its parts, and no flood-fill can reach
+it without also eating legitimate pale art (a fogged binocular lens is achromatic grey,
+exactly like the wash, only dimmer; and the wash hides *behind* the shadow's dark core, so
+connectivity can't route past it either). Cutting the shadow out costs one prompt line.
+
+**Do not pass a reference image that contains a shadow.** The model copies the shadow out of
+the reference and ignores the prompt. Regenerate text-only.
+
+### Fallback: keying an image that came back opaque
+
+Only for re-using older generations — prefer RGBA output above.
+
 **Ask for a flat WHITE matte, never for darkness.** Prompting "most of the image is empty
 darkness" makes the model paint a solid black field behind the subject, which renders as a
 black card because sprites are alpha-cutout. Worse, that field is the same value as the
@@ -41,17 +62,14 @@ figure's own shadowed interior, so it cannot be keyed away without eating the ar
 a plain flat white background and put the darkness *in the subject* — same separation, but
 separable.
 
-**Key only what is connected to the border.** The darkness inside the figure must survive:
-the in-tone sprites keep a lot of opaque black, because the withheld information is the
-art and the room's lighting will not supply it. `key_matte.py` flood-fills from the canvas
-edges and stops at the silhouette, so a black body stays black and only the field goes.
-It also ramps the alpha across the model's soft contact shadow (a single threshold leaves a
-pale halo on a light floor, which is what knocked the mould-crusted binoculars runner-up
-out of contention).
-
-`transparent=true` on the generator works fine for brightly-lit subjects — the hazmat rear
-view came out with a clean alpha channel. It is specifically the low-key, dark-dominant
-subjects that need the white matte.
+**Key only what is connected to the border, and cut hard.** The darkness inside the figure
+must survive: the in-tone sprites keep a lot of opaque black, because the withheld
+information is the art and the room's lighting will not supply it. `key_matte.py` flood-fills
+from the canvas edges and stops at the silhouette, so a black body stays black and only the
+field goes. The alpha is cut hard, never ramped: ramping across the model's contact shadow
+leaves semi-transparent pixels whose RGB is still the field's colour, and those survive the
+0.5 alpha cut and blend as pale specks. Undoing the blend is impossible — an un-premultiply
+of pure white is still white at any alpha.
 
 ## Fitting a replacement into the old sprite's footprint
 
@@ -63,6 +81,46 @@ height. Scale the new figure to *contain* inside the old figure's visible box, p
 its own aspect, then bottom-align and centre. Contain, not match-height: a crouched
 replacement should stay crouched rather than being inflated to the old figure's height.
 "Visible" means alpha >= 128, which is what the shader's alpha scissor keeps.
+
+## Idle animation
+
+Every entity and item animates as a 4-frame horizontal strip — the same shape
+`barrel_fire` always shipped with. `assemble_frames.py` builds the strip; switching a sprite
+on is one dict entry: `EntityRenderer.ENTITY_SPRITESHEETS` or
+`ItemRenderer.ITEM_SPRITESHEETS`. Node construction is shared in
+`scripts/world/animated_billboard.gd` (entities and items used to need separate copies).
+
+Per sprite:
+
+1. Generate frame 2 and frame 3 from the **shipped sprite as the reference image**, with
+   `transparent: true`, asking for one clearly visible change and nothing else.
+2. `assemble_frames.py base.png f2.png f3.png <name>_spritesheet.png --anchor bottom|centre --gif preview.gif`
+3. Watch the GIF, then read the IoU it prints.
+4. Register the entry, `--import`, run `scripts/tools/verify_sprite_snap.gd`. Commit the
+   strip **and its `.import` file** — those are version-controlled now.
+
+Playback order is baked into the strip as `1,2,3,2`: neutral, sway, neutral, sway-back. Two
+generated frames give a cycle that closes with no pop, at two generations per sprite.
+
+**The contract is what the game draws.** Billboards use `ALPHA_CUT_DISCARD` at 0.5, so
+everything under alpha 128 is discarded — the generator's low-alpha haze (measured at
+9-10/255) never reaches the screen, and neither does a sprite's own faintest art. Frames are
+binarised at 128 and judged on that rendered silhouette, and preview renders apply the same
+cut. A normal image viewer shows defects the player never sees and hides ones they do.
+
+**Amplitude.** barrel_fire — the reference Drew holds up — has adjacent-frame IoU of
+0.87-0.93 and a bbox that swings 385 to 458 px. Prompts phrased as "a few percent" come back
+too tame (IoU 0.97, barely moves). Ask for a clearly visible change.
+
+**What drifts.** Solid subjects hold: drowner 0.97/0.98. Sparse, ghost-like subjects do not:
+the smiler came back at 0.36, because when only 5% of the canvas is sprite the model invents
+mass (bigger grin, violet glow) rather than swaying it. Keeping that jank is a deliberate
+call — it suits the chaotic liminal tone — but the IoU is printed per sprite so a QA pass can
+pick out the ones that went too far.
+
+`--anchor bottom` for anything standing on the floor (feet must not float or sink),
+`--anchor centre` for floating things (the smiler's face, hanging fixtures).
+
 
 ## Measuring detail, and what the measurement gets wrong
 

@@ -18,6 +18,9 @@ extends SceneTree
 
 # Static access to the same script the Utilities autoload exposes
 const UtilitiesScript := preload("res://scripts/autoload/utilities.gd")
+const EntityRendererScript := preload("res://scripts/world/entity_renderer.gd")
+const ItemRendererScript := preload("res://scripts/world/item_renderer.gd")
+const AnimatedBillboardScript := preload("res://scripts/world/animated_billboard.gd")
 
 const ENTITY_TEX := "res://assets/textures/entities/tutorial_mannequin.png"  # 512x512
 const SHEET_TEX := "res://assets/textures/entities/barrel_fire_spritesheet.png"  # 2048x512
@@ -38,6 +41,7 @@ const CEILING_Y := 4.4
 const ALPHA_SCISSOR_8BIT := 128
 
 var _failures := 0
+var _check_count := 0
 
 
 func _initialize() -> void:
@@ -100,6 +104,7 @@ func _initialize() -> void:
 	_avatar_size()
 	_ceiling_fixtures()
 	_decal_uv()
+	_sprite_sheets()
 
 	if _failures == 0:
 		print("ALL CHECKS PASSED")
@@ -283,7 +288,93 @@ func _decal_uv() -> void:
 			"modulate_color=%s — the decal would not light like its floor" % str(tone))
 
 
+## Regression 5: every declared spritesheet must cut into equal frames, snap, and keep its
+## world size. Entities and items now share AnimatedBillboard, so a bad strip — wrong
+## declared frame count, a width that doesn't divide, a file that moved — shows up here
+## instead of as a billboard rendering at the wrong scale in a level this check never loads.
+func _sprite_sheets() -> void:
+	print("=== spritesheet animations ===")
+	var entity_sheets = EntityRendererScript.ENTITY_SPRITESHEETS
+	var item_sheets = ItemRendererScript.ITEM_SPRITESHEETS
+	_check("entity sheets registered", entity_sheets.size() > 0, "none")
+	for id in entity_sheets:
+		var world_size: float = float(EntityRendererScript.BILLBOARD_SIZE) * float(
+				EntityRendererScript.ENTITY_SCALE_OVERRIDES.get(id, 1.0))
+		_check_sheet("entity %s" % id, entity_sheets[id], world_size,
+				UtilitiesScript.SnapRef.WIDTH)
+	for id in item_sheets:
+		_check_sheet("item %s" % id, item_sheets[id],
+				float(ItemRendererScript.BILLBOARD_SIZE),
+				UtilitiesScript.SnapRef.LONGEST_SIDE)
+
+
+const SHEET_INSPECTIONS := 6
+
+func _check_sheet(what: String, cfg: Dictionary, world_size: float, ref: int) -> void:
+	var checks_before := _check_count
+	var path: String = cfg["path"]
+	var frames: int = int(cfg["frames"])
+	var fps: float = float(cfg["fps"])
+	if not ResourceLoader.exists(path):
+		_check("%s strip exists" % what, false, "missing %s" % path)
+		return
+
+	var sheet: Texture2D = load(path)
+	var sprite_frames = AnimatedBillboardScript.build_frames(sheet, frames, fps)
+	if sprite_frames == null:
+		_check("%s cuts into frames" % what, false,
+				"%s is %dpx wide, declares %d frames" % [path, sheet.get_width(), frames])
+		return
+
+	_check("%s frame count" % what, sprite_frames.get_frame_count("default") == frames,
+			"%d frames, declares %d" % [sprite_frames.get_frame_count("default"), frames])
+	_check("%s loops" % what, sprite_frames.get_animation_loop("default"), "loop off")
+	_check("%s fps" % what,
+			is_equal_approx(sprite_frames.get_animation_speed("default"), fps),
+			"%s want %s" % [sprite_frames.get_animation_speed("default"), fps])
+
+	var frame_w: int = sheet.get_width() / frames
+	var bad := ""
+	for i in frames:
+		var region: Rect2 = sprite_frames.get_frame_texture("default", i).region
+		if not is_equal_approx(region.size.x, float(frame_w)) \
+				or not is_equal_approx(region.position.x, float(i * frame_w)) \
+				or region.end.x > float(sheet.get_width()):
+			bad = "frame %d region %s, want x=%d w=%d inside %dpx" % [
+					i, str(region), i * frame_w, frame_w, sheet.get_width()]
+			break
+	_check("%s regions tile the strip" % what, bad == "", bad)
+
+	# Snapping must re-cut the regions for the snapped sheet (frame regions live in the
+	# atlas' own pixel space) and pin the world size off the snapped frame.
+	var sprite := AnimatedSprite3D.new()
+	sprite.sprite_frames = sprite_frames
+	UtilitiesScript.apply_snap_sprite(sprite, sheet, world_size, frames, ref)
+	var frame0: Texture2D = sprite_frames.get_frame_texture("default", 0)
+	var atlas: Texture2D = frame0.atlas
+	var snapped_w: int = int(frame0.region.size.x)
+	_check("%s regions re-cut after snap" % what,
+			atlas.get_width() == snapped_w * frames
+					and frame0.region.end.x <= float(atlas.get_width()),
+			"atlas %dpx, frame %dpx, frames %d" % [atlas.get_width(), snapped_w, frames])
+	var ref_px: int = maxi(1, snapped_w)
+	if ref == UtilitiesScript.SnapRef.LONGEST_SIDE:
+		ref_px = maxi(ref_px, atlas.get_height())
+	_check("%s world size" % what,
+			is_equal_approx(float(ref_px) * sprite.pixel_size, world_size),
+			"frame %dpx * pixel_size %.6f = %.3f m, want %.3f m" % [
+					ref_px, sprite.pixel_size, float(ref_px) * sprite.pixel_size, world_size])
+	var ran := _check_count - checks_before
+	_check("%s ran every inspection" % what, ran == SHEET_INSPECTIONS,
+			"only %d of %d inspections ran — something errored inside the check" % [
+					ran, SHEET_INSPECTIONS])
+
+
+## Every inspection is counted so an aborted check run cannot report success. A script
+## error inside a check (a renamed function, a missing const) aborts only that call, so the
+## summary used to still print ALL CHECKS PASSED with half the checks never run.
 func _check(what: String, ok: bool, detail: String) -> void:
+	_check_count += 1
 	if ok:
 		print("  PASS  %s" % what)
 	else:

@@ -29,7 +29,7 @@ class_name ItemRenderer extends Node3D
 # ============================================================================
 
 ## Maps world tile position to Sprite3D node
-var item_billboards: Dictionary = {}  # Vector2i -> Sprite3D
+var item_billboards: Dictionary = {}  # Vector2i -> SpriteBase3D (Sprite3D or AnimatedSprite3D)
 
 ## Maps world tile position to serialized item data
 var item_data_cache: Dictionary = {}  # Vector2i -> Dictionary
@@ -46,6 +46,14 @@ const BILLBOARD_SIZE = 1.0
 const BILLBOARD_HEIGHT = 1.25
 
 ## Placeholder colors by rarity (until we have sprites)
+## Item idle animations: item_id -> horizontal atlas strip. Mirrors
+## EntityRenderer.ENTITY_SPRITESHEETS. Strips are built by
+## _claude_scripts/sprite_pipeline/assemble_frames.py from the item's existing sprite as
+## reference, so frame 1 is always the shipped art and the loop is base, sway, sway-back.
+## Items animate at BILLBOARD_SIZE on the longest side, exactly like their static versions.
+const ITEM_SPRITESHEETS = {
+}
+
 const RARITY_COLORS = {
 	ItemRarity.Tier.DEBUG: Color(1.0, 0.0, 1.0),       # Magenta
 	ItemRarity.Tier.COMMON: Color(0.8, 0.8, 0.8),      # Light gray
@@ -136,34 +144,44 @@ func _create_billboard(item_data: Dictionary, world_pos: Vector2i) -> Sprite3D:
 		Log.warn(Log.Category.GRID, "Failed to find item resource for ID: %s" % item_id)
 		return null
 
-	# Create sprite node
-	var sprite = Sprite3D.new()
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art friendly
-
 	# Position at world coordinates (centered in cell)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, BILLBOARD_HEIGHT) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,  # Fallback if no grid
 		BILLBOARD_HEIGHT,
 		world_pos.y * 2.0 + 1.0
 	)
-	sprite.position = world_3d
 
-	# Use the item's ground sprite
-	if item_resource.ground_sprite:
-		# Longest side maps to BILLBOARD_SIZE at every Sprite Detail level
-		Utilities.apply_snap_sprite(
-				sprite, item_resource.ground_sprite, BILLBOARD_SIZE, 1,
-				Utilities.SnapRef.LONGEST_SIDE
-		)
-	else:
-		# Fallback: colored square if no sprite defined
-		var rarity = item_data.get("rarity", ItemRarity.Tier.COMMON)
-		var color = RARITY_COLORS.get(rarity, Color.WHITE)
-		var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-		image.fill(color)
-		sprite.texture = ImageTexture.create_from_image(image)
-		sprite.pixel_size = BILLBOARD_SIZE / 16.0
+	# Animated items declare an atlas strip in ITEM_SPRITESHEETS; everything else is a
+	# single-frame billboard. Both are SpriteBase3D, so the brightness, corruption and
+	# examination handling below is shared by the two paths.
+	var sprite: SpriteBase3D = null
+	var anim = ITEM_SPRITESHEETS.get(item_id, {})
+	if not anim.is_empty():
+		sprite = AnimatedBillboard.create(
+				anim["path"], anim["frames"], anim["fps"], world_3d, BILLBOARD_SIZE,
+				_get_sprite_brightness(), Utilities.SnapRef.LONGEST_SIDE)
+
+	if sprite == null:
+		sprite = Sprite3D.new()
+		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art friendly
+		sprite.position = world_3d
+
+		# Use the item's ground sprite
+		if item_resource.ground_sprite:
+			# Longest side maps to BILLBOARD_SIZE at every Sprite Detail level
+			Utilities.apply_snap_sprite(
+					sprite, item_resource.ground_sprite, BILLBOARD_SIZE, 1,
+					Utilities.SnapRef.LONGEST_SIDE
+			)
+		else:
+			# Fallback: colored square if no sprite defined
+			var rarity = item_data.get("rarity", ItemRarity.Tier.COMMON)
+			var color = RARITY_COLORS.get(rarity, Color.WHITE)
+			var image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+			image.fill(color)
+			sprite.texture = ImageTexture.create_from_image(image)
+			sprite.pixel_size = BILLBOARD_SIZE / 16.0
 
 	# Apply level sprite brightness (amplifies light reflection from point sources)
 	var b = _get_sprite_brightness()
@@ -317,7 +335,7 @@ func _to_string() -> String:
 # CORRUPTED ITEM EFFECTS
 # ============================================================================
 
-func _start_glitch_animation(sprite: Sprite3D) -> void:
+func _start_glitch_animation(sprite: SpriteBase3D) -> void:
 	"""Add a looping glitch animation to a corrupted item billboard.
 
 	Uses recursive tween calls so each loop gets fresh random values.
