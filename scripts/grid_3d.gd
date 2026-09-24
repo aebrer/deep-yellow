@@ -727,17 +727,23 @@ func get_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
 		push_warning("[Grid3D] No floor material cached — decal %s will not match floor lighting" % key)
 		return null
 
-	# Derive from the level's floor material so tone (modulate_color) and UV
-	# transform match; one GridMap cell of floor and one decal quad both use
-	# UV 0..1, so pixel_snap_resolution gives both the same texel size.
+	# Derive tone from the level's floor material so the decal brightens and darkens
+	# exactly like the tiles around it. UV is NOT derived: a floor's uv_scale is a
+	# TILING factor (level 1 tiles its texture 2x2 across one cell), and the shader
+	# applies it as UV = UV * uv_scale before sampling, so inheriting it sampled the
+	# decal's art twice per axis and wrapped it — four staircases in one cell. A decal
+	# shows its sprite once, so uv_scale is 1 and uv_offset is 0. Texel size still
+	# lands where sprites want it: pixel_snap_resolution snaps UV after scaling, so the
+	# sprite resolves to 128 samples across the cell, the same budget apply_snap_sprite
+	# gives billboarded entities.
 	var floor_mat: ShaderMaterial = floor_materials[0]
 	var mat := ShaderMaterial.new()
 	mat.shader = LIT_DECAL_SHADER
 	mat.set_shader_parameter("modulate_color", floor_mat.get_shader_parameter("modulate_color"))
 	mat.set_shader_parameter("albedoTex", texture)
 	mat.set_shader_parameter("alpha_scissor", 0.1)
-	mat.set_shader_parameter("uv_scale", floor_mat.get_shader_parameter("uv_scale"))
-	mat.set_shader_parameter("uv_offset", floor_mat.get_shader_parameter("uv_offset"))
+	mat.set_shader_parameter("uv_scale", Vector2.ONE)
+	mat.set_shader_parameter("uv_offset", Vector2.ZERO)
 
 	_lit_decal_materials[key] = mat
 	register_lit_material(mat)

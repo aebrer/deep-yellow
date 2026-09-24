@@ -99,6 +99,7 @@ func _initialize() -> void:
 
 	_avatar_size()
 	_ceiling_fixtures()
+	_decal_uv()
 
 	if _failures == 0:
 		print("ALL CHECKS PASSED")
@@ -247,6 +248,39 @@ func _check_regions(what: String, sprite: AnimatedSprite3D) -> void:
 		_check("%s frame %d region" % [what, i], inside,
 				"region=%s atlas=%dx%d frame_w=%d" % [
 						str(region), atlas.get_width(), atlas.get_height(), frame_w])
+
+
+## Regression 4: a floor decal inherited the level floor's uv_scale. That value is a
+## TILING factor (level 1 repeats its tile texture 2x2 across one cell) and the shader
+## applies it as UV = UV * uv_scale, and the sampler is repeat_enable — so the decal drew
+## its art four times. Drew: "it's literally four sets of stairs in a single tile".
+func _decal_uv() -> void:
+	print("=== floor decal UV ===")
+	var grid = load("res://scripts/grid_3d.gd").new()
+	var floor_mat := ShaderMaterial.new()
+	floor_mat.shader = load("res://shaders/psx_lit.gdshader")
+	floor_mat.set_shader_parameter("uv_scale", Vector2(2, 2))  # level 1 poolroom floor
+	floor_mat.set_shader_parameter("uv_offset", Vector2(0.3, 0.7))
+	floor_mat.set_shader_parameter("modulate_color", Color(1.35, 1.45, 1.44))
+	var floor_mats: Array[ShaderMaterial] = [floor_mat]
+	grid.floor_materials = floor_mats
+
+	var tex: Texture2D = load("res://assets/textures/entities/lobby_to_poolrooms_stairs.png")
+	var mat: ShaderMaterial = grid.get_lit_decal_material(tex)
+	_check("decal material built", mat != null, "get_lit_decal_material returned null")
+	if mat == null:
+		return
+
+	var uv_scale: Vector2 = mat.get_shader_parameter("uv_scale")
+	_check("decal samples its art once", uv_scale == Vector2.ONE,
+			"uv_scale=%s repeats the sprite %dx%d times per cell" % [
+					str(uv_scale), int(uv_scale.x), int(uv_scale.y)])
+	var uv_offset: Vector2 = mat.get_shader_parameter("uv_offset")
+	_check("decal is not offset", uv_offset == Vector2.ZERO,
+			"uv_offset=%s slides the sprite off its cell and wraps it" % str(uv_offset))
+	var tone: Color = mat.get_shader_parameter("modulate_color")
+	_check("decal still matches the floor's tone", tone == Color(1.35, 1.45, 1.44),
+			"modulate_color=%s — the decal would not light like its floor" % str(tone))
 
 
 func _check(what: String, ok: bool, detail: String) -> void:
