@@ -179,6 +179,46 @@ const ENTITY_SPRITESHEETS = {
 		"frames": 4,
 		"fps": 6.0,
 	},
+	"sodden": {
+		"path": "res://assets/textures/entities/sodden_spritesheet.png",
+		"frames": 4,
+		"fps": 4.0,
+	},
+	"ambassador": {
+		"path": "res://assets/textures/entities/ambassador_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+	"tutorial_mannequin": {
+		"path": "res://assets/textures/entities/tutorial_mannequin_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+	"vending_machine": {
+		"path": "res://assets/textures/entities/vending_machine_spritesheet.png",
+		"frames": 4,
+		"fps": 6.0,
+	},
+	"bacteria_motherload": {
+		"path": "res://assets/textures/entities/bacteria_motherload_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+	"bacteria_spreader": {
+		"path": "res://assets/textures/entities/bacteria_spreader_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+	"bacteria_spawn": {
+		"path": "res://assets/textures/entities/bacteria_spawn_spritesheet.png",
+		"frames": 4,
+		"fps": 4.0,
+	},
+	"smiler": {
+		"path": "res://assets/textures/entities/smiler_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
 }
 
 ## Entity types that get lightweight sprite rendering only (no collision, health bar, signals).

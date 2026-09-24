@@ -116,6 +116,34 @@ def align(a, ref_xy, anchor, floor_row):
     return out
 
 
+def match_colour(gen, base, clip=(0.7, 1.4)):
+    """Remove COLOUR CAST from a generated frame without touching its brightness.
+
+    The generator drifts palette between calls — bacteria_spawn came back a saturated lime
+    against the shipped sprite's murky green, which reads as the object changing material
+    mid-loop. But it also makes deliberate brightness changes that ARE the animation: the
+    vending machine's frames differ because its case light rises and sags, and matching the
+    overall level would delete the animation it was asked for.
+
+    So the per-channel gain is split into the part common to all three channels (a
+    brightness change — keep it) and the per-channel deviation (a cast — remove it).
+    """
+    g = gen[:, :, 3] >= ALPHA_CUT
+    b = base[:, :, 3] >= ALPHA_CUT
+    if not g.any() or not b.any():
+        return gen, (1.0, 1.0, 1.0)
+    gains = []
+    for c in range(3):
+        gm, bm = gen[:, :, c][g].mean(), base[:, :, c][b].mean()
+        gains.append(bm / gm if gm > 1.0 else 1.0)
+    overall = float(np.prod(gains) ** (1.0 / 3.0))
+    factors = [float(np.clip(k / overall, *clip)) if overall > 1e-6 else 1.0 for k in gains]
+    out = gen.copy()
+    for c in range(3):
+        out[:, :, c] = np.clip(out[:, :, c].astype(np.float64) * factors[c], 0, 255).astype(np.uint8)
+    return out, tuple(round(k, 3) for k in factors)
+
+
 def iou(a, b):
     A, B = a[:, :, 3] > 128, b[:, :, 3] > 128
     union = (A | B).sum()
@@ -130,6 +158,8 @@ def main():
     ap.add_argument("--size", type=int, default=512)
     ap.add_argument("--gif", default=None)
     ap.add_argument("--iou-min", type=float, default=0.75)
+    ap.add_argument("--no-match-colour", action="store_true",
+                    help="skip pulling generated frames onto the base frame's palette")
     args = ap.parse_args()
 
     # The base is shipped art: cut it, but never repaint it. Generated frames are defringed
@@ -139,8 +169,12 @@ def main():
     for k, p in ((2, args.f2), (3, args.f3)):
         a, n = defringe(load_rgba(p, args.size))
         a = cut(a)
+        note = ""
+        if not args.no_match_colour:
+            a, gains = match_colour(a, frames[1])
+            note = f", cast correction RGB {gains}"
         frames[k] = a
-        print(f"  frame {k}: defringed {n} magenta edge pixels")
+        print(f"  frame {k}: defringed {n} magenta edge pixels{note}")
 
     base = frames[1]
     ref = centroid(base)
