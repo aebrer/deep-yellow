@@ -44,6 +44,14 @@ def fit(new_path: str, old_path: str, out_path: str) -> None:
 
     canvas = Image.new("RGBA", old.size, (0, 0, 0, 0))
     canvas.paste(crop, (int(round((ox0 + ox1) / 2 - fw / 2)), oy1 - fh), crop)
+
+    # Re-lancering a hard-cut sprite reintroduces intermediate alpha, and where that lands
+    # on a bright edge (a fogged lens) it leaves pale semi-transparent pixels — the same
+    # class of defect as the keyed white specks. The renderer point-samples sprites at
+    # sprite_pixel_snap and cuts alpha at 0.5, so partial alpha buys nothing here.
+    arr = np.array(canvas)
+    arr[:, :, 3] = np.where(arr[:, :, 3] >= ALPHA_MIN, 255, 0)
+    canvas = Image.fromarray(arr, "RGBA")
     canvas.save(out_path)
 
     cx0, cy0, cx1, cy1 = bbox(canvas)
