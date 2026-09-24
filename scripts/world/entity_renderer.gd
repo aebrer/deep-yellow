@@ -269,7 +269,7 @@ func render_chunk_entities(chunk: Chunk) -> void:
 			if entity_type in LIGHT_ONLY_ENTITIES:
 				if entity_billboards.has(world_pos):
 					continue
-				var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+				var entity_height = _entity_billboard_height(entity_type)
 				var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 					world_pos.x * 2.0 + 1.0, entity_height, world_pos.y * 2.0 + 1.0)
 
@@ -429,7 +429,7 @@ func _on_entity_moved(old_pos: Vector2i, new_pos: Vector2i) -> void:
 		entity_health_bars[new_pos] = health_bar
 
 	# Calculate new 3D position (use height override for this entity type)
-	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity.entity_type, BILLBOARD_HEIGHT)
+	var entity_height = _entity_billboard_height(entity.entity_type)
 	var new_world_3d = grid_3d.grid_to_world_centered(new_pos, entity_height) if grid_3d else Vector3(
 		new_pos.x * 2.0 + 1.0,
 		entity_height,
@@ -497,6 +497,37 @@ func _get_sprite_brightness() -> float:
 		return level.sprite_brightness
 	return 1.0
 
+## Fixtures set INTO the ceiling rather than standing on the floor.
+## A Sprite3D is a vertical quad and billboards turn to face the camera, so drawing a
+## recessed downlight that way puts half the housing inside the ceiling tile with the
+## other half slicing down into the room. These are laid flat, facing down, just under
+## the ceiling surface instead.
+const CEILING_MOUNTED_ENTITIES = ["poolroom_light", "fluorescent_light"]
+
+## How far below the ceiling surface a ceiling-mounted fixture is drawn, in metres.
+## Small enough to read as flush with the tile, large enough not to z-fight with it.
+const CEILING_PLANE_INSET := 0.02
+
+func _entity_billboard_height(entity_type: String) -> float:
+	"""Vertical centre for an entity's visual, honouring ceiling-mounted fixtures."""
+	var height: float = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+	if entity_type in CEILING_MOUNTED_ENTITIES:
+		height -= CEILING_PLANE_INSET
+	return height
+
+func _orient_as_ceiling_fixture(sprite: Sprite3D) -> void:
+	"""Lay a ceiling fixture flat under the ceiling plane instead of billboarding it.
+
+	Seen from below, a billboarded fixture rotates as the player walks and its housing
+	slices through the ceiling tile. Facing the quad down fixes both: it reads as set into
+	the tile, and the Examinable body (a child of the sprite) rotates with it, so looking up
+	at the fixture still picks it. double_sided keeps it visible from above, which is what
+	tactical view relies on.
+	"""
+	sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+	sprite.rotation_degrees = Vector3(90.0, 0.0, 0.0)  # quad normal +Z -> -Y (down)
+	sprite.double_sided = true
+
 func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	"""Create a visual node for an entity (billboard sprite or floor decal)
 
@@ -513,7 +544,7 @@ func _create_billboard_for_entity(entity: WorldEntity) -> Node3D:
 	if render_mode == RenderMode.FLOOR_DECAL:
 		return _create_floor_decal_for_entity(entity)
 
-	var entity_height = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
+	var entity_height = _entity_billboard_height(entity_type)
 	var world_3d = grid_3d.grid_to_world_centered(world_pos, entity_height) if grid_3d else Vector3(
 		world_pos.x * 2.0 + 1.0,
 		entity_height,
@@ -716,6 +747,9 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
 	sprite.position = world_3d
 
+	if entity_type in CEILING_MOUNTED_ENTITIES:
+		_orient_as_ceiling_fixture(sprite)
+
 	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
 	var final_size = BILLBOARD_SIZE * scale_mult
 
@@ -736,12 +770,12 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 	# Use a wide flat slab (not thin card) since billboard is rendering-only —
 	# the collision shape stays fixed in world space, needs to be hittable from below
 	if entity:
-		_add_examination_support(sprite, entity, final_size, Vector3(1.5, 0.2, 1.5))
+		_add_examination_support(sprite, entity, final_size, Vector3(1.5, 0.2, 1.5), entity_type in CEILING_MOUNTED_ENTITIES)
 
 	return sprite
 
 
-func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null) -> void:
+func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null, keep_collision_level: bool = false) -> void:
 	"""Add Examinable + StaticBody3D for raycast examination
 
 	Args:
@@ -749,12 +783,18 @@ func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: f
 		entity: WorldEntity for type/hostile info
 		default_size: Default collision box size (square)
 		collision_size: Optional Vector3 override for collision box dimensions
+		keep_collision_level: Undo the parent's rotation, for visuals that are laid flat
+			(ceiling fixtures). The box sizes are authored in world axes, so a rotated
+			parent would turn a flat hittable slab into a vertical card.
 	"""
 	var exam_body = StaticBody3D.new()
 	exam_body.name = "ExamBody"
 	exam_body.collision_layer = 8
 	exam_body.collision_mask = 0
 	node.add_child(exam_body)
+
+	if keep_collision_level:
+		exam_body.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 
 	var examinable = Examinable.new()
 	examinable.entity_id = entity.entity_type

@@ -71,6 +71,41 @@ var move_indicator: Node3D = null  # Set by Game node
 @onready var camera_rig: TacticalCamera = $CameraRig
 @onready var first_person_camera: FirstPersonCamera = $FirstPersonCamera
 
+## World-space size of the third-person avatar's sprite canvas (square texture).
+##
+## Sprite3D sizes itself from texture * pixel_size, and the pixel_size stored in
+## game_3d.tscn was calibrated against the original 64px sprite: its figure is 58px
+## tall, so 0.03 drew 1.74 m of player. The high-resolution sprite is 512px with a
+## 490px figure, which at that same literal 0.03 draws a 15 m giant clipping through
+## the ceiling. Deriving pixel_size from whatever texture is actually loaded keeps the
+## figure's height fixed no matter how the art is re-rendered or re-cropped.
+##
+## 1.82 m of canvas = 1.74 m of figure * 512/490. Model sits at y=0.9 in the scene,
+## which drops a ~1.8 m sprite's feet onto the floor — an independent confirmation
+## that ~1.8 m is what the scene was authored around.
+## The avatar draws the rear view (hazmat_suit_back.png). The sprite is billboarded, and
+## because the player's facing IS the camera's forward grid direction, the camera is
+## always behind him — so a front-facing sprite always reads as facing the wrong way.
+## The front view is still what the minimap and map overlay draw, where a visible visor
+## is the more identifiable icon.
+const AVATAR_WORLD_SIZE := 1.82
+
+func _setup_avatar_scale() -> void:
+	"""Pin the third-person avatar's world size to the sprite that actually loaded.
+
+	Without this, a re-render of the avatar art at a different resolution silently
+	rescales the player in tactical view, because the scene's pixel_size is a literal.
+	"""
+	var sprite := model as Sprite3D
+	if sprite == null:
+		push_warning("Player3D: $Model is not a Sprite3D — avatar size not calibrated")
+		return
+	if sprite.texture == null:
+		push_warning("Player3D: $Model has no texture — avatar size not calibrated")
+		return
+	var ref_px: int = maxi(sprite.texture.get_width(), sprite.texture.get_height())
+	sprite.pixel_size = AVATAR_WORLD_SIZE / float(ref_px)
+
 # ============================================================================
 # LIFECYCLE
 # ============================================================================
@@ -78,6 +113,9 @@ var move_indicator: Node3D = null  # Set by Game node
 func _ready() -> void:
 	# Add to player group for obstruction detection
 	add_to_group("player")
+
+	# Calibrate the third-person avatar against the sprite that actually loaded
+	_setup_avatar_scale()
 
 	# Initialize stats system
 	_initialize_stats()

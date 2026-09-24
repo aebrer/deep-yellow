@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://shaders/psx_sprite.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/hazmat_suit_back.png" id="2_texture"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+shader_parameter/billboard = false
+shader_parameter/y_billboard = true
+shader_parameter/alpha_scissor = 0.5
+shader_parameter/albedoTex = ExtResource("2_texture")

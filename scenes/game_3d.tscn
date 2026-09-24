@@ -8,8 +8,8 @@
 [ext_resource type="Script" path="res://scripts/player/states/executing_turn_state.gd" id="8_executing"]
 [ext_resource type="Script" path="res://scripts/player/states/pre_turn_state.gd" id="9_preturn"]
 [ext_resource type="Script" path="res://scripts/player/states/post_turn_state.gd" id="10_postturn"]
-[ext_resource type="Material" uid="uid://player_hazmat" path="res://assets/sprites/player/hazmat_suit.tres" id="11_hazmat_material"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/hazmat_suit.png" id="12_hazmat_texture"]
+[ext_resource type="Material" uid="uid://player_hazmat" path="res://assets/sprites/player/hazmat_suit_back.tres" id="11_hazmat_material"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/hazmat_suit_back.png" id="12_hazmat_texture"]
 [ext_resource type="Script" path="res://scripts/player/tactical_camera.gd" id="13_camera"]
 [ext_resource type="Script" path="res://scripts/player/first_person_camera.gd" id="14_fpcamera"]
 [ext_resource type="Script" path="res://scripts/ui/examination_crosshair.gd" id="15_crosshair"]
@@ -89,7 +89,7 @@ shape = SubResource("CapsuleShape3D_1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 material_override = ExtResource("11_hazmat_material")
 texture = ExtResource("12_hazmat_texture")
-pixel_size = 0.03
+pixel_size = 0.0035546875
 
 [node name="InputStateMachine" type="Node" parent="Player3D"]
 script = ExtResource("5_statemachine")
