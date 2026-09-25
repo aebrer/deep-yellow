@@ -115,6 +115,23 @@ static func swap_snap_sprite(sprite: Sprite3D, texture: Texture2D) -> void:
 	sprite.set_meta("snap_src_tex", texture)
 	_apply_snap_to_sprite(sprite)
 
+## Swap the whole animation on an already-snapped animated billboard.
+##
+## The light fixtures need this: a fixture's on and off states are separate atlas strips,
+## so a flicker is a SpriteFrames swap, not a texture swap. Sprite3D and AnimatedSprite3D
+## are siblings, so a caller holding a SpriteBase3D cannot use swap_snap_sprite() at all,
+## and assigning sprite_frames alone would leave the world size pinned from the old sheet
+## and the frame regions cut for the old atlas' pixel size.
+static func swap_snap_frames(sprite: AnimatedSprite3D, frames: SpriteFrames,
+		sheet: Texture2D, frame_count: int) -> void:
+	if not sprite.has_meta("snap_world_size"):
+		push_warning("swap_snap_frames: sprite has no snap state — call apply_snap_sprite() first")
+		return
+	sprite.sprite_frames = frames
+	sprite.set_meta("snap_src_tex", sheet)
+	sprite.set_meta("snap_frames", frame_count)
+	_apply_snap_to_sprite(sprite)
+
 static func _apply_snap_to_sprite(sprite: SpriteBase3D) -> void:
 	var frames: int = maxi(1, int(sprite.get_meta("snap_frames")))
 	var snapped := snap_texture(sprite.get_meta("snap_src_tex"), frames)

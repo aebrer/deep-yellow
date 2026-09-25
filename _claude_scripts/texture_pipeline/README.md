@@ -185,7 +185,10 @@ Then install, reimport, and validate:
 
     godot --headless --path . --import
     godot --headless --path . --quit
-    godot --headless --path . --script scripts/tools/verify_sprite_snap.gd
+    godot --headless --path . res://scenes/tools/verify_sprite_snap.tscn
+
+   It runs as a scene, not with `--script`: a bare `--script` run has no autoloads, so any
+   script naming one fails to compile and its checks are skipped without failing anything.
 
 ## Known gaps
 

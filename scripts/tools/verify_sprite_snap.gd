@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 ## Headless checks for billboard sizing and orientation.
 ##
 ## Regression 1: a billboard sizes itself from the texture it is actually showing
@@ -14,7 +14,14 @@ extends SceneTree
 ## Regression 3: ceiling fixtures were billboarded vertical quads centred on the ceiling
 ## plane, so half the housing sliced down through the tile into the room.
 ##
-## Run: godot --headless --script scripts/tools/verify_sprite_snap.gd
+## Run: godot --headless --path . res://scenes/tools/verify_sprite_snap.tscn
+##
+## It runs as a SCENE, not with --script, and that is not a detail: a bare --script run has
+## no autoloads, so every script that names one (Log, LevelManager) fails to compile and its
+## `.new()` silently returns nothing. The ceiling-fixture group ran zero checks that way for
+## its whole life while the summary still printed ALL CHECKS PASSED. Under a scene the
+## autoloads exist, the real renderers instantiate, and _group() below can tell a passing
+## group from a group that never ran.
 
 # Static access to the same script the Utilities autoload exposes
 const UtilitiesScript := preload("res://scripts/autoload/utilities.gd")
@@ -40,11 +47,34 @@ const CEILING_Y := 4.4
 ## and Sprite3D.ALPHA_CUT_DISCARD is the equivalent for billboards. In 8-bit alpha.
 const ALPHA_SCISSOR_8BIT := 128
 
+## How many inspections each group owes, counted against a full run and asserted by
+## _group(), so a group that aborts part-way is a failure instead of a smaller green blob.
+## Bump them when adding checks — a count that is too high fails loudly, which is the point.
+const SIZING_CHECKS := 40
+const AVATAR_CHECKS := 2
+const DECAL_CHECKS := 4
+## Fixture types rendered as ceiling-mounted quads, and the checks each one owes: hung,
+## laid flat, level pick volume, visible from above, animated, playing, swaps to dead,
+## still playing after the swap, still sized after the swap.
+const CEILING_TYPES := ["poolroom_light", "fluorescent_light"]
+const FIXTURE_CHECKS_PER_TYPE := 9
+
 var _failures := 0
 var _check_count := 0
 
 
-func _initialize() -> void:
+func _ready() -> void:
+	_group("sprite pixel-snap sizing", SIZING_CHECKS, _sizing)
+	_group("third-person avatar", AVATAR_CHECKS, _avatar_size)
+	_group("ceiling fixtures", _expected_fixtures(), _ceiling_fixtures)
+	_group("floor decal UV", DECAL_CHECKS, _decal_uv)
+	_group("spritesheet animations", _expected_sheets(), _sprite_sheets)
+	_group("hit VFX cast", 1, _hit_vfx_cast)
+
+
+
+## Everything the settings cycle can do to a billboard's size, at every snap level.
+func _sizing() -> void:
 	var entity_tex: Texture2D = load(ENTITY_TEX)
 	var sheet_tex: Texture2D = load(SHEET_TEX)
 	var tall_tex: Texture2D = load(TALL_TEX)
@@ -86,8 +116,10 @@ func _initialize() -> void:
 	UtilitiesScript.apply_snap_sprite(live, entity_tex, WORLD_SIZE)
 	var anim_live := _make_animated(sheet_tex, SHEET_FRAMES)
 	UtilitiesScript.apply_snap_sprite(anim_live, sheet_tex, WORLD_SIZE, SHEET_FRAMES)
-	root.add_child(live)
-	root.add_child(anim_live)
+	# Added to this node rather than the tree root: _ready runs while the root is still
+	# setting up its children, and add_child() there fails outright.
+	add_child(live)
+	add_child(anim_live)
 
 	for snap in [64.0, 0.0, 128.0]:
 		UtilitiesScript.set_sprite_pixel_snap(snap)
@@ -101,16 +133,43 @@ func _initialize() -> void:
 	_check("HD returns source texture", live.texture == entity_tex,
 			"got %s" % live.texture.resource_path)
 
-	_avatar_size()
-	_ceiling_fixtures()
-	_decal_uv()
-	_sprite_sheets()
-
 	if _failures == 0:
 		print("ALL CHECKS PASSED")
-		quit(0)
+		get_tree().quit(0)
 	print("%d CHECK(S) FAILED" % _failures)
-	quit(1)
+	get_tree().quit(1)
+
+
+## Run one check group and insist it produced the inspections it owes.
+##
+## A script error aborts only the call it happened in, so a group that dies on its first
+## line contributes nothing and the run still reports success. Every group therefore
+## declares its count up front; if the group aborts, the shortfall is the failure.
+func _group(what: String, want: int, fn: Callable) -> void:
+	var before := _check_count
+	fn.call()
+	var ran := _check_count - before
+	_check("%s ran every inspection" % what, ran >= want,
+			"only %d of %d inspections ran — the group aborted (missing autoload? renamed " \
+					% [ran, want] + "function? uncompiled script?)")
+
+
+## Fixtures: four checks per type (hung, laid flat, pick volume, visible from above) plus
+## the animated-pair checks and the floor-entity control.
+func _expected_fixtures() -> int:
+	return CEILING_TYPES.size() * FIXTURE_CHECKS_PER_TYPE + 1
+
+
+## Sheets: one registration check, the item-id guard, and eight inspections per strip
+## (entity strips plus item strips plus both strips of every ceiling fixture).
+func _expected_sheets() -> int:
+	var strips := EntityRendererScript.ENTITY_SPRITESHEETS.size() \
+			+ ItemRendererScript.ITEM_SPRITESHEETS.size()
+	for fixture in EntityRendererScript.CEILING_FIXTURE_SHEETS.values():
+		strips += 2  # lit and dead
+	# 3 for the registration and item-id guards, and each strip owes its own
+	# "ran every inspection" guard on top of the inspections themselves.
+	return 3 + strips * (SHEET_INSPECTIONS + 1)
 
 
 ## The avatar must keep drawing a human-sized figure whatever resolution the art ships at.
@@ -186,7 +245,7 @@ func _ceiling_fixtures() -> void:
 				"centre y=%.3f (want %.3f, ceiling is %.1f)" % [y, CEILING_Y - 0.02, CEILING_Y])
 
 		var entity = entity_script.new(type, Vector2i(3, 4))
-		var sprite: Sprite3D = renderer._create_light_fixture_sprite(type, Vector3(1, y, 1), entity)
+		var sprite: SpriteBase3D = renderer._create_light_fixture_sprite(type, Vector3(1, y, 1), entity)
 		_check("%s laid flat, not billboarded" % type,
 				sprite.billboard == BaseMaterial3D.BILLBOARD_DISABLED \
 				and is_equal_approx(sprite.rotation_degrees.x, 90.0),
@@ -201,6 +260,76 @@ func _ceiling_fixtures() -> void:
 	var plain_y: float = renderer._entity_billboard_height("sodden")
 	_check("floor entities keep their height", is_equal_approx(plain_y, 1.4),
 			"sodden centre y=%.3f" % plain_y)
+
+	# A fixture has to flicker AND animate: LightFixtureBehavior flips it between a lit and a
+	# dead strip every turn, and the two are separate atlas strips.
+	for type in CEILING_TYPES:
+		var entity2 = entity_script.new(type, Vector2i(9, 9))
+		var pos := Vector2i(9, 9)
+		var fixture_sprite = renderer._create_light_fixture_sprite(
+				type, Vector3(1, CEILING_Y - 0.02, 1), entity2)
+		var anim := fixture_sprite as AnimatedSprite3D
+		_check("%s flickers as an animation" % type, anim != null,
+				"fixture is a %s, but CEILING_FIXTURE_SHEETS declares strips" 				% fixture_sprite.get_class())
+		if anim != null:
+			var declared: Dictionary = renderer.CEILING_FIXTURE_SHEETS[type]
+			_check("%s fixture plays its strip" % type, anim.sprite_frames != null \
+							and anim.sprite_frames.get_frame_count("default") == int(declared["frames"]) \
+							and anim.is_playing(),
+					"frames=%d playing=%s" % [
+							0 if anim.sprite_frames == null else anim.sprite_frames.get_frame_count("default"),
+							str(anim.is_playing())])
+			# The swap the flicker system performs every turn. Sprite3D and AnimatedSprite3D
+			# are siblings, so a cast to the wrong one makes this a silent no-op: the room's
+			# baked light changes while the fixture keeps showing the other state.
+			renderer.entity_billboards[pos] = anim
+			renderer.light_entity_cache[pos] = entity2
+			var lit_atlas: Texture2D = anim.sprite_frames.get_frame_texture("default", 0).atlas
+			renderer._apply_flicker_visual(pos, false)
+			var dead_tex = anim.sprite_frames.get_frame_texture("default", 0)
+			var dead_atlas: Texture2D = dead_tex.atlas if dead_tex != null else null
+			_check("%s flicker swaps to the dead strip" % type, dead_atlas != null \
+							and dead_atlas != lit_atlas,
+					"still showing %s after being switched off" % [
+							"<nothing>" if dead_atlas == null else dead_atlas.resource_path])
+			_check("%s keeps animating after the swap" % type, anim.is_playing(),
+					"playback stopped when the state changed")
+			_check("%s dead strip is snapped and sized" % type,
+					is_equal_approx(float(_display_px(anim)) * anim.pixel_size,
+							float(renderer.BILLBOARD_SIZE) * float(
+									renderer.ENTITY_SCALE_OVERRIDES.get(type, 1.0))),
+					"world size %.3f m after the swap" % (float(_display_px(anim)) * anim.pixel_size))
+			renderer.entity_billboards.erase(pos)
+			renderer.light_entity_cache.erase(pos)
+		fixture_sprite.free()
+
+	renderer.free()
+
+
+## Regression 6: hit and death VFX are positioned off the entity's billboard. Both used a
+## `as Sprite3D` cast and returned early, which was harmless until entities started using
+## AnimatedSprite3D — at which point every animated enemy silently stopped showing damage
+## numbers. Sibling classes, so the common type is the only honest cast.
+func _hit_vfx_cast() -> void:
+	print("=== hit VFX on animated entities ===")
+	var renderer = load("res://scripts/world/entity_renderer.gd").new()
+	add_child(renderer)  # create_tween() needs the node inside the tree
+	var entity_script = load("res://scripts/world/world_entity.gd")
+	var pos := Vector2i(4, 4)
+
+	var anim := _make_animated(load(SHEET_TEX), SHEET_FRAMES)
+	renderer.entity_billboards[pos] = anim
+	add_child(anim)
+	renderer._spawn_hit_emoji(pos, "x", 3.0)
+	var labels := 0
+	for child in renderer.get_children():
+		if child is Label3D:
+			labels += 1
+	_check("animated entity shows a damage number", labels > 0,
+			"no Label3D was spawned for an AnimatedSprite3D billboard")
+
+	renderer.entity_billboards.erase(pos)
+	renderer.free()
 
 
 func _make_animated(sheet_tex: Texture2D, frames: int) -> AnimatedSprite3D:
@@ -328,6 +457,20 @@ func _sprite_sheets() -> void:
 		_check_sheet("item %s" % id, item_sheets[id],
 				float(ItemRendererScript.BILLBOARD_SIZE),
 				UtilitiesScript.SnapRef.LONGEST_SIDE)
+	# Ceiling fixtures declare a PAIR of strips (lit and dead), and the dead one is only
+	# ever seen when a flicker swaps to it — which is exactly when nobody looks at it.
+	for type in EntityRendererScript.CEILING_FIXTURE_SHEETS:
+		var pair: Dictionary = EntityRendererScript.CEILING_FIXTURE_SHEETS[type]
+		var size: float = float(EntityRendererScript.BILLBOARD_SIZE) * float(
+				EntityRendererScript.ENTITY_SCALE_OVERRIDES.get(type, 1.0))
+		for state in ["on", "off"]:
+			var cfg := {
+				"path": String(pair[state]),
+				"frames": int(pair["frames"]),
+				"fps": float(pair["fps_on"]) if state == "on" else float(pair["fps_off"]),
+			}
+			_check_sheet("fixture %s %s" % [type, state], cfg, size,
+					UtilitiesScript.SnapRef.WIDTH)
 
 
 const SHEET_INSPECTIONS := 6

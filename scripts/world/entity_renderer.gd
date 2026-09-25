@@ -28,7 +28,10 @@ class_name EntityRenderer extends Node3D
 ## Uses default_font.tres which has NotoColorEmoji as fallback
 const _EMOJI_FONT = preload("res://assets/fonts/default_font.tres")
 
-@onready var grid_3d: Grid3D = get_parent()
+## The renderer must be parented to its Grid3D. `as` rather than a bare assignment because a
+## bare one hard-crashes the whole script when it is instantiated anywhere else — including
+## the headless checks in scripts/tools, which build a renderer to inspect its sprites.
+@onready var grid_3d: Grid3D = get_parent() as Grid3D
 
 # ============================================================================
 # STATE
@@ -521,15 +524,37 @@ func tick_flicker() -> bool:
 	return any_changed
 
 func _apply_flicker_visual(pos: Vector2i, is_on: bool) -> void:
-	"""Swap sprite texture to match current flicker state."""
-	var sprite = entity_billboards.get(pos, null) as Sprite3D
+	"""Swap the fixture's art to match its current flicker state.
+
+	AnimatedSprite3D is a SIBLING of Sprite3D, not a subclass, so the obvious
+	`as Sprite3D` cast returns null for an animated fixture: the room's baked light would
+	keep changing while the fixture itself sat there glowing (or not) regardless of its
+	state. Both paths are taken explicitly instead, and a fixture that can show neither
+	state says so.
+	"""
+	var sprite: SpriteBase3D = entity_billboards.get(pos, null) as SpriteBase3D
 	if not sprite:
 		return
 	var entity: WorldEntity = light_entity_cache.get(pos, null)
-	if entity and entity.entity_type == "poolroom_light":
-		Utilities.swap_snap_sprite(sprite, _tex_poolroom_light_on if is_on else _tex_poolroom_light_off)
+	if not entity:
+		return
+
+	if sprite is AnimatedSprite3D:
+		var fixture: Dictionary = CEILING_FIXTURE_SHEETS.get(entity.entity_type, {})
+		if fixture.is_empty():
+			push_warning("Fixture at %s is animated but declares no CEILING_FIXTURE_SHEETS" 					% str(pos))
+			return
+		_apply_fixture_frames(sprite as AnimatedSprite3D, fixture, is_on, 0.0)
+		return
+
+	var tex: Texture2D = _tex_light_on if is_on else _tex_light_off
+	if entity.entity_type == "poolroom_light":
+		tex = _tex_poolroom_light_on if is_on else _tex_poolroom_light_off
+	if sprite is Sprite3D:
+		Utilities.swap_snap_sprite(sprite as Sprite3D, tex)
 	else:
-		Utilities.swap_snap_sprite(sprite, _tex_light_on if is_on else _tex_light_off)
+		push_warning("Fixture at %s cannot show its %s state on a %s" % [
+				str(pos), "lit" if is_on else "dead", sprite.get_class()])
 
 # ============================================================================
 # BILLBOARD CREATION
@@ -553,6 +578,29 @@ const CEILING_MOUNTED_ENTITIES = ["poolroom_light", "fluorescent_light"]
 ## Small enough to read as flush with the tile, large enough not to z-fight with it.
 const CEILING_PLANE_INSET := 0.02
 
+## Ceiling fixtures have idle animation too, but their config is a PAIR of strips: the
+## flicker system (LightFixtureBehavior) flips a fixture between lit and dead every turn,
+## and both states now animate — a tube that buzzes, and a tube that struggles to strike.
+## Keyed by the spawned entity type; the off strip is the same art the flicker system
+## already swapped to, so nothing about which fixture is on or off changes.
+const CEILING_FIXTURE_SHEETS = {
+	"fluorescent_light": {
+		"on": "res://assets/textures/entities/fluorescent_light_spritesheet.png",
+		"off": "res://assets/textures/entities/fluorescent_light_broken_spritesheet.png",
+		"frames": 4,
+		# A failing ballast buzzes, so the lit tube runs fast; the dead one pulses slowly.
+		"fps_on": 8.0,
+		"fps_off": 2.0,
+	},
+	"poolroom_light": {
+		"on": "res://assets/textures/entities/poolroom_light_spritesheet.png",
+		"off": "res://assets/textures/entities/poolroom_light_broken_spritesheet.png",
+		"frames": 4,
+		"fps_on": 4.0,
+		"fps_off": 2.0,
+	},
+}
+
 func _entity_billboard_height(entity_type: String) -> float:
 	"""Vertical centre for an entity's visual, honouring ceiling-mounted fixtures."""
 	var height: float = ENTITY_HEIGHT_OVERRIDES.get(entity_type, BILLBOARD_HEIGHT)
@@ -560,7 +608,7 @@ func _entity_billboard_height(entity_type: String) -> float:
 		height -= CEILING_PLANE_INSET
 	return height
 
-func _orient_as_ceiling_fixture(sprite: Sprite3D) -> void:
+func _orient_as_ceiling_fixture(sprite: SpriteBase3D) -> void:
 	"""Lay a ceiling fixture flat under the ceiling plane instead of billboarding it.
 
 	Seen from below, a billboarded fixture rotates as the player walks and its housing
@@ -742,8 +790,8 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 
 
 
-func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity: WorldEntity = null) -> Sprite3D:
-	"""Create a lightweight Sprite3D for a light fixture (no health bar or signals).
+func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity: WorldEntity = null) -> SpriteBase3D:
+	"""Create a lightweight sprite for a light fixture (no health bar or signals).
 
 	Used by LIGHT_ONLY_ENTITIES. Cheaper than _create_billboard_for_entity():
 	no health bar, no signal connections. But DOES include examination support
@@ -751,34 +799,26 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 
 	Args:
 		entity_type: Entity type for color/texture/scale lookup
-		world_3d: World position for the sprite
+		world_3d: World position for the fixture location
 		entity: WorldEntity for examination support (optional for backwards compat)
 
 	Returns:
-		Sprite3D positioned at the fixture location
+		SpriteBase3D positioned at the fixture location — an AnimatedSprite3D when the
+		fixture declares strips, a Sprite3D otherwise. Sprite3D and AnimatedSprite3D are
+		siblings, so the common type is the only one this can honestly return.
 	"""
-	var sprite := Sprite3D.new()
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	sprite.shaded = false
-	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
-	sprite.position = world_3d
+	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
+	var final_size = BILLBOARD_SIZE * scale_mult
+
+	var sprite := _build_fixture_sprite(entity_type, world_3d, final_size, scale_mult, entity)
+	if sprite == null:
+		return null
 
 	if entity_type in CEILING_MOUNTED_ENTITIES:
 		_orient_as_ceiling_fixture(sprite)
 
-	var scale_mult = ENTITY_SCALE_OVERRIDES.get(entity_type, 1.0)
-	var final_size = BILLBOARD_SIZE * scale_mult
-
-	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
-	if texture_path != "" and ResourceLoader.exists(texture_path):
-		var texture = load(texture_path) as Texture2D
-		if texture:
-			Utilities.apply_snap_sprite(sprite, texture, final_size)
-			var b = _get_sprite_brightness()
-			sprite.modulate = Color(b, b, b, 1.0)
-	else:
-		_apply_fallback_texture(sprite, entity_type, scale_mult)
+	var b = _get_sprite_brightness()
+	sprite.modulate = Color(b, b, b, 1.0)
 
 	# Shorter visibility range than gameplay entities — ceiling fixtures are small
 	sprite.visibility_range_end = 30.0
@@ -791,6 +831,73 @@ func _create_light_fixture_sprite(entity_type: String, world_3d: Vector3, entity
 
 	return sprite
 
+
+## Build a fixture's visual: an animated pair of strips when it declares them, the single
+## static sprite otherwise. Split out so the orientation, brightness, culling range and
+## examination slab above are written once for both kinds.
+func _build_fixture_sprite(entity_type: String, world_3d: Vector3, final_size: float,
+		scale_mult: float, entity: WorldEntity) -> SpriteBase3D:
+	var fixture: Dictionary = CEILING_FIXTURE_SHEETS.get(entity_type, {})
+	if not fixture.is_empty():
+		var anim := AnimatedSprite3D.new()
+		anim.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		anim.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		anim.shaded = false
+		anim.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+		anim.position = world_3d
+		# Start in the state the entity is actually in; the flicker system re-applies its
+		# own state on spawn, but a fixture loaded as dead must not flash lit first.
+		if _apply_fixture_frames(anim, fixture, entity == null or entity.flicker_on, final_size):
+			return anim
+		anim.free()
+
+	var sprite := Sprite3D.new()
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.shaded = false
+	sprite.alpha_cut = Sprite3D.ALPHA_CUT_DISCARD
+	sprite.position = world_3d
+
+	var texture_path = ENTITY_TEXTURES.get(entity_type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		var texture = load(texture_path) as Texture2D
+		if texture:
+			Utilities.apply_snap_sprite(sprite, texture, final_size)
+	else:
+		_apply_fallback_texture(sprite, entity_type, scale_mult)
+
+	return sprite
+
+
+## Point an animated fixture at its lit or dead strip and snap it to the PSX grid.
+##
+## Returns false when the strip cannot be loaded. The caller keeps whatever it already had
+## and says so — a fixture drawn in the wrong on/off state would be the game lying about
+## which lights are working, which is worse than a missing animation.
+func _apply_fixture_frames(sprite: AnimatedSprite3D, fixture: Dictionary, lit: bool,
+		world_size: float) -> bool:
+	var path: String = String(fixture["on"]) if lit else String(fixture["off"])
+	var fps: float = float(fixture["fps_on"]) if lit else float(fixture["fps_off"])
+	var frames: int = int(fixture["frames"])
+	if not ResourceLoader.exists(path):
+		push_warning("Fixture %s strip is missing: %s" % ["lit" if lit else "dead", path])
+		return false
+	var sheet := load(path) as Texture2D
+	if sheet == null:
+		push_warning("Fixture strip failed to load: %s" % path)
+		return false
+	var sprite_frames := AnimatedBillboard.build_frames(sheet, frames, fps)
+	if sprite_frames == null:
+		return false
+	# Assigned before snapping: _resnap_animated_sheet() re-cuts the regions of whatever
+	# sprite_frames the sprite is already holding, so it has to be holding this one.
+	sprite.sprite_frames = sprite_frames
+	if sprite.has_meta("snap_world_size"):
+		Utilities.swap_snap_frames(sprite, sprite_frames, sheet, frames)
+	else:
+		Utilities.apply_snap_sprite(sprite, sheet, world_size, frames)
+	sprite.play("default")
+	return true
 
 func _add_examination_support(node: Node3D, entity: WorldEntity, default_size: float, collision_size: Variant = null, keep_collision_level: bool = false) -> void:
 	"""Add Examinable + StaticBody3D for raycast examination
@@ -1177,7 +1284,7 @@ func _spawn_hit_emoji(world_pos: Vector2i, emoji: String, damage: float = 0.0) -
 	if not entity_billboards.has(world_pos):
 		return
 
-	var sprite = entity_billboards[world_pos] as Sprite3D
+	var sprite = entity_billboards[world_pos] as SpriteBase3D
 	if not sprite:
 		return
 
@@ -1350,7 +1457,7 @@ func _spawn_death_emoji(world_pos: Vector2i) -> void:
 	if not entity_billboards.has(world_pos):
 		return
 
-	var sprite = entity_billboards[world_pos] as Sprite3D
+	var sprite = entity_billboards[world_pos] as SpriteBase3D
 	if not sprite:
 		return
 

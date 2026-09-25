@@ -95,9 +95,40 @@ Per sprite:
 1. Generate frame 2 and frame 3 from the **shipped sprite as the reference image**, with
    `transparent: true`, asking for one clearly visible change and nothing else.
 2. `assemble_frames.py base.png f2.png f3.png <name>_spritesheet.png --anchor bottom|centre --gif preview.gif`
-3. Watch the GIF, then read the IoU it prints.
-4. Register the entry, `--import`, run `scripts/tools/verify_sprite_snap.gd`. Commit the
-   strip **and its `.import` file** — those are version-controlled now.
+3. `qa_sheet.py sheet.png ...` renders every frame through the same alpha cut the shader
+   applies, on a dim room grey. Reading a 2048px atlas is how a frame that lost a limb,
+   grew a black fin, or drifted off its floor line gets installed.
+4. Watch the GIF, then read the IoU it prints.
+5. Register the entry, `--import`, run
+   `godot --headless --path . res://scenes/tools/verify_sprite_snap.tscn`. Commit the strip
+   **and its `.import` file** — those are version-controlled now.
+
+### Which colour knobs to turn off
+
+`assemble_frames.py` matches each generated frame's per-channel means onto the base frame,
+because the generator drifts colour (a greenish cast on a coin, a blown-out brass knuckles).
+Two deviations from the default are deliberate:
+
+* **`--level-brightness` for items.** Matching normally keeps the *overall* brightness change
+  and removes only the per-channel cast — right for the vending machine and the glowing
+  bacteria, where brightness IS the animation. For a static object the model's brightness
+  drift is far larger than the highlight slide that was asked for, so items level it out too.
+* **`--no-match-colour` for anything whose animation is a colour change.** A dead tube's
+  orange ember or a dead dome's green pulse would otherwise be corrected straight back out
+  as if it were a cast.
+
+### Ceiling fixtures are a pair
+
+A fixture's on and off states are separate strips (`CEILING_FIXTURE_SHEETS` in
+`entity_renderer.gd`), because `LightFixtureBehavior` already swaps lit/dead art every turn.
+Both states animate: the lit tube buzzes at 8 fps, the dead one struggles to strike at 2.
+They are laid flat under the ceiling plane rather than billboarded, so they assemble with
+`--anchor centre`.
+
+**Hold the silhouette.** The first poolroom frame grew a 200-pixel drip hanging below the
+housing. IoU barely noticed (a hairline is almost no area) but the loop popped: a drip that
+appears and vanishes is a rendering bug, not weather. Say so in the prompt — "nothing may
+stick out beyond the housing, no drips, no strands".
 
 Playback order is baked into the strip as `1,2,3,2`: neutral, sway, neutral, sway-back. Two
 generated frames give a cycle that closes with no pop, at two generations per sprite.
