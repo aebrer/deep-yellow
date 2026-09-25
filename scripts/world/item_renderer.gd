@@ -52,6 +52,89 @@ const BILLBOARD_HEIGHT = 1.25
 ## reference, so frame 1 is always the shipped art and the loop is base, sway, sway-back.
 ## Items animate at BILLBOARD_SIZE on the longest side, exactly like their static versions.
 const ITEM_SPRITESHEETS = {
+	"almond_water": {
+		"path": "res://assets/textures/items/almond_water_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"antigonous_notebook": {
+		"path": "res://assets/textures/items/antigonous_notebook_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"baseball_bat": {
+		"path": "res://assets/textures/items/baseball_bat_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"binoculars": {
+		"path": "res://assets/textures/items/binoculars_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"brass_knuckles": {
+		"path": "res://assets/textures/items/brass_knuckles_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"coachs_whistle": {
+		"path": "res://assets/textures/items/coachs_whistle_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"drinking_bird": {
+		# The only item whose loop is a real action rather than a light shift: the bird
+		# dips its beak. It is anchored on its base instead of its centre so the stand
+		# stays planted, and it runs faster because a rocking toy is mechanical.
+		"path": "res://assets/textures/items/drinking_bird_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+	"lucky_rabbits_foot": {
+		"path": "res://assets/textures/items/lucky_rabbits_foot_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"meat": {
+		"path": "res://assets/textures/items/meat_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"mustard": {
+		"path": "res://assets/textures/items/mustard_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"roman_coin": {
+		"path": "res://assets/textures/items/roman_coin_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"shovel": {
+		"path": "res://assets/textures/items/shovel_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"sirens_cords": {
+		"path": "res://assets/textures/items/sirens_cords_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"trail_mix": {
+		"path": "res://assets/textures/items/trail_mix_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"vegetables": {
+		"path": "res://assets/textures/items/vegetables_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"wheatie_os": {
+		"path": "res://assets/textures/items/wheatie_os_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
 }
 
 const RARITY_COLORS = {

@@ -116,7 +116,7 @@ def align(a, ref_xy, anchor, floor_row):
     return out
 
 
-def match_colour(gen, base, clip=(0.7, 1.4)):
+def match_colour(gen, base, clip=(0.7, 1.4), level_brightness=False):
     """Remove COLOUR CAST from a generated frame without touching its brightness.
 
     The generator drifts palette between calls — bacteria_spawn came back a saturated lime
@@ -137,7 +137,14 @@ def match_colour(gen, base, clip=(0.7, 1.4)):
         gm, bm = gen[:, :, c][g].mean(), base[:, :, c][b].mean()
         gains.append(bm / gm if gm > 1.0 else 1.0)
     overall = float(np.prod(gains) ** (1.0 / 3.0))
-    factors = [float(np.clip(k / overall, *clip)) if overall > 1e-6 else 1.0 for k in gains]
+    if level_brightness:
+        # Items: the model's brightness drift is bigger than any highlight slide it was
+        # asked to draw, so level it out and keep only the cast correction. Entities leave
+        # this off — for the vending machine and the glowing bacteria the brightness change
+        # IS the animation.
+        factors = [float(np.clip(k, *clip)) for k in gains]
+    else:
+        factors = [float(np.clip(k / overall, *clip)) if overall > 1e-6 else 1.0 for k in gains]
     out = gen.copy()
     for c in range(3):
         out[:, :, c] = np.clip(out[:, :, c].astype(np.float64) * factors[c], 0, 255).astype(np.uint8)
@@ -158,6 +165,9 @@ def main():
     ap.add_argument("--size", type=int, default=512)
     ap.add_argument("--gif", default=None)
     ap.add_argument("--iou-min", type=float, default=0.75)
+    ap.add_argument("--level-brightness", action="store_true",
+                    help="also remove the overall brightness change (items: their drift is "
+                         "bigger than the highlight slide that was asked for)")
     ap.add_argument("--no-match-colour", action="store_true",
                     help="skip pulling generated frames onto the base frame's palette")
     args = ap.parse_args()
@@ -171,7 +181,7 @@ def main():
         a = cut(a)
         note = ""
         if not args.no_match_colour:
-            a, gains = match_colour(a, frames[1])
+            a, gains = match_colour(a, frames[1], level_brightness=args.level_brightness)
             note = f", cast correction RGB {gains}"
         frames[k] = a
         print(f"  frame {k}: defringed {n} magenta edge pixels{note}")

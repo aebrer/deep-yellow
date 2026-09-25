@@ -296,6 +296,28 @@ func _sprite_sheets() -> void:
 	print("=== spritesheet animations ===")
 	var entity_sheets = EntityRendererScript.ENTITY_SPRITESHEETS
 	var item_sheets = ItemRendererScript.ITEM_SPRITESHEETS
+
+	# A key that is not a real item id is invisible: the lookup misses, the item falls back to
+	# a static billboard, and nothing complains. Compare against the ITEM_ID consts instead.
+	var declared := {}
+	var items_dir := DirAccess.open("res://scripts/items")
+	_check("item scripts readable", items_dir != null, "res://scripts/items did not open")
+	if items_dir != null:
+		for fname in items_dir.get_files():
+			if not fname.ends_with(".gd"):
+				continue
+			var fa := FileAccess.open("res://scripts/items/" + fname, FileAccess.READ)
+			if fa == null:
+				continue
+			for line in fa.get_as_text().split("\n"):
+				if line.strip_edges().begins_with("const ITEM_ID"):
+					declared[line.get_slice("\"", 1)] = true
+	var unknown := ""
+	for id in item_sheets:
+		if not declared.has(id):
+			unknown += id + " "
+	_check("item sheet ids are real item ids", unknown == "",
+			"no item declares ITEM_ID for: %s — those sheets never play" % unknown)
 	_check("entity sheets registered", entity_sheets.size() > 0, "none")
 	for id in entity_sheets:
 		var world_size: float = float(EntityRendererScript.BILLBOARD_SIZE) * float(
