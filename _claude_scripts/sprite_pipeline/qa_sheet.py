@@ -15,13 +15,13 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 ROOM = (38, 40, 44)  # dim floor/wall grey, close to the lit average of a level-0 room
-ALPHA_CUT = 128
+ALPHA_CUT = 128  # billboards; floor decals cut at 26 (alpha_scissor 0.1)
 
 
-def cut(im):
+def cut(im, threshold=ALPHA_CUT):
     a = np.array(im.convert("RGBA"))
-    a[a[..., 3] >= ALPHA_CUT, 3] = 255
-    a[a[..., 3] < ALPHA_CUT, 3] = 0
+    a[a[..., 3] >= threshold, 3] = 255
+    a[a[..., 3] < threshold, 3] = 0
     return Image.fromarray(a)
 
 
@@ -30,6 +30,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--cell", type=int, default=190)
     ap.add_argument("--cols", type=int, default=4)
+    ap.add_argument("--alpha-cut", type=int, default=ALPHA_CUT)
     ap.add_argument("strips", nargs="+")
     args = ap.parse_args()
 
@@ -44,7 +45,7 @@ def main():
         for c in range(cols):
             f = c % n
             frame = cut(strip.crop((f * strip.height, 0, (f + 1) * strip.height, strip.height))
-                        .resize((cell, cell), Image.LANCZOS))
+                        .resize((cell, cell), Image.LANCZOS), args.alpha_cut)
             sheet.paste(frame, (c * cell, r * cell), frame)
         d.text((4, r * cell + 3), name, fill=(240, 240, 160))
     sheet.save(args.out)

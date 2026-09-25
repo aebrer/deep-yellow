@@ -39,7 +39,12 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-ALPHA_CUT = 128          # Sprite3D.ALPHA_CUT_DISCARD at the default 0.5 threshold
+## The alpha a sprite must exceed to be drawn at all. Billboards use
+## Sprite3D.ALPHA_CUT_DISCARD at the default 0.5 -> 128. Floor decals are different:
+## psx_lit_decal.gdshader is set up with alpha_scissor 0.1 -> 26, so cutting a decal strip
+## at 128 throws away pixels the game would draw (the shipped stairs decal has 20.9% of its
+## area between 26 and 128 — the water). --alpha-cut overrides it.
+ALPHA_CUT = 128
 MAGENTA_KEY = np.array([150.7, 54.1, 192.0])   # measured from returned RGBA output
 MAGENTA_TOL = 150.0      # summed abs RGB distance; the rim is a dark violet, not the key
 
@@ -116,7 +121,7 @@ def align(a, ref_xy, anchor, floor_row):
     return out
 
 
-def match_colour(gen, base, clip=(0.7, 1.4), level_brightness=False):
+def match_colour(gen, base, clip=(0.7, 1.4), level_brightness=False, bands=1):
     """Remove COLOUR CAST from a generated frame without touching its brightness.
 
     The generator drifts palette between calls — bacteria_spawn came back a saturated lime
@@ -128,26 +133,37 @@ def match_colour(gen, base, clip=(0.7, 1.4), level_brightness=False):
     So the per-channel gain is split into the part common to all three channels (a
     brightness change — keep it) and the per-channel deviation (a cast — remove it).
     """
-    g = gen[:, :, 3] >= ALPHA_CUT
-    b = base[:, :, 3] >= ALPHA_CUT
-    if not g.any() or not b.any():
-        return gen, (1.0, 1.0, 1.0)
-    gains = []
-    for c in range(3):
-        gm, bm = gen[:, :, c][g].mean(), base[:, :, c][b].mean()
-        gains.append(bm / gm if gm > 1.0 else 1.0)
-    overall = float(np.prod(gains) ** (1.0 / 3.0))
-    if level_brightness:
-        # Items: the model's brightness drift is bigger than any highlight slide it was
-        # asked to draw, so level it out and keep only the cast correction. Entities leave
-        # this off — for the vending machine and the glowing bacteria the brightness change
-        # IS the animation.
-        factors = [float(np.clip(k, *clip)) for k in gains]
-    else:
-        factors = [float(np.clip(k / overall, *clip)) if overall > 1e-6 else 1.0 for k in gains]
     out = gen.copy()
-    for c in range(3):
-        out[:, :, c] = np.clip(out[:, :, c].astype(np.float64) * factors[c], 0, 255).astype(np.uint8)
+    factors = (1.0, 1.0, 1.0)
+    h = gen.shape[0]
+    # A cast is not always global. The stairs decal came back with its lower third lit by
+    # the water and its dry upper steps tinted salmon — a whole-frame mean saw the two and
+    # called the palette close enough. Matching per horizontal band catches a cast that
+    # only covers part of the subject, which is what "change ONLY the water" breaks into.
+    for i in range(bands):
+        y0, y1 = h * i // bands, h * (i + 1) // bands
+        sel = np.zeros((h, 1), bool); sel[y0:y1, 0] = True
+        g = (gen[:, :, 3] >= ALPHA_CUT) & sel
+        b = (base[:, :, 3] >= ALPHA_CUT) & sel
+        if not g.any() or not b.any():
+            continue
+        gains = []
+        for c in range(3):
+            gm, bm = gen[:, :, c][g].mean(), base[:, :, c][b].mean()
+            gains.append(bm / gm if gm > 1.0 else 1.0)
+        overall = float(np.prod(gains) ** (1.0 / 3.0))
+        if level_brightness:
+            # Items: the model's brightness drift is bigger than any highlight slide it was
+            # asked to draw, so level it out and keep only the cast correction. Entities
+            # leave this off — for the vending machine and the glowing bacteria the
+            # brightness change IS the animation.
+            factors = [float(np.clip(k, *clip)) for k in gains]
+        else:
+            factors = [float(np.clip(k / overall, *clip)) if overall > 1e-6 else 1.0 for k in gains]
+        for c in range(3):
+            band = out[:, :, c].astype(np.float64)
+            band[y0:y1] = np.clip(band[y0:y1] * factors[c], 0, 255)
+            out[:, :, c] = band.astype(np.uint8)
     return out, tuple(round(k, 3) for k in factors)
 
 
@@ -158,6 +174,7 @@ def iou(a, b):
 
 
 def main():
+    global ALPHA_CUT
     ap = argparse.ArgumentParser()
     ap.add_argument("base"); ap.add_argument("f2"); ap.add_argument("f3"); ap.add_argument("out")
     ap.add_argument("--loop", default="1,2,3,2")
@@ -168,9 +185,20 @@ def main():
     ap.add_argument("--level-brightness", action="store_true",
                     help="also remove the overall brightness change (items: their drift is "
                          "bigger than the highlight slide that was asked for)")
+    ap.add_argument("--alpha-cut", type=int, default=ALPHA_CUT,
+                    help="alpha a pixel must reach to survive; 128 for billboards, 26 for "
+                         "floor decals (psx_lit_decal.gdshader uses alpha_scissor 0.1)")
+    ap.add_argument("--alpha-from-base", action="store_true",
+                    help="floor decals: give every frame the base's alpha (its transparency "
+                         "is authored art, and the generator repaints it)")
+    ap.add_argument("--band-match", type=int, default=1,
+                    help="match colour cast per horizontal band (full-bleed tiles whose "
+                         "change is confined to one part of the frame)")
     ap.add_argument("--no-match-colour", action="store_true",
                     help="skip pulling generated frames onto the base frame's palette")
     args = ap.parse_args()
+
+    ALPHA_CUT = args.alpha_cut
 
     # The base is shipped art: cut it, but never repaint it. Generated frames are defringed
     # BEFORE the cut — the cut makes every surviving pixel opaque, which would leave no
@@ -181,7 +209,8 @@ def main():
         a = cut(a)
         note = ""
         if not args.no_match_colour:
-            a, gains = match_colour(a, frames[1], level_brightness=args.level_brightness)
+            a, gains = match_colour(a, frames[1], level_brightness=args.level_brightness,
+                                                bands=args.band_match)
             note = f", cast correction RGB {gains}"
         frames[k] = a
         print(f"  frame {k}: defringed {n} magenta edge pixels{note}")
@@ -200,6 +229,19 @@ def main():
             worst = min(worst, score)
             flag = "ok" if score >= args.iou_min else "DRIFTS TOO MUCH"
             print(f"  frame {k}: silhouette IoU vs base {score:.3f}  ({flag})")
+
+    if args.alpha_from_base:
+        # Floor decals: the shipped tile's alpha is authored art (the stairs' water is
+        # deliberately semi-transparent so the floor reads through it) and the generator
+        # repaints it however it likes — it filled the water fully opaque. Transparency is
+        # not what was asked to animate, so every frame inherits the base's.
+        for k in placed:
+            if k != 1:
+                placed[k][:, :, 3] = base[:, :, 3]
+
+    if float((base[:, :, 3] > 128).mean()) > 0.95:
+        print("  note: the base fills its canvas, so silhouette IoU cannot see anything "
+              "here — judge this loop by eye")
 
     order = [int(x) for x in args.loop.split(",")]
     n = len(order)

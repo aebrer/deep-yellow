@@ -110,6 +110,34 @@ const ENTITY_COLORS = {
 	"barrel_fire": Color(1.0, 0.4, 0.1),            # Orange flame
 }
 
+## Floor-decal idle animations: entity type -> atlas strip. These cannot live in
+## ENTITY_SPRITESHEETS because that dict drives billboards; a decal is a quad with a lit
+## custom shader, so Grid3D swaps its albedoTex instead (get_animated_lit_decal_material).
+## Both stair pairs share one art file, so both entries point at the same strip and animate
+## in lockstep.
+const FLOOR_DECAL_SHEETS = {
+	"exit_hole": {
+		"path": "res://assets/textures/entities/exit_hole_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,  # Frost light lifting off the rim — slow, it is still a hole in the ground
+	},
+	"tutorial_to_lobby_stairs": {
+		"path": "res://assets/textures/entities/exit_hole_spritesheet.png",
+		"frames": 4,
+		"fps": 2.0,
+	},
+	"lobby_to_poolrooms_stairs": {
+		"path": "res://assets/textures/entities/lobby_to_poolrooms_stairs_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,  # Caustics on the submerged steps
+	},
+	"poolrooms_to_lobby_stairs": {
+		"path": "res://assets/textures/entities/lobby_to_poolrooms_stairs_spritesheet.png",
+		"frames": 4,
+		"fps": 3.0,
+	},
+}
+
 ## Entity render modes: BILLBOARD (default, faces camera) or FLOOR_DECAL (flat on ground)
 enum RenderMode { BILLBOARD, FLOOR_DECAL }
 const ENTITY_RENDER_MODES = {
@@ -740,7 +768,15 @@ func _create_floor_decal_for_entity(entity: WorldEntity) -> MeshInstance3D:
 	# lightmap). Falls back to the old flat material only if Grid3D has no floor
 	# material to derive from, in which case it warns.
 	var mat: Material = null
-	if texture and grid_3d:
+	var sheet: Dictionary = FLOOR_DECAL_SHEETS.get(entity_type, {})
+	if not sheet.is_empty() and grid_3d:
+		mat = grid_3d.get_animated_lit_decal_material(
+				String(sheet["path"]), int(sheet["frames"]), float(sheet["fps"]))
+		if mat == null:
+			# Loud, and then keep the static art: a decal that quietly stops animating is
+			# invisible to notice, and an exit that renders nothing at all is worse.
+			push_warning("Decal %s: animated strip unavailable, falling back to static art" 					% entity_type)
+	if mat == null and texture and grid_3d:
 		mat = grid_3d.get_lit_decal_material(texture)
 	if mat == null:
 		var unshaded := StandardMaterial3D.new()

@@ -52,7 +52,8 @@ const ALPHA_SCISSOR_8BIT := 128
 ## Bump them when adding checks — a count that is too high fails loudly, which is the point.
 const SIZING_CHECKS := 40
 const AVATAR_CHECKS := 2
-const DECAL_CHECKS := 4
+## Four UV checks plus six per decal type with an animated strip (4 types).
+const DECAL_CHECKS := 28
 ## Fixture types rendered as ceiling-mounted quads, and the checks each one owes: hung,
 ## laid flat, level pick volume, visible from above, animated, playing, swaps to dead,
 ## still playing after the swap, still sized after the swap.
@@ -415,6 +416,51 @@ func _decal_uv() -> void:
 	var tone: Color = mat.get_shader_parameter("modulate_color")
 	_check("decal still matches the floor's tone", tone == Color(1.35, 1.45, 1.44),
 			"modulate_color=%s — the decal would not light like its floor" % str(tone))
+
+	# Animated decals: the strip has to be cut into real textures (Godot hands a shader the
+	# atlas and drops an AtlasTexture's region), and the material has to advance through them.
+	for type in EntityRendererScript.FLOOR_DECAL_SHEETS:
+		var sheet: Dictionary = EntityRendererScript.FLOOR_DECAL_SHEETS[type]
+		var frames: Array[Texture2D] = grid.split_strip(
+				load(String(sheet["path"])), int(sheet["frames"]))
+		_check("%s decal strip cuts into frames" % type,
+				frames.size() == int(sheet["frames"]),
+				"%d frames from %s" % [frames.size(), sheet["path"]])
+		if frames.size() != int(sheet["frames"]):
+			continue
+		var frame_w: int = load(String(sheet["path"])).get_width() / int(sheet["frames"])
+		var wrong := ""
+		for i in frames.size():
+			# AtlasTexture would sample the whole strip: every frame identical.
+			if frames[i] is AtlasTexture or frames[i].get_width() != frame_w \
+					or frames[i].get_height() != load(String(sheet["path"])).get_height():
+				wrong = "frame %d is %s %dx%d, want %dx%d" % [
+						i, frames[i].get_class(), frames[i].get_width(),
+						frames[i].get_height(), frame_w,
+						load(String(sheet["path"])).get_height()]
+				break
+		_check("%s decal frames are whole textures" % type, wrong == "", wrong)
+
+		var anim_mat: ShaderMaterial = grid.get_animated_lit_decal_material(
+				String(sheet["path"]), int(sheet["frames"]), float(sheet["fps"]))
+		_check("%s animated decal material built" % type, anim_mat != null, "null")
+		if anim_mat == null:
+			continue
+		# Compared by object identity among the frames the MATERIAL is holding — split_strip
+		# called twice returns equal-but-distinct textures, and comparing against a second
+		# split would test the cache rather than the ticker.
+		var first: Texture2D = anim_mat.get_shader_parameter("albedoTex")
+		var seen := {}
+		for i in int(sheet["frames"]):
+			grid._tick_animated_decals(1.0)
+			seen[anim_mat.get_shader_parameter("albedoTex")] = true
+		_check("%s decal advances its frame" % type, seen.size() > 1,
+				"albedoTex never changed — the decal is frozen on one frame")
+		_check("%s decal shows each frame once per cycle" % type,
+				seen.size() == int(sheet["frames"]),
+				"%d distinct frames over %d ticks" % [seen.size(), int(sheet["frames"])])
+		_check("%s decal loops back to its first frame" % type, seen.has(first),
+				"never returned to the frame it started on")
 
 
 ## Regression 5: every declared spritesheet must cut into equal frames, snap, and keep its

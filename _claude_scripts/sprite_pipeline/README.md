@@ -130,6 +130,34 @@ housing. IoU barely noticed (a hairline is almost no area) but the loop popped: 
 appears and vanishes is a rendering bug, not weather. Say so in the prompt — "nothing may
 stick out beyond the housing, no drips, no strands".
 
+### Floor decals (the level exits)
+
+Exits are quads with a lit custom shader, not billboards, so they animate through
+`FLOOR_DECAL_SHEETS` in `entity_renderer.gd` and `Grid3D.get_animated_lit_decal_material()`
+instead of `AnimatedBillboard`. Three things are different, and each one bit once:
+
+* **The frames are not `AtlasTexture`s.** Godot hands a shader the atlas and drops the region
+  (godotengine/godot#70604), so every frame would sample the whole strip. `split_strip()`
+  crops real `ImageTexture`s out of the strip and `_process()` swaps `albedoTex`. It also
+  keeps `pixel_snap_resolution` giving 128 samples *per frame* instead of per strip.
+* **`--alpha-cut 26`, not 128.** The decal shader runs `alpha_scissor 0.1`, not the
+  billboard's 0.5. The shipped stairs decal has 20.9% of its area between 26 and 128 — the
+  water — and cutting at 128 throws away pixels the game draws.
+* **`--alpha-from-base`.** A full-bleed tile's alpha is authored art (the water is
+  deliberately semi-transparent so the floor reads through) and the generator repaints it —
+  it filled the water fully opaque, which would pop the water between solid and see-through
+  every frame.
+
+IoU cannot see anything on a full-bleed tile (the silhouette is the whole square), so the
+script says so and the loop has to be judged by eye. Use `--band-match 4` as well: the
+stairs came back with a salmon cast on the dry upper steps that a whole-frame mean averaged
+away, and matching per horizontal band is what caught it.
+
+**`transparent: false` for full-bleed tiles.** The standing rule is `transparent: true`, and
+for sprites it is right. But the RGBA pipeline treats an enclosed dark region as background:
+told to animate a hole in the snow, it cut the hole out and left white sky where the void
+should be. A tile that fills its square has nothing to cut out, so ask for no transparency.
+
 Playback order is baked into the strip as `1,2,3,2`: neutral, sway, neutral, sway-back. Two
 generated frames give a cycle that closes with no pop, at two generations per sprite.
 

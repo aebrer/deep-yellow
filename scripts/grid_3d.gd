@@ -708,6 +708,7 @@ func _build_all_lit_materials() -> void:
 const LIT_DECAL_SHADER := preload("res://shaders/psx_lit_decal.gdshader")
 
 var _lit_decal_materials: Dictionary = {}  # texture path -> ShaderMaterial
+var _animated_decals: Dictionary = {}  # sheet path -> {mat, frames, fps, elapsed, index}
 
 
 func get_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
@@ -723,19 +724,108 @@ func get_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
 	if _lit_decal_materials.has(key):
 		return _lit_decal_materials[key]
 
-	if floor_materials.is_empty():
-		push_warning("[Grid3D] No floor material cached — decal %s will not match floor lighting" % key)
+	var mat := _derive_lit_decal_material(texture)
+	if mat == null:
+		return null
+	_lit_decal_materials[key] = mat
+	return mat
+
+
+## Lit material for a floor decal that plays an atlas strip.
+##
+## A decal is a quad with a custom shader, not a Sprite3D, so there is no AnimatedSprite3D
+## to hand the strip to — the frames are swapped on the material's albedoTex instead, by
+## _process(). The frames are real textures cropped out of the strip rather than
+## AtlasTextures, because Godot hands a shader the atlas and drops the region
+## (godotengine/godot#70604): every frame would sample the whole strip.
+##
+## All decals sharing a strip share this one material, so identical exits animate in
+## lockstep — which is what a single light source down there would do anyway.
+##
+## Returns null when no floor material is cached yet, exactly like get_lit_decal_material().
+func get_animated_lit_decal_material(sheet_path: String, frame_count: int, fps: float) -> ShaderMaterial:
+	var key := "anim:%s" % sheet_path
+	if _lit_decal_materials.has(key):
+		return _lit_decal_materials[key]
+
+	var sheet := load(sheet_path) as Texture2D
+	if sheet == null:
+		push_warning("[Grid3D] Decal spritesheet failed to load: %s" % sheet_path)
+		return null
+	var frames := split_strip(sheet, frame_count)
+	if frames.is_empty():
+		push_warning("[Grid3D] Decal spritesheet could not be cut into frames: %s" % sheet_path)
 		return null
 
-	# Derive tone from the level's floor material so the decal brightens and darkens
-	# exactly like the tiles around it. UV is NOT derived: a floor's uv_scale is a
-	# TILING factor (level 1 tiles its texture 2x2 across one cell), and the shader
-	# applies it as UV = UV * uv_scale before sampling, so inheriting it sampled the
-	# decal's art twice per axis and wrapped it — four staircases in one cell. A decal
-	# shows its sprite once, so uv_scale is 1 and uv_offset is 0. Texel size still
-	# lands where sprites want it: pixel_snap_resolution snaps UV after scaling, so the
-	# sprite resolves to 128 samples across the cell, the same budget apply_snap_sprite
-	# gives billboarded entities.
+	var mat := _derive_lit_decal_material(frames[0])
+	if mat == null:
+		return null
+	_lit_decal_materials[key] = mat
+	_animated_decals[key] = {"mat": mat, "frames": frames, "fps": fps, "elapsed": 0.0, "index": 0}
+	return mat
+
+
+## Cut a horizontal atlas strip into standalone textures.
+##
+## Frames get their own ImageTexture rather than an AtlasTexture region for the reason above:
+## a custom shader sampling an AtlasTexture sees the whole atlas. Each frame maps UV 0..1
+## onto itself, which also keeps pixel_snap_resolution giving a full 128 samples per frame
+## instead of 128 across the whole strip.
+static func split_strip(sheet: Texture2D, frame_count: int) -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	if frame_count < 2:
+		push_warning("[Grid3D] %s declares %d frames, need at least 2" % [sheet.resource_path, frame_count])
+		return frames
+	if sheet.get_width() % frame_count != 0:
+		push_warning("[Grid3D] %s is %d px wide, not divisible by %d frames" % [
+				sheet.resource_path, sheet.get_width(), frame_count])
+		return frames
+	var img := sheet.get_image()
+	if img == null or img.is_empty():
+		push_warning("[Grid3D] %s has no readable image to cut frames from" % sheet.resource_path)
+		return frames
+	if img.is_compressed():
+		# Same trap as Utilities.snap_texture: VRAM-compressed data cannot be cropped in place.
+		if img.decompress() != OK:
+			push_warning("[Grid3D] %s could not be decompressed to cut frames from" % sheet.resource_path)
+			return frames
+	var frame_w: int = sheet.get_width() / frame_count
+	for i in frame_count:
+		var region := img.get_region(Rect2i(i * frame_w, 0, frame_w, img.get_height()))
+		frames.append(ImageTexture.create_from_image(region))
+	return frames
+
+
+## Advance every animated decal material. Runs before _process()'s early return: a decal
+## has no player-light or proximity-fade business to do, and it should keep shimmering even
+## when there is no player node yet.
+func _tick_animated_decals(delta: float) -> void:
+	for key in _animated_decals:
+		var state: Dictionary = _animated_decals[key]
+		var frames: Array = state["frames"]
+		var step: float = 1.0 / maxf(0.01, float(state["fps"]))
+		state["elapsed"] = float(state["elapsed"]) + delta
+		if float(state["elapsed"]) < step:
+			continue
+		state["elapsed"] = 0.0
+		state["index"] = (int(state["index"]) + 1) % frames.size()
+		(state["mat"] as ShaderMaterial).set_shader_parameter("albedoTex", frames[int(state["index"])])
+
+
+## Build a lit decal material from the level's floor tone. Shared by the static and animated
+## paths so the two cannot drift apart in how they light.
+##
+## Tone is derived from the floor; UV is NOT. A floor's uv_scale is a TILING factor (level 1
+## tiles its texture 2x2 across one cell), and the shader applies it as UV = UV * uv_scale
+## before sampling, so inheriting it sampled the decal's art twice per axis and wrapped it —
+## four staircases in one cell. A decal shows its sprite once, so uv_scale is 1 and
+## uv_offset is 0. Texel size still lands where sprites want it: pixel_snap_resolution snaps
+## UV after scaling, so the sprite resolves to 128 samples across the cell, the same budget
+## apply_snap_sprite gives billboarded entities.
+func _derive_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
+	if floor_materials.is_empty():
+		push_warning("[Grid3D] No floor material cached — decal %s will not match floor lighting" 				% texture.resource_path)
+		return null
 	var floor_mat: ShaderMaterial = floor_materials[0]
 	var mat := ShaderMaterial.new()
 	mat.shader = LIT_DECAL_SHADER
@@ -744,8 +834,6 @@ func get_lit_decal_material(texture: Texture2D) -> ShaderMaterial:
 	mat.set_shader_parameter("alpha_scissor", 0.1)
 	mat.set_shader_parameter("uv_scale", Vector2.ONE)
 	mat.set_shader_parameter("uv_offset", Vector2.ZERO)
-
-	_lit_decal_materials[key] = mat
 	register_lit_material(mat)
 	return mat
 
@@ -777,6 +865,9 @@ var _flicker_tick_accumulator := 0.0
 func _process(delta: float) -> void:
 	"""Update shader uniforms: proximity fade + lightmap rebuild + player light + flicker"""
 	_frame_count += 1
+	# Decals animate on their own: they need neither the player position nor a lit-material
+	# list to be populated, and the early return below would otherwise freeze them.
+	_tick_animated_decals(delta)
 
 	if not player_node or all_lit_materials.is_empty():
 		if _frame_count % 60 == 0:
