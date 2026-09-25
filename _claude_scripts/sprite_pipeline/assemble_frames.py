@@ -191,6 +191,12 @@ def main():
     ap.add_argument("--alpha-from-base", action="store_true",
                     help="floor decals: give every frame the base's alpha (its transparency "
                          "is authored art, and the generator repaints it)")
+    ap.add_argument("--clip-to-base", action="store_true",
+                    help="cut every frame to the base frame's silhouette (stops the "
+                         "generator inventing drips and wisps outside the subject)")
+    ap.add_argument("--max-brightness", type=float, default=10.0,
+                    help="allowed spread of mean luminance across frames; glowing things "
+                         "that pulse (vending machines, bacteria) need this raised")
     ap.add_argument("--band-match", type=int, default=1,
                     help="match colour cast per horizontal band (full-bleed tiles whose "
                          "change is confined to one part of the frame)")
@@ -229,6 +235,35 @@ def main():
             worst = min(worst, score)
             flag = "ok" if score >= args.iou_min else "DRIFTS TOO MUCH"
             print(f"  frame {k}: silhouette IoU vs base {score:.3f}  ({flag})")
+
+    if args.clip_to_base:
+        # The generator cannot be talked out of adding a drip hanging off a fogged light
+        # fixture — three attempts, three drips, and a drip that appears for one frame is a
+        # rendering bug. The base frame IS the subject's extent, so cut every frame to it.
+        keep = base[:, :, 3] >= ALPHA_CUT
+        for k in placed:
+            if k != 1:
+                placed[k][~keep] = 0
+
+    # Brightness report. Silhouette IoU cannot see a loop that keeps its outline and flips
+    # its lighting: the poolroom downlight measured 0.97 on every frame while alternating
+    # meanL 119 / 139, which reads as the fixture switching itself on and off — on top of a
+    # flicker system that already does that on purpose. Report the swing; --max-brightness
+    # decides when it is a failure rather than a look.
+    lum = []
+    for k in sorted(placed):
+        a = placed[k]
+        m = a[:, :, 3] >= ALPHA_CUT
+        rgb = a[:, :, :3][m].astype(np.float64) if m.any() else np.zeros((1, 3))
+        lum.append(float((rgb * np.array([0.299, 0.587, 0.114])).sum(axis=1).mean()))
+    swing = max(lum) - min(lum)
+    print("  mean luminance per frame: " + " ".join(f"{v:.1f}" for v in lum)
+          + f"  (swing {swing:.1f})")
+    if swing > args.max_brightness:
+        print(f"  WARNING: brightness swings {swing:.1f} (limit {args.max_brightness}). For a "
+              "fixture or a static item that reads as the object switching itself on and off; "
+              "re-generate asking for the SAME light level, or assemble with "
+              "--level-brightness.", file=sys.stderr)
 
     if args.alpha_from_base:
         # Floor decals: the shipped tile's alpha is authored art (the stairs' water is

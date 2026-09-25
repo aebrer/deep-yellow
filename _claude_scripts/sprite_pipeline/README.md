@@ -117,6 +117,33 @@ Two deviations from the default are deliberate:
   orange ember or a dead dome's green pulse would otherwise be corrected straight back out
   as if it were a cast.
 
+### Brightness is the other half of the check
+
+Silhouette IoU says nothing about a loop that keeps its outline and flips its lighting. The
+first poolroom downlight scored 0.97 on every frame while alternating mean luminance
+119 / 139 — which reads as the fixture switching itself on and off, on top of a flicker
+system that already does that on purpose. Its dead twin scored 0.98 while collapsing 58 → 21.
+Drew caught both by eye; the metric said they were fine.
+
+`assemble_frames.py` now prints mean luminance per frame and the spread across the loop, and
+warns above `--max-brightness` (default 10). Fix it by re-generating with the light level
+pinned in the prompt — "it stays ON in every frame, do not dim it" — and assemble with
+`--level-brightness` so any residual global drift is removed. The poolroom pair went
+19.9 → 1.3 and 38.7 → 2.7.
+
+What the limit is *not* for: the vending machine's case light, the barrel fire, the
+fluorescent buzz and the bacteria's glow swing 15-35 points on purpose. Raise
+`--max-brightness` for those rather than flattening the animation — the flag exists to catch
+a fixture going dark when the game did not ask it to.
+
+Sweeping every installed strip with the same metric is a few lines of Python and worth doing
+after a batch: the defect is invisible in a filmstrip and obvious in a room.
+
+**`--clip-to-base`** cuts every frame to the base frame's silhouette. Asked to fog a light
+fixture, the model added a drip hanging below the housing on three consecutive attempts —
+and a drip that exists for one frame is a rendering bug, not weather. The base frame *is*
+the subject's extent, so clip to it instead of negotiating with the prompt again.
+
 ### Ceiling fixtures are a pair
 
 A fixture's on and off states are separate strips (`CEILING_FIXTURE_SHEETS` in
